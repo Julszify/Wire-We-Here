@@ -145,5 +145,23 @@
 	],
 	"rack": {
 		"reach_m": 3.0
+	},
+	"cord": {
+		"_kommentar": "C.O.R.D. folgt dem Spieler und stellt die Bestellfalle",
+		"follow_behind_m": -0.4,
+		"follow_side_m": -1.5,
+		"hover_height_m": 1.6,
+		"follow_speed": 3.0,
+		"first_ask_s": 30.0,
+		"ask_interval_min_s": 45.0,
+		"ask_interval_max_s": 90.0,
+		"answer_time_s": 6.0,
+		"order_count": 100,
+		"order_heap_radius_m": 3.0,
+		"order_heap_peak_m": 1.8,
+		"order_distance_m": 5.5,
+		"drop_height_m": 9.0,
+		"drop_time_s": 0.8,
+		"drop_stagger_s": 0.6
 	}
 }

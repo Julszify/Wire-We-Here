@@ -62,7 +62,7 @@ Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
 
 Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
-**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Tab öffnet das Tablet (Upgrades kaufen, Spiel läuft weiter); gekaufte Rollen werden vor der Figur aufgestellt.
+**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Tab öffnet das Tablet (Upgrades kaufen, Spiel läuft weiter); N sagt „Nein“ zu C.O.R.D.s Bestellfrage; gekaufte Rollen werden vor der Figur aufgestellt.
 
 **Wichtige Kabel (entschieden in M6, angepasst in M6.5):** genau 20 in der ganzen Zone, zufällig verteilt, leuchten und tragen ein Etikett (Port + Dienst). Man rollt sie normal auf; statt Geld entsteht ein beschriftetes Knäuel, das man zum Server-Schrank trägt und mit E einsteckt (Q legt es ab). Ports werden der Reihe nach vergeben. Reaktivierte Dienste schalten Upgrades frei (`data/services.json`, Feld `unlocks`).
 
@@ -119,7 +119,7 @@ Alle Werte gehören in Datendateien (Godot-Resources oder JSON), nicht in den Co
 5. ✅ Geld, Knoten, Handkurbel als erstes Upgrade, Motorrolle
 6. ✅ Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
 6.5 ✅ Ganze Zone voller Kabel auf einmal: großer Kabelberg, 6 Haufen und Streukabel (ca. 525 Kabel, `data/zone.json`), genau 20 wichtige Kabel zufällig verteilt
-7. C.O.R.D.-Platzhalter und Bestellfalle
+7. ✅ C.O.R.D.-Platzhalter und Bestellfalle (erste Frage nach 30 s, dann alle 45–90 s, 6 s Zeit für „Nein“, sonst fallen 100 Kabel neben den Spieler)
 8. Speichern und Laden
 
 Engine: Godot 4.7 mit GDScript (bestätigt).

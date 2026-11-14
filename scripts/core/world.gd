@@ -46,6 +46,13 @@ var _target_item: CoilItem
 var _target_rack := false
 var _end_marker: MeshInstance3D
 
+# C.O.R.D. und Bestellfalle
+var _cord: CordLogic
+var _cord_view: CordView
+var _cord_prompt: CordPrompt
+var _landing: Dictionary = {}  # Kabel-ID -> Sekunden seit Beginn des Falls (negativ = wartet noch)
+var _orders := 0
+
 
 func _ready() -> void:
 	_system = CableSystem.new()
@@ -87,12 +94,26 @@ func _ready() -> void:
 	_player.look_toward(ZONE_CENTER)
 	_apply_upgrades()
 
+	_cord = CordLogic.new()
+	add_child(_cord)
+	_cord.setup(hash([int(Balancing.zone.get("seed", 1234)), "cord"]))
+	_cord.order_requested.connect(_on_order_requested)
+	_cord.order_declined.connect(_on_order_declined)
+	_cord.order_placed.connect(_on_order_placed)
+	_cord_view = CordView.new()
+	add_child(_cord_view)
+	_cord_view.global_position = _player.global_position + Vector3(1, 1.3, 1)
+	_cord_prompt = CordPrompt.new()
+	_hud.add_child(_cord_prompt)
+
 	# Nur zum automatischen Testen, siehe _apply_test_args
 	_apply_test_args()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("tablet") and not _tablet.visible:
+	if event.is_action_pressed("decline"):
+		_cord.decline()
+	elif event.is_action_pressed("tablet") and not _tablet.visible:
 		get_viewport().set_input_as_handled()
 		_open_tablet()
 
@@ -116,6 +137,11 @@ func _process(delta: float) -> void:
 
 	if _carried:
 		_item_views[_carried.id].follow_arm(arm)
+
+	_cord_view.follow(_player.global_position, _player.facing(), delta)
+	if _cord.phase == CordLogic.Phase.ASKING:
+		_cord_prompt.update_time(_cord.time_left)
+	_update_landing(delta)
 
 	# Knoten-Markierungen pulsieren
 	for m: MeshInstance3D in _knot_markers.values():
@@ -296,7 +322,103 @@ func _on_service_activated(port_id: int, service_name: String, unlocks: String) 
 		_show_message("Dienst „%s“ läuft wieder." % service_name)
 
 
+func _on_order_requested(answer_time: float) -> void:
+	_cord_view.set_asking(true, "Ersatz bestellen?")
+	_cord_prompt.show_question(answer_time)
+
+
+func _on_order_declined() -> void:
+	_cord_view.set_asking(false)
+	_cord_prompt.visible = false
+	_show_message("C.O.R.D.: „Bestellung storniert. Ich merke mir das.“")
+
+
+func _on_order_placed(count: int) -> void:
+	_cord_view.set_asking(false)
+	_cord_prompt.visible = false
+	_spawn_order(count)
+	_show_message("C.O.R.D.: „Ersatz bestellt: %d Kabel. Gern geschehen!“" % count)
+
+
 # --- Hilfen ---------------------------------------------------------------
+
+## Neue Lieferung: ein Haufen fällt neben dem Spieler vom Himmel.
+func _spawn_order(count: int) -> void:
+	var c: Dictionary = Balancing.cord
+	var radius: float = c["order_heap_radius_m"]
+	var center := _find_free_spot(radius)
+	_orders += 1
+	var heap := HeapData.new(_zone.heaps.size(), hash([_zone.rng_seed, "order", _orders]), center, count,
+		radius, float(c["order_heap_peak_m"]), HeapData.Kind.HEAP)
+	heap.name = "Lieferung %d" % _orders
+	_zone.heaps.append(heap)
+	var stagger: float = c["drop_stagger_s"]
+	var i := 0
+	for cable in heap.create_cables(_next_cable_id):
+		_system.add_cable(cable)
+		var view := CableView.new()
+		add_child(view)
+		view.setup(cable)
+		view.position.y = float(c["drop_height_m"])
+		_views[cable.id] = view
+		_landing[cable.id] = -stagger * float(i) / maxf(count, 1)
+		i += 1
+	_next_cable_id += heap.cable_count
+
+
+## Fall-Animation der gelieferten Kabel; erst nach der Landung greifbar.
+func _update_landing(delta: float) -> void:
+	if _landing.is_empty():
+		return
+	var c: Dictionary = Balancing.cord
+	var fall: float = c["drop_time_s"]
+	var height: float = c["drop_height_m"]
+	for id in _landing.keys():
+		var t: float = _landing[id] + delta
+		_landing[id] = t
+		var view: CableView = _views.get(id)
+		if view == null:
+			_landing.erase(id)
+			continue
+		var k := clampf(t / fall, 0.0, 1.0)
+		view.position.y = height * (1.0 - k * k)  # beschleunigter Fall
+		if k >= 1.0:
+			view.position.y = 0.0
+			_landing.erase(id)
+
+
+func _grabbable_cables() -> Array:
+	if _landing.is_empty():
+		return _system.cables.values()
+	return _system.cables.values().filter(func(c: CableData) -> bool: return not _landing.has(c.id))
+
+
+## Freier Platz für einen neuen Haufen in der Nähe des Spielers.
+func _find_free_spot(radius: float) -> Vector3:
+	var dist: float = Balancing.cord["order_distance_m"]
+	var half := float(Balancing.zone.get("floor_size_m", 90)) * 0.5 - radius - 1.0
+	var base := atan2(_player.facing().z, _player.facing().x)
+	# Zuerst Plätze in Blickrichtung prüfen, dann abwechselnd weiter links/rechts
+	var order: Array[int] = [0]
+	for k in range(1, 7):
+		order.append(k)
+		order.append(-k)
+	for ring in 4:
+		for step in order:
+			var a := base + step * TAU / 12.0
+			var pos := _player.global_position + Vector3(cos(a), 0.0, sin(a)) * (dist + ring * 3.0)
+			pos.y = 0.0
+			if absf(pos.x) > half or absf(pos.z) > half:
+				continue
+			if _zone.heap_at(pos, radius + 0.5) != null:
+				continue
+			if Vector2(pos.x - _rack_pos.x, pos.z - _rack_pos.z).length() < radius + 2.0:
+				continue
+			return pos
+	var fallback := _player.global_position + _player.facing() * dist
+	fallback.y = 0.0
+	return fallback
+
 
 ## Upgrade-Wirkungen an Logik und Spielfigur weitergeben
 func _apply_upgrades() -> void:
@@ -352,7 +474,7 @@ func _update_targets() -> void:
 	if _target_knot == null and _target_reel == null and not _arm_busy():
 		_target_item = _find_item(origin, dir, pos)
 		if _target_item == null:
-			_target_end = CableTargeting.find_end(_system.cables.values(), origin, dir, pos)
+			_target_end = CableTargeting.find_end(_grabbable_cables(), origin, dir, pos)
 	var holding := not _arm_reel.is_free()
 	_crosshair.targeting = _target_knot != null or _target_end != null or _target_item != null or _target_rack \
 		or (holding and _target_reel != null and _target_reel.is_free())
@@ -554,3 +676,7 @@ func _apply_test_args() -> void:
 		_plug_carried()
 	if opts.has("tablet"):
 		_open_tablet()
+	if opts.has("ask"):
+		_cord.ask_now()
+	if opts.has("order"):
+		_spawn_order(int(Balancing.cord["order_count"]))
