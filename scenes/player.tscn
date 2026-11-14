@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 
@@ -12,8 +12,8 @@ roughness = 0.6
 
 [sub_resource type="CapsuleMesh" id="body_mesh"]
 material = SubResource("suit_mat")
-radius = 0.35
-height = 1.3
+radius = 0.33
+height = 0.9
 
 [sub_resource type="StandardMaterial3D" id="skin_mat"]
 albedo_color = Color(0.96, 0.8, 0.65, 1)
@@ -38,6 +38,20 @@ material = SubResource("skin_mat")
 radius = 0.07
 height = 0.14
 
+[sub_resource type="StandardMaterial3D" id="pants_mat"]
+albedo_color = Color(0.2, 0.22, 0.28, 1)
+roughness = 0.7
+
+[sub_resource type="CapsuleMesh" id="leg_mesh"]
+material = SubResource("pants_mat")
+radius = 0.12
+height = 0.62
+
+[sub_resource type="CapsuleMesh" id="upper_arm_mesh"]
+material = SubResource("suit_mat")
+radius = 0.07
+height = 0.32
+
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1_player")
 
@@ -48,7 +62,7 @@ shape = SubResource("body_shape")
 [node name="Body" type="Node3D" parent="."]
 
 [node name="Torso" type="MeshInstance3D" parent="Body"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.98, 0)
 mesh = SubResource("body_mesh")
 
 [node name="Head" type="MeshInstance3D" parent="Body"]
@@ -59,15 +73,55 @@ mesh = SubResource("head_mesh")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.25)
 mesh = SubResource("nose_mesh")
 
-[node name="WrapArm" type="Node3D" parent="Body"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 1.0, -0.1)
+[node name="LegL" type="Node3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 0.62, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Body/LegL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.31, 0)
+mesh = SubResource("leg_mesh")
+
+[node name="LegR" type="Node3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.62, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Body/LegR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.31, 0)
+mesh = SubResource("leg_mesh")
+
+[node name="ArmR" type="Node3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.22, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Body/ArmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, 0)
+mesh = SubResource("upper_arm_mesh")
+
+[node name="ForearmR" type="Node3D" parent="Body/ArmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.24, 0)
+rotation = Vector3(0.2, 0, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Body/ArmR/ForearmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.18, 0)
+mesh = SubResource("forearm_mesh")
+
+[node name="Hand" type="MeshInstance3D" parent="Body/ArmR/ForearmR"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.4, 0)
+mesh = SubResource("hand_mesh")
+
+[node name="UpperArmL" type="Node3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.22, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Body/UpperArmL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, 0)
+mesh = SubResource("upper_arm_mesh")
+
+[node name="WrapArm" type="Node3D" parent="Body/UpperArmL"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.24, 0)
 rotation = Vector3(0, 0.6109, 0)
 
-[node name="Forearm" type="MeshInstance3D" parent="Body/WrapArm"]
+[node name="Forearm" type="MeshInstance3D" parent="Body/UpperArmL/WrapArm"]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -0.18)
 mesh = SubResource("forearm_mesh")
 
-[node name="Hand" type="MeshInstance3D" parent="Body/WrapArm"]
+[node name="Hand" type="MeshInstance3D" parent="Body/UpperArmL/WrapArm"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.4)
 mesh = SubResource("hand_mesh")
 

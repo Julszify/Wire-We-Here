@@ -9,7 +9,11 @@ signal pull_pressed
 signal release_pressed
 
 @onready var _body: Node3D = $Body
-@onready var _arm: Node3D = $Body/WrapArm
+@onready var _arm: Node3D = $Body/UpperArmL/WrapArm
+@onready var _arm_l: Node3D = $Body/UpperArmL
+@onready var _arm_r: Node3D = $Body/ArmR
+@onready var _leg_l: Node3D = $Body/LegL
+@onready var _leg_r: Node3D = $Body/LegR
 @onready var _yaw: Node3D = $CameraYaw
 @onready var _pitch: Node3D = $CameraYaw/CameraPitch
 @onready var _spring: SpringArm3D = $CameraYaw/CameraPitch/SpringArm3D
@@ -25,6 +29,7 @@ var tether_anchor := Vector3.ZERO
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
+var _walk_phase := 0.0
 
 
 func _ready() -> void:
@@ -67,6 +72,7 @@ func _physics_process(delta: float) -> void:
 	velocity.z = dir.z * speed
 	velocity.y = 0.0 if is_on_floor() else velocity.y - _gravity * delta
 	move_and_slide()
+	_animate_walk(delta, Vector2(velocity.x, velocity.z).length(), float(p["walk_speed_m_per_s"]))
 
 	# Mit Kabel in der Hand: nicht weiter als die Leine vom Haufen weg
 	if holding:
@@ -110,11 +116,26 @@ func arm_transform() -> Transform3D:
 	return _arm.global_transform
 
 
+## Einfaches Beine- und Armschwingen, Stärke abhängig vom Tempo
+func _animate_walk(delta: float, speed: float, walk_speed: float) -> void:
+	_walk_phase += delta * speed * 2.4
+	var amount := clampf(speed / walk_speed, 0.0, 1.0)
+	var swing := sin(_walk_phase) * 0.6 * amount
+	var k := 1.0 - exp(-15.0 * delta)
+	_leg_l.rotation.x = lerpf(_leg_l.rotation.x, swing, k)
+	_leg_r.rotation.x = lerpf(_leg_r.rotation.x, -swing, k)
+	_arm_r.rotation.x = lerpf(_arm_r.rotation.x, -swing * 0.8, k)
+	# Linker Arm schwingt nur ohne Kabel; mit Kabel bleibt er ruhig
+	var left := 0.0 if holding else swing * 0.8
+	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, left, k)
+
+
 func _update_arm_pose() -> void:
 	if _arm == null:
 		return
-	# Mit Kabel: Unterarm waagerecht nach vorn; sonst hängt er herunter
-	_arm.rotation.x = 0.0 if holding else deg_to_rad(-80)
+	# Mit Kabel: Unterarm waagerecht nach vorn; sonst hängt er leicht angewinkelt herunter
+	# (mit Kabel zusätzlich 35° nach außen gedreht, damit das Knäuel neben dem Körper sichtbar ist)
+	_arm.rotation = Vector3(0.0, deg_to_rad(35), 0.0) if holding else Vector3(deg_to_rad(-70), 0.0, 0.0)
 
 
 func _wiggle_arm() -> void:

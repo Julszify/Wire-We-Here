@@ -158,6 +158,9 @@ func _make_marker() -> MeshInstance3D:
 
 func _apply_test_args() -> void:
 	var args := OS.get_cmdline_user_args()
+	for arg in args:
+		if arg.begins_with("--orbit=") and not args.has("--grab"):
+			_player.orbit_camera(float(arg.trim_prefix("--orbit=")))
 	if not args.has("--grab"):
 		return
 	# Nächstes Kabelende greifen und optional vorwickeln
