@@ -33,7 +33,8 @@
 		"cable_count": 20
 	},
 	"economy": {
-		"money_per_meter": 0.5
+		"money_per_meter": 0.5,
+		"starting_money": 0.0
 	},
 	"upgrades": {
 		"crank": {
@@ -55,7 +56,7 @@
 			"effect_factor": 1.4
 		},
 		"extra_reel": {
-			"name": "Weitere Motorrolle",
+			"name": "Motorrolle",
 			"base_cost": 15.0,
 			"cost_growth": 1.8,
 			"max_count": 8
@@ -108,7 +109,8 @@
 		"mouse_sensitivity": 0.003,
 		"reach_m": 2.8,
 		"aim_radius_m": 0.35,
-		"tether_length_m": 6.0
+		"tether_length_m": 6.0,
+		"reel_reach_m": 3.2
 	},
 	"arm": {
 		"_kommentar": "Kabel zwischen Hand und Ellbogen um den Arm gewickelt",
@@ -119,5 +121,13 @@
 		"loop_lateral_step_m": 0.022,
 		"point_step_m": 0.05,
 		"connector_sag_m": 0.35
+	},
+	"knot": {
+		"untie_presses": 3,
+		"marker_radius_m": 0.16
+	},
+	"placement": {
+		"distance_ahead_m": 2.2,
+		"min_heap_clearance_m": 1.3
 	}
 }

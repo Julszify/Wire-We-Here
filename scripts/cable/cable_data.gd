@@ -24,6 +24,8 @@ var state: State = State.HEAP
 var pulled_m: float = 0.0
 var reel_id: int = -1
 var knots_solved: int = 0
+## Tastendrücke am aktuellen Knoten
+var knot_presses: int = 0
 
 
 ## Erzeugt ein Kabel vollständig aus dem Seed. Gleicher Seed = gleiches Kabel.
@@ -56,6 +58,16 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3) -> CableD
 ## Fortschritt 0..1
 func progress() -> float:
 	return clampf(pulled_m / length_m, 0.0, 1.0) if length_m > 0.0 else 0.0
+
+
+## Position des nächsten ungelösten Knotens in Metern, INF wenn keiner mehr kommt
+func next_knot_m() -> float:
+	return knots_m[knots_solved] if knots_solved < knots_m.size() else INF
+
+
+## Hängt das Kabel gerade an einem Knoten fest?
+func is_stuck() -> bool:
+	return pulled_m >= next_knot_m() - 1e-5
 
 
 func color() -> Color:

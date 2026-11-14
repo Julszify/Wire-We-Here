@@ -111,6 +111,13 @@ func orbit_camera(degrees: float) -> void:
 	_yaw.rotation.y += deg_to_rad(degrees)
 
 
+## Blickrichtung des Körpers (waagerecht)
+func facing() -> Vector3:
+	var f := -_body.global_basis.z
+	f.y = 0.0
+	return f.normalized()
+
+
 ## Globale Lage des Unterarms, um den das Kabel gewickelt wird
 func arm_transform() -> Transform3D:
 	return _arm.global_transform

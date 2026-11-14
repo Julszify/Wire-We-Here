@@ -62,7 +62,9 @@ Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
 
 Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
-**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben.
+**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Vorläufiger Laden bis M6: Taste 1 Handkurbel, Taste 2 Motorrolle (wird vor der Figur aufgestellt).
+
+**Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 
 **Technischer Hinweis:** In `.tscn`-Dateien Drehungen als `rotation = Vector3(...)` schreiben, nicht als Transform3D-Matrix; Godot speichert die Matrix zeilenweise, das führt leicht zu gespiegelten Drehungen.
 
@@ -111,8 +113,8 @@ Alle Werte gehören in Datendateien (Godot-Resources oder JSON), nicht in den Co
 1. ✅ Godot-Projekt anlegen, Ordnerstruktur, leere Testszene mit Boden und Kamera
 2. ✅ Ein einzelnes Kabel als Tube-Mesh aus einer zufälligen Kurve erzeugen
 3. ✅ Kabel an eine Rolle hängen und per Taste ziehen, inklusive Aufwickeln
-4. Haufen mit 20 Kabeln, Spielfigur, Anvisieren, Kabelende greifen und per Hand um den Arm wickeln
-5. Geld, Knoten, Handkurbel als erstes Upgrade, Motorrolle
+4. ✅ Haufen mit 20 Kabeln, Spielfigur, Anvisieren, Kabelende greifen und per Hand um den Arm wickeln
+5. ✅ Geld, Knoten, Handkurbel als erstes Upgrade, Motorrolle
 6. Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
 7. C.O.R.D.-Platzhalter und Bestellfalle
 8. Speichern und Laden

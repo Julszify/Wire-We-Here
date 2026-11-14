@@ -1,7 +1,7 @@
 class_name CableSystem
 extends Node
 ## Spiellogik für Kabel und Aufwickler (Arm, Handkurbel, Motorrolle):
-## einhängen, ziehen, loslassen, fertigstellen.
+## einhängen, umhängen, ziehen, Knoten lösen, loslassen, fertigstellen.
 ## Hält nur Daten und sendet Signale; Darstellung hört zu.
 ## Später läuft genau diese Logik beim Koop-Host, Clients bekommen den Zustand.
 
@@ -9,6 +9,9 @@ signal cable_hooked(cable: CableData, reel: ReelData)
 signal cable_pulled(cable: CableData, reel: ReelData, meters: float)
 signal cable_released(cable: CableData, reel: ReelData)
 signal cable_completed(cable: CableData, reel: ReelData)
+signal knot_hit(cable: CableData, reel: ReelData)
+signal knot_progress(cable: CableData, presses: int, needed: int)
+signal knot_solved(cable: CableData)
 
 var cables: Dictionary = {}  # id -> CableData
 var reels: Dictionary = {}   # id -> ReelData
@@ -30,6 +33,10 @@ func cable_on(reel: ReelData) -> CableData:
 	return cables.get(reel.cable_id) if reel.cable_id >= 0 else null
 
 
+func reel_of(cable: CableData) -> ReelData:
+	return reels.get(cable.reel_id) if cable.reel_id >= 0 else null
+
+
 ## Hängt ein Kabel aus dem Haufen an einen freien Aufwickler. Gibt false zurück, wenn nicht möglich.
 func hook(cable: CableData, reel: ReelData) -> bool:
 	if cable.state != CableData.State.HEAP or not reel.is_free():
@@ -42,44 +49,86 @@ func hook(cable: CableData, reel: ReelData) -> bool:
 	return true
 
 
+## Hängt ein Kabel von einem Aufwickler an einen anderen (z. B. Arm -> Rolle).
+## Der Fortschritt bleibt erhalten.
+func transfer(from_reel: ReelData, to_reel: ReelData) -> bool:
+	var cable := cable_on(from_reel)
+	if cable == null or not to_reel.is_free():
+		return false
+	from_reel.cable_id = -1
+	from_reel.pending_m = 0.0
+	cable.reel_id = to_reel.id
+	to_reel.cable_id = cable.id
+	to_reel.pending_m = 0.0
+	cable_hooked.emit(cable, to_reel)
+	return true
+
+
 ## Ein Tastendruck (Arm oder Handkurbel). Die Meter werden über einige Frames
 ## abgearbeitet, damit das Ziehen flüssig aussieht.
 func press(reel: ReelData) -> void:
 	if reel.kind == ReelData.Kind.MOTOR or reel.is_free():
 		return
+	var cable := cable_on(reel)
+	if cable.is_stuck():
+		return
 	reel.pending_m += float(reel.tuning()["pull_per_press_m"])
 
 
+## Ein Tastendruck am Knoten. Nach genügend Drücken ist der Knoten gelöst.
+func untie(cable: CableData) -> void:
+	if not cable.is_stuck():
+		return
+	var needed := int(Balancing.knot["untie_presses"])
+	cable.knot_presses += 1
+	knot_progress.emit(cable, cable.knot_presses, needed)
+	if cable.knot_presses >= needed:
+		cable.knot_presses = 0
+		cable.knots_solved += 1
+		knot_solved.emit(cable)
+
+
 ## Kabel loslassen: es rutscht komplett zurück in den Haufen, der Fortschritt geht verloren.
+## Bereits gelöste Knoten bleiben gelöst.
 func release(reel: ReelData) -> void:
 	var cable := cable_on(reel)
 	if cable == null:
 		return
 	cable.state = CableData.State.HEAP
 	cable.pulled_m = 0.0
+	cable.knot_presses = 0
 	cable.reel_id = -1
 	reel.cable_id = -1
 	reel.pending_m = 0.0
 	cable_released.emit(cable, reel)
 
 
-## Zieht `meters` am Kabel des Aufwicklers. Gibt die tatsächlich gezogenen Meter zurück.
+## Zieht `meters` am Kabel des Aufwicklers, höchstens bis zum nächsten Knoten.
+## Gibt die tatsächlich gezogenen Meter zurück.
 func pull(reel: ReelData, meters: float) -> float:
 	var cable := cable_on(reel)
-	if cable == null or meters <= 0.0:
+	if cable == null or meters <= 0.0 or cable.is_stuck():
 		return 0.0
-	var applied := minf(meters, cable.length_m - cable.pulled_m)
+	var limit := minf(cable.length_m, cable.next_knot_m())
+	var applied := minf(meters, limit - cable.pulled_m)
 	cable.pulled_m += applied
 	cable_pulled.emit(cable, reel, applied)
 	if cable.pulled_m >= cable.length_m - 1e-5:
 		cable.pulled_m = cable.length_m
 		_complete(cable, reel)
+	elif cable.is_stuck():
+		reel.pending_m = 0.0
+		knot_hit.emit(cable, reel)
 	return applied
 
 
 func _process(delta: float) -> void:
 	for reel: ReelData in reels.values():
-		if reel.pending_m > 0.0:
+		if reel.is_free():
+			continue
+		if reel.kind == ReelData.Kind.MOTOR:
+			pull(reel, float(Balancing.motor_reel["pull_speed_m_per_s"]) * delta)
+		elif reel.pending_m > 0.0:
 			var feed: float = reel.tuning()["feed_speed_m_per_s"]
 			var step := minf(reel.pending_m, feed * delta)
 			reel.pending_m -= step

@@ -14,6 +14,8 @@ var motor_reel: Dictionary = {}
 var reel: Dictionary = {}
 var player: Dictionary = {}
 var arm: Dictionary = {}
+var knot: Dictionary = {}
+var placement: Dictionary = {}
 
 
 func _init() -> void:
@@ -40,3 +42,5 @@ func reload() -> void:
 	reel = parsed.get("reel", {})
 	player = parsed.get("player", {})
 	arm = parsed.get("arm", {})
+	knot = parsed.get("knot", {})
+	placement = parsed.get("placement", {})
