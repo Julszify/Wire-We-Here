@@ -1,0 +1,123 @@
+{
+	"_kommentar": "Balancing-Werte für den Vertical Slice. Startwerte aus dem Browser-Prototyp.",
+	"cable": {
+		"length_min_m": 15.0,
+		"length_max_m": 30.0,
+		"radius_m": 0.055,
+		"tube_sides": 8,
+		"path_samples": 180,
+		"control_points_min": 7,
+		"control_points_max": 10,
+		"knot_chance": 0.55,
+		"double_knot_chance": 0.4,
+		"knot_min_fraction": 0.2,
+		"knot_max_fraction": 0.85,
+		"palette": [
+			"#d6453d",
+			"#f2c230",
+			"#2f6fd6",
+			"#2f9e5b",
+			"#8a55d6",
+			"#eceff2",
+			"#e07b2a",
+			"#3b4350"
+		]
+	},
+	"heap": {
+		"radius_m": 2.5,
+		"inner_fraction": 0.85,
+		"min_height_m": 0.1,
+		"base_height_m": 0.25,
+		"peak_extra_height_m": 1.7,
+		"end_height_m": 0.12,
+		"cable_count": 20
+	},
+	"economy": {
+		"money_per_meter": 0.5
+	},
+	"upgrades": {
+		"crank": {
+			"name": "Handkurbel",
+			"base_cost": 8.0,
+			"cost_growth": 1.0,
+			"max_count": 1
+		},
+		"grip": {
+			"name": "Festerer Griff",
+			"base_cost": 10.0,
+			"cost_growth": 1.9,
+			"effect_factor": 1.5
+		},
+		"motor": {
+			"name": "Stärkere Motoren",
+			"base_cost": 40.0,
+			"cost_growth": 2.2,
+			"effect_factor": 1.4
+		},
+		"extra_reel": {
+			"name": "Weitere Motorrolle",
+			"base_cost": 15.0,
+			"cost_growth": 1.8,
+			"max_count": 8
+		},
+		"copper": {
+			"name": "Kupferhändler",
+			"base_cost": 60.0,
+			"cost_growth": 2.3,
+			"effect_factor": 1.35
+		},
+		"auto_pull": {
+			"name": "Dauerzug",
+			"_kommentar": "Taste gedrückt halten statt wiederholt drücken",
+			"base_cost": 30.0,
+			"cost_growth": 1.0,
+			"max_count": 1,
+			"presses_per_second": 4.0
+		}
+	},
+	"hand_crank": {
+		"_kommentar": "Erstes Werkzeug-Upgrade, aufstellbar",
+		"pull_per_press_m": 0.75,
+		"feed_speed_m_per_s": 3.0
+	},
+	"motor_reel": {
+		"pull_speed_m_per_s": 0.25
+	},
+	"reel": {
+		"drum_radius_m": 0.5,
+		"drum_height_m": 0.9,
+		"flange_radius_m": 0.95,
+		"coil_start_radius_m": 0.56,
+		"coil_layer_step_m": 0.1,
+		"coil_min_height_m": 0.22,
+		"coil_max_height_m": 1.0,
+		"coil_pitch_m": 0.12,
+		"coil_point_step_m": 0.12,
+		"connector_lift_m": 0.45,
+		"connector_samples": 10,
+		"done_fade_s": 0.6
+	},
+	"hand_wrap": {
+		"_kommentar": "Start: Kabel per Hand um den Arm wickeln, Taste wiederholt drücken",
+		"pull_per_press_m": 0.25,
+		"feed_speed_m_per_s": 1.5
+	},
+	"player": {
+		"walk_speed_m_per_s": 4.0,
+		"sprint_speed_m_per_s": 7.0,
+		"mouse_sensitivity": 0.003,
+		"reach_m": 2.8,
+		"aim_radius_m": 0.35,
+		"tether_length_m": 6.0
+	},
+	"arm": {
+		"_kommentar": "Kabel zwischen Hand und Ellbogen um den Arm gewickelt",
+		"forearm_length_m": 0.36,
+		"loop_half_length_m": 0.2,
+		"loop_half_height_m": 0.07,
+		"loop_growth_m": 0.006,
+		"loop_lateral_step_m": 0.022,
+		"point_step_m": 0.05,
+		"connector_sag_m": 0.35
+	}
+}

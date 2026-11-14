@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kabelsalat 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e3e8ed;--surface:#f8fafb;--ink:#1c2632;--muted:#5a6777;--line:#c3ccd6;
+  --scene:#dce3ea;--floor:#c8d1db;--hud:rgba(248,250,251,.86);
+  --btn:#1c2632;--btnink:#f8fafb;--btnoff:#c3ccd6;--btnoffink:#6f7b89;--accent:#f2c230;--red:#d6453d;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#17202b;--surface:#212c3a;--ink:#e8eef4;--muted:#93a1b1;--line:#344255;
+    --scene:#1a2430;--floor:#253141;--hud:rgba(33,44,58,.86);
+    --btn:#f2c230;--btnink:#1c2632;--btnoff:#2c3848;--btnoffink:#7d8b9b;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17202b;--surface:#212c3a;--ink:#e8eef4;--muted:#93a1b1;--line:#344255;
+  --scene:#1a2430;--floor:#253141;--hud:rgba(33,44,58,.86);
+  --btn:#f2c230;--btnink:#1c2632;--btnoff:#2c3848;--btnoffink:#7d8b9b;color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Rubik",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+.stage{position:relative;height:62vh;height:62svh;min-height:340px;max-height:640px;background:var(--scene);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;pointer-events:none}
+.money{top:12px;left:12px;background:var(--hud);padding:8px 12px;border-radius:14px}
+.money b{font-family:"Bungee",Impact,"Arial Black",sans-serif;font-weight:400;font-size:1.6rem;line-height:1;display:block}
+.money span{font-size:.82rem;color:var(--muted)}
+.heap{top:12px;right:12px;background:var(--hud);padding:8px 12px;border-radius:14px;font-size:.85rem;text-align:right;max-width:46%}
+.heap b{display:block;font-size:.95rem}
+.pullbox{left:50%;bottom:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;width:min(320px,90%)}
+.pullbox .info{background:var(--hud);padding:4px 10px;border-radius:10px;font-size:.84rem;text-align:center}
+.pull{pointer-events:auto;font-family:"Bungee",Impact,"Arial Black",sans-serif;font-size:1.25rem;border:none;border-radius:16px;padding:14px 0;width:100%;background:var(--btn);color:var(--btnink);cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.pull:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.float{position:absolute;pointer-events:none;font-weight:700;font-size:1.05rem;color:var(--ink);background:var(--hud);padding:2px 8px;border-radius:8px;transform:translate(-50%,-50%);transition:transform 1.3s ease-out,opacity 1.3s ease-in;white-space:nowrap}
+.float.go{transform:translate(-50%,-180%);opacity:0}
+.wrap{max-width:680px;margin:0 auto;padding:10px 16px 40px}
+h1{font-family:"Bungee",Impact,"Arial Black",sans-serif;font-weight:400;font-size:1.6rem;margin:6px 0 0}
+.msg{min-height:2.9em;margin:6px 0 8px;font-size:.95rem}
+.shop{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:4px 14px}
+.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block}
+.row .t span{display:block;color:var(--muted);font-size:.86rem}
+.lvl{font-family:"Bungee",Impact,sans-serif;min-width:2.5ch;text-align:right}
+.buy{font:inherit;font-weight:700;border:none;border-radius:12px;padding:10px 12px;min-width:92px;background:var(--btn);color:var(--btnink);cursor:pointer}
+.buy:disabled{background:var(--btnoff);color:var(--btnoffink);cursor:not-allowed}
+button:focus-visible{outline:3px solid #2f6fd6;outline-offset:2px}
+.help{color:var(--muted);font-size:.88rem;margin:14px 2px}
+.reset{font:inherit;background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0;font-size:.85rem}
+@media (prefers-reduced-motion:reduce){.float{transition:opacity .6s}.float.go{transform:translate(-50%,-50%)}}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="hud money"><b id="money">0 €</b><span id="rate">Noch keine Rollen</span></div>
+  <div class="hud heap"><b id="heapName"></b><span id="heapInfo"></span></div>
+  <div class="hud pullbox">
+    <div class="info" id="handInfo">Tippe auf ein Kabel im Haufen</div>
+    <button class="pull" id="pull">Ziehen</button>
+  </div>
+</div>
+<div class="wrap">
+  <h1>Kabelsalat 3D</h1>
+  <p class="msg" id="msg" aria-live="polite">Tippe auf ein Kabel, um sein Ende an deiner Handkurbel einzuhängen. Dann zieh!</p>
+  <div class="shop" id="shop"></div>
+  <p class="help">Wischen dreht die Ansicht, zwei Finger oder das Mausrad zoomen. Rote Kugeln sind Knoten: Tippe auf das Kabel, um sie zu lösen.</p>
+  <button class="reset" id="reset">Spielstand löschen</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const V3=THREE.Vector3;
+const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const SAVE_KEY="kabelsalat3d-v1";
+
+/* ---------- Spielstand ---------- */
+const TIERS=["Schubladen-Haufen","Gamer-Setup-Haufen","Serverraum-Haufen","Konzertbühnen-Haufen","Rechenzentrums-Haufen"];
+const TIER_COST=[250,5000,1e5,2.5e6];
+function fresh(){return{geld:0,total:0,reels:0,motor:0,hand:0,copper:0,ruettel:false,einf:false,tier:0,last:Date.now()};}
+let S=fresh();
+try{const r=localStorage.getItem(SAVE_KEY);if(r)S=Object.assign(fresh(),JSON.parse(r));}catch(e){}
+function save(){S.last=Date.now();try{localStorage.setItem(SAVE_KEY,JSON.stringify(S));}catch(e){}}
+
+const vpm=()=>0.5*Math.pow(1.35,S.copper)*Math.pow(3,S.tier);
+const speed=()=>0.25*Math.pow(1.4,S.motor);
+const handPower=()=>0.5*Math.pow(1.5,S.hand)*Math.pow(2,S.tier);
+const heapTarget=()=>16+4*S.tier;
+
+const SHOP=[
+ {id:"reels",n:"Kabelrolle mit Motor",d:"Häng ein Kabelende ein, sie zieht von selbst.",cost:()=>15*Math.pow(1.8,S.reels),lvl:()=>S.reels+"/8",ok:()=>S.reels<8,buy:()=>{S.reels++;buildReels();}},
+ {id:"motor",n:"Stärkere Motoren",d:"Alle Rollen ziehen 40 % schneller.",cost:()=>40*Math.pow(2.2,S.motor),lvl:()=>S.motor,ok:()=>S.reels>0,buy:()=>{S.motor++;}},
+ {id:"hand",n:"Festerer Griff",d:"Jeder Zug holt 50 % mehr Kabel raus.",cost:()=>10*Math.pow(1.9,S.hand),lvl:()=>S.hand,ok:()=>true,buy:()=>{S.hand++;}},
+ {id:"copper",n:"Kupferhändler",d:"Jeder Meter bringt 35 % mehr Geld.",cost:()=>60*Math.pow(2.3,S.copper),lvl:()=>S.copper,ok:()=>true,buy:()=>{S.copper++;}},
+ {id:"ruettel",n:"Rüttelmotor",d:"Rollen lösen Knoten nach 1,5 Sekunden selbst.",cost:()=>300,lvl:()=>S.ruettel?"✓":"",ok:()=>!S.ruettel&&S.reels>0,buy:()=>{S.ruettel=true;}},
+ {id:"einf",n:"Selbsteinfädler",d:"Freie Rollen hängen sich selbst ein Kabel ein.",cost:()=>900,lvl:()=>S.einf?"✓":"",ok:()=>!S.einf&&S.reels>0,buy:()=>{S.einf=true;}},
+ {id:"tier",n:"Nächster Haufen",d:"",cost:()=>TIER_COST[S.tier],lvl:()=>"",ok:()=>S.tier<TIER_COST.length,buy:()=>{S.tier++;swapHeap();toast("Lieferung: "+TIERS[S.tier]+". Längere Kabel, besseres Kupfer.");}}
+];
+
+/* ---------- Format ---------- */
+const SUF=["","Tsd.","Mio.","Mrd.","Bio.","Brd."];
+function eur(n){
+  if(n<1000)return n.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+  const e=Math.min(SUF.length-1,Math.floor(Math.log10(n)/3));
+  return(n/Math.pow(1000,e)).toLocaleString("de-DE",{maximumFractionDigits:2})+" "+SUF[e]+" €";
+}
+const m1=n=>n.toLocaleString("de-DE",{maximumFractionDigits:1});
+
+/* ---------- Szene ---------- */
+const stage=document.getElementById("stage");
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,1,0.1,100);
+const target=new V3(0,0.7,0);
+let yaw=0,pitch=0.62,dist=12.5;
+function placeCam(){camera.position.set(target.x+dist*Math.cos(pitch)*Math.sin(yaw),target.y+dist*Math.sin(pitch),target.z+dist*Math.cos(pitch)*Math.cos(yaw));camera.lookAt(target);}
+scene.add(new THREE.HemisphereLight(0xffffff,0x667788,0.85));
+const sun=new THREE.DirectionalLight(0xffffff,0.75);sun.position.set(5,10,6);scene.add(sun);
+const floorMat=new THREE.MeshStandardMaterial({roughness:1});
+const floor=new THREE.Mesh(new THREE.CircleGeometry(9,64),floorMat);floor.rotation.x=-Math.PI/2;scene.add(floor);
+const shadowDisc=new THREE.Mesh(new THREE.CircleGeometry(3,48),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.12}));
+shadowDisc.rotation.x=-Math.PI/2;shadowDisc.position.y=0.01;scene.add(shadowDisc);
+function readTheme(){
+  const cs=getComputedStyle(document.documentElement);
+  scene.background=new THREE.Color(cs.getPropertyValue("--scene").trim()||"#dce3ea");
+  floorMat.color.set(cs.getPropertyValue("--floor").trim()||"#c8d1db");
+}
+readTheme();window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readTheme);
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+
+/* ---------- Rollen ---------- */
+const reelSlots=[];
+const drumGeo=new THREE.CylinderGeometry(0.5,0.5,0.9,24);
+const flangeGeo=new THREE.CylinderGeometry(0.95,0.95,0.06,32);
+const drumMat=new THREE.MeshStandardMaterial({color:0x9aa5b1,roughness:0.5,metalness:0.4});
+const handFlange=new THREE.MeshStandardMaterial({color:0x8a5a3a,roughness:0.8});
+const autoFlange=new THREE.MeshStandardMaterial({color:0xf2c230,roughness:0.5});
+function makeReel(kind,angDeg){
+  const a=angDeg*Math.PI/180,R=5;
+  const pos=new V3(R*Math.cos(a),0,R*Math.sin(a));
+  const g=new THREE.Group();g.position.copy(pos);
+  const spin=new THREE.Group();g.add(spin);
+  const drum=new THREE.Mesh(drumGeo,drumMat);drum.position.y=0.6;spin.add(drum);
+  const fm=kind==="hand"?handFlange:autoFlange;
+  const f1=new THREE.Mesh(flangeGeo,fm);f1.position.y=0.12;spin.add(f1);
+  const f2=new THREE.Mesh(flangeGeo,fm);f2.position.y=1.08;spin.add(f2);
+  if(kind==="hand"){
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.06,0.1),handFlange);arm.position.set(0.3,1.16,0);spin.add(arm);
+    const knob=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.3,10),drumMat);knob.position.set(0.58,1.3,0);spin.add(knob);
+  }else{
+    const motor=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.4,0.5),new THREE.MeshStandardMaterial({color:0x3b4350,roughness:0.6}));
+    motor.position.set(0,0.2,0);motor.position.add(pos.clone().normalize().multiplyScalar(1.05));g.add(motor);
+  }
+  scene.add(g);
+  return{kind:kind,pos:pos,group:g,spin:spin,cable:null};
+}
+const AUTO_ANG=[125,20,160,340,200,300,240,270];
+const handReel=makeReel("hand",62);reelSlots.push(handReel);
+function buildReels(){while(reelSlots.length-1<S.reels){reelSlots.push(makeReel("auto",AUTO_ANG[reelSlots.length-1]));}}
+buildReels();
+
+/* ---------- Kabel ---------- */
+const PAL=[0xd6453d,0xf2c230,0x2f6fd6,0x2f9e5b,0x8a55d6,0xeceff2,0xe07b2a,0x3b4350];
+const RAD=0.055;
+const cables=[];
+const knotGeo=new THREE.SphereGeometry(0.2,16,12);
+const knotMat=new THREE.MeshStandardMaterial({color:0xd6453d,emissive:0x8a1a14,roughness:0.4});
+function spawnCable(delay){
+  const R=2.5,a0=Math.random()*Math.PI*2;
+  const pts=[new V3(R*Math.cos(a0),0.12,R*Math.sin(a0)),new V3(R*0.85*Math.cos(a0+0.15),0.35,R*0.85*Math.sin(a0+0.15))];
+  const n=7+Math.floor(Math.random()*4);
+  for(let i=0;i<n;i++){
+    const r=Math.sqrt(Math.random())*R*0.85,t=Math.random()*Math.PI*2;
+    const hMax=0.25+1.7*(1-Math.pow(r/R,2));
+    pts.push(new V3(r*Math.cos(t),0.1+Math.random()*hMax,r*Math.sin(t)));
+  }
+  const curve=new THREE.CatmullRomCurve3(pts,false,"centripetal");
+  const sp=curve.getSpacedPoints(180);
+  const Ls=curve.getLength();
+  const Lm=(3+Math.random()*4)*Math.pow(2,S.tier);
+  const knots=[];const kc=Math.random()<0.55?(Math.random()<0.4?2:1):0;
+  for(let i=0;i<kc;i++)knots.push(Lm*(0.2+Math.random()*0.65));
+  knots.sort((x,y)=>x-y);
+  const mat=new THREE.MeshStandardMaterial({color:PAL[Math.floor(Math.random()*PAL.length)],roughness:0.45,metalness:0.05});
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,150,RAD,6,false),mat);
+  const c={sp:sp,Ls:Ls,Lm:Lm,knots:knots,mesh:mesh,state:"heap",reel:null,m:0,stuck:false,stuckT:0,drop:reduced?1:-(delay||0),fade:1,marker:null};
+  mesh.userData.cable=c;
+  if(!reduced)mesh.position.y=6;
+  scene.add(mesh);cables.push(c);
+  return c;
+}
+function removeCable(c){
+  scene.remove(c.mesh);c.mesh.geometry.dispose();c.mesh.material.dispose();
+  if(c.marker)scene.remove(c.marker);
+  const i=cables.indexOf(c);if(i>=0)cables.splice(i,1);
+}
+function fillHeap(){let k=0;while(cables.filter(c=>c.state==="heap").length<heapTarget())spawnCable(k++*0.12);}
+function swapHeap(){cables.filter(c=>c.state==="heap").forEach(removeCable);fillHeap();}
+fillHeap();
+
+function coilPts(base,len){
+  const step=0.12,pts=[];let r=0.56,a=0,h=0.22,dir=1,s=0;
+  pts.push(new V3(base.x+r,base.y+h,base.z));
+  while(s<len){
+    s+=step;a+=step/r;h+=dir*0.12*step/(2*Math.PI*r);
+    if(h>1.0){h=1.0;dir=-1;r+=0.1;}else if(h<0.22){h=0.22;dir=1;r+=0.1;}
+    pts.push(new V3(base.x+r*Math.cos(a),base.y+h,base.z+r*Math.sin(a)));
+  }
+  return pts;
+}
+function rebuild(c){
+  const p=Math.min(1,c.m/c.Lm),N=c.sp.length-1;
+  const k=Math.max(1,Math.round((1-p)*N));
+  const pts=[];
+  for(let i=k;i>0;i-=3)pts.push(c.sp[i]);
+  pts.push(c.sp[0]);
+  const coil=coilPts(c.reel.pos,p*c.Ls);
+  const A=c.sp[0],E=coil[coil.length-1];
+  const mid=A.clone().add(E).multiplyScalar(0.5);mid.y=Math.max(A.y,E.y)+0.45;
+  pts.push(mid);
+  for(let i=coil.length-1;i>=0;i--)pts.push(coil[i]);
+  const g=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts,false,"centripetal"),Math.min(700,pts.length*2),RAD,6,false);
+  c.mesh.geometry.dispose();c.mesh.geometry=g;
+}
+function hook(c,reel){
+  c.state="hooked";c.reel=reel;reel.cable=c;rebuild(c);
+}
+function advance(c,amount){
+  if(c.stuck)return;
+  c.m+=amount;
+  if(c.knots.length&&c.m>=c.knots[0]){
+    c.m=c.knots.shift();c.stuck=true;c.stuckT=0;
+    c.marker=new THREE.Mesh(knotGeo,knotMat);c.marker.position.copy(c.sp[0]);c.marker.userData.cable=c;scene.add(c.marker);
+    if(c.reel.kind==="hand")toast("Knoten! Tippe auf das Kabel, um ihn zu lösen.");
+  }
+  if(c.m>=c.Lm){c.m=c.Lm;complete(c);}
+  else rebuild(c);
+}
+function untie(c){
+  c.stuck=false;if(c.marker){scene.remove(c.marker);c.marker=null;}
+}
+function complete(c){
+  rebuild(c);
+  const pay=c.Lm*vpm();
+  S.geld+=pay;S.total+=pay;
+  floatAt(c.reel.pos.clone().setY(1.6),"+"+eur(pay));
+  c.reel.cable=null;c.state="done";c.reel=c.reel;
+  c.mesh.material.transparent=true;
+  fillHeap();
+  shopDirty=true;
+}
+
+/* ---------- Floating Labels ---------- */
+function floatAt(p,txt){
+  const v=p.clone().project(camera);
+  const el=document.createElement("div");el.className="float";el.textContent=txt;
+  el.style.left=((v.x+1)/2*stage.clientWidth)+"px";el.style.top=((1-v.y)/2*stage.clientHeight)+"px";
+  stage.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add("go")));
+  setTimeout(()=>el.remove(),1500);
+}
+const msg=document.getElementById("msg");let msgT=0;
+function toast(t,ms){msg.textContent=t;clearTimeout(msgT);msgT=setTimeout(()=>{msg.textContent="";},ms||4500);}
+
+/* ---------- Eingabe ---------- */
+const ray=new THREE.Raycaster();const ndc=new THREE.Vector2();
+function pickCable(x,y){
+  ndc.set(x/stage.clientWidth*2-1,-(y/stage.clientHeight)*2+1);
+  ray.setFromCamera(ndc,camera);
+  const objs=[];cables.forEach(c=>{if(c.state!=="done")objs.push(c.mesh);if(c.marker)objs.push(c.marker);});
+  const hit=ray.intersectObjects(objs,false)[0];
+  return hit?hit.object.userData.cable:null;
+}
+function nearestFree(c,kind){
+  let best=null,bd=1e9;
+  reelSlots.forEach(r=>{if(r.kind!==kind||r.cable)return;const d=r.pos.distanceTo(c.sp[0]);if(d<bd){bd=d;best=r;}});
+  return best;
+}
+function pullHand(){
+  const c=handReel.cable;
+  if(!c){toast("Tippe auf ein Kabel im Haufen, um es an der Handkurbel einzuhängen.");return;}
+  if(c.stuck){untie(c);toast("Knoten gelöst.");return;}
+  advance(c,handPower());
+}
+function tap(x,y){
+  const c=pickCable(x,y);
+  if(c&&c.state==="heap"){
+    if(c.drop<1)return;
+    const r=nearestFree(c,"auto")||(handReel.cable?null:handReel);
+    if(!r){toast("Alle Rollen sind belegt. Zieh an der Handkurbel oder kauf mehr Rollen.");return;}
+    hook(c,r);
+    if(r.kind==="auto"&&S.total===0)toast("Eingehängt! Die Rolle zieht jetzt von selbst.");
+    return;
+  }
+  if(c&&c.state==="hooked"){
+    if(c.stuck){untie(c);return;}
+    if(c.reel.kind==="auto"){advance(c,handPower()*0.5);return;}
+  }
+  pullHand();
+}
+document.getElementById("pull").addEventListener("click",pullHand);
+
+const ptrs=new Map();let downInfo=null,pinchD=0;
+const cvs=renderer.domElement;
+cvs.addEventListener("pointerdown",e=>{
+  cvs.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===1)downInfo={x:e.clientX,y:e.clientY,t:performance.now(),moved:false};
+  if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinchD=Math.hypot(a.x-b.x,a.y-b.y);if(downInfo)downInfo.moved=true;}
+});
+cvs.addEventListener("pointermove",e=>{
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+  if(ptrs.size===2){
+    const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);
+    dist=Math.min(20,Math.max(6,dist*pinchD/d));pinchD=d;return;
+  }
+  if(downInfo&&Math.hypot(e.clientX-downInfo.x,e.clientY-downInfo.y)>8)downInfo.moved=true;
+  if(downInfo&&downInfo.moved){yaw-=dx*0.008;pitch=Math.min(1.25,Math.max(0.2,pitch+dy*0.006));}
+});
+function endPtr(e){
+  if(!ptrs.has(e.pointerId))return;
+  ptrs.delete(e.pointerId);
+  if(ptrs.size===0&&downInfo){
+    if(!downInfo.moved&&performance.now()-downInfo.t<500){const r=cvs.getBoundingClientRect();tap(e.clientX-r.left,e.clientY-r.top);}
+    downInfo=null;
+  }
+}
+cvs.addEventListener("pointerup",endPtr);cvs.addEventListener("pointercancel",endPtr);
+cvs.addEventListener("wheel",e=>{e.preventDefault();dist=Math.min(20,Math.max(6,dist*(1+e.deltaY*0.001)));},{passive:false});
+
+/* ---------- Shop ---------- */
+const shop=document.getElementById("shop");let shopDirty=true;
+function buildShop(){
+  shopDirty=false;let h="";
+  SHOP.forEach(it=>{
+    if(!it.ok())return;
+    let d=it.d,n=it.n;
+    if(it.id==="tier"){n="Nächster Haufen: "+TIERS[S.tier+1];d="Kabel doppelt so lang, jeder Meter dreimal so viel wert.";}
+    h+='<div class="row"><div class="t"><b>'+n+'</b><span>'+d+'</span></div><span class="lvl">'+it.lvl()+'</span><button class="buy" data-id="'+it.id+'"></button></div>';
+  });
+  shop.innerHTML=h||'<p>Alles gekauft. Respekt.</p>';
+}
+shop.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-id]");if(!b||b.disabled)return;
+  const it=SHOP.find(x=>x.id===b.dataset.id);const c=it.cost();
+  if(S.geld>=c&&it.ok()){S.geld-=c;it.buy();shopDirty=true;save();}
+});
+document.getElementById("reset").addEventListener("click",function(){
+  if(this.dataset.c!=="1"){this.dataset.c="1";this.textContent="Wirklich alles löschen? Nochmal tippen";return;}
+  try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+  location.reload();
+});
+
+/* ---------- HUD ---------- */
+const $=id=>document.getElementById(id);
+function updateHud(){
+  if(shopDirty)buildShop();
+  $("money").textContent=eur(S.geld);
+  $("rate").textContent=S.reels?"bis "+eur(S.reels*speed()*vpm())+" pro Sekunde mit "+S.reels+(S.reels===1?" Rolle":" Rollen"):"Noch keine Rollen";
+  $("heapName").textContent=TIERS[S.tier];
+  $("heapInfo").textContent=m1(vpm())+" € pro Meter";
+  const c=handReel.cable;
+  $("handInfo").textContent=c?(c.stuck?"Knoten! Tippen zum Lösen":"Handkurbel: "+m1(c.m)+" von "+m1(c.Lm)+" m"):"Tippe auf ein Kabel im Haufen";
+  shop.querySelectorAll("button[data-id]").forEach(b=>{
+    const it=SHOP.find(x=>x.id===b.dataset.id);const co=it.cost();
+    b.textContent=eur(co);b.disabled=S.geld<co;
+  });
+}
+
+/* ---------- Offline ---------- */
+const away=Math.min((Date.now()-S.last)/1000,8*3600);
+if(S.einf&&S.reels>0&&away>10){
+  const g=away*S.reels*speed()*vpm()*0.5;S.geld+=g;S.total+=g;
+  toast("Während du weg warst, haben deine Rollen "+eur(g)+" verdient.",7000);
+}
+
+/* ---------- Schleife ---------- */
+let last=performance.now(),uiT=0,saveT=performance.now(),einfT=0;
+function loop(now){
+  const dt=Math.min(0.1,(now-last)/1000);last=now;
+  placeCam();
+  for(let i=cables.length-1;i>=0;i--){
+    const c=cables[i];
+    if(c.drop<1){c.drop+=dt/0.7;const e=1-Math.pow(1-Math.max(0,Math.min(1,c.drop)),3);c.mesh.position.y=6*(1-e);}
+    if(c.state==="hooked"&&c.reel.kind==="auto"){
+      if(c.stuck){c.stuckT+=dt;if(S.ruettel&&c.stuckT>1.5)untie(c);}
+      else advance(c,speed()*dt);
+    }
+    if(c.marker){const s=1+0.18*Math.sin(now/120);c.marker.scale.setScalar(s);}
+    if(c.state==="done"){c.fade-=dt/0.5;c.mesh.material.opacity=Math.max(0,c.fade);if(c.fade<=0)removeCable(c);}
+  }
+  reelSlots.forEach(r=>{if(r.cable&&!r.cable.stuck)r.spin.rotation.y+=dt*(r.kind==="auto"?speed()*4:1.5);});
+  if(S.einf){einfT+=dt;if(einfT>0.8){einfT=0;
+    reelSlots.forEach(r=>{if(r.kind!=="auto"||r.cable)return;
+      const free=cables.filter(c=>c.state==="heap"&&c.drop>=1);
+      if(free.length){free.sort((a,b)=>a.sp[0].distanceTo(r.pos)-b.sp[0].distanceTo(r.pos));hook(free[0],r);}
+    });}}
+  renderer.render(scene,camera);
+  if(now-uiT>150){updateHud();uiT=now;}
+  if(now-saveT>5000){save();saveT=now;}
+  requestAnimationFrame(loop);
+}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)save();});
+window.addEventListener("pagehide",save);
+updateHud();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
