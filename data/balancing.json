@@ -163,5 +163,10 @@
 		"drop_height_m": 9.0,
 		"drop_time_s": 0.8,
 		"drop_stagger_s": 0.6
+	},
+	"save": {
+		"path": "user://savegame.json",
+		"autosave_s": 30.0,
+		"version": 1
 	}
 }

@@ -53,6 +53,14 @@ var _cord_prompt: CordPrompt
 var _landing: Dictionary = {}  # Kabel-ID -> Sekunden seit Beginn des Falls (negativ = wartet noch)
 var _orders := 0
 
+# Spielstand
+var _zone_ports: Array[int] = []      # Ports, die bei der Zonen-Erzeugung frei waren
+var _zone_first_id := 0               # erste Kabel-ID der Zone
+var _order_heaps: Array[Dictionary] = []  # { "heap": HeapData, "first_id": int }
+var _removed_ids: Array[int] = []     # fertig aufgerollte Kabel (fehlen beim Neuerzeugen)
+var _saving_enabled := true
+var _autosave_t := 0.0
+
 
 func _ready() -> void:
 	_system = CableSystem.new()
@@ -88,9 +96,20 @@ func _ready() -> void:
 
 	_end_marker = _make_sphere(0.1, Color(1.0, 0.85, 0.3), 2.0)
 	add_child(_end_marker)
+	# Spielstand laden, falls vorhanden (außer bei "Neues Spiel" oder --nosave)
+	_saving_enabled = not OS.get_cmdline_user_args().has("--nosave")
+	var save := {}
+	if _saving_enabled and not SaveGame.force_new:
+		save = SaveGame.read()
+	SaveGame.force_new = false
+	var zs: Dictionary = save.get("zone", {})
+
 	var start: Array = Balancing.zone.get("player_start", [0, 0, 10])
 	_player.global_position = Vector3(start[0], start[1], start[2])
-	_spawn_zone(int(Balancing.zone.get("seed", 1234)))
+	var ports: Array[int] = []
+	for p in zs.get("ports", []):
+		ports.append(int(p))
+	_spawn_zone(int(zs.get("seed", Balancing.zone.get("seed", 1234))), ports if zs.has("ports") else null, int(zs.get("first_id", 0)))
 	_player.look_toward(ZONE_CENTER)
 	_apply_upgrades()
 
@@ -105,6 +124,10 @@ func _ready() -> void:
 	_cord_view.global_position = _player.global_position + Vector3(1, 1.3, 1)
 	_cord_prompt = CordPrompt.new()
 	_hud.add_child(_cord_prompt)
+	_tablet.new_game_requested.connect(_new_game)
+
+	if not save.is_empty():
+		_apply_save(save)
 
 	# Nur zum automatischen Testen, siehe _apply_test_args
 	_apply_test_args()
@@ -113,6 +136,13 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("decline"):
 		_cord.decline()
+	elif event.is_action_pressed("quicksave"):
+		_save_game(true)
+	elif event.is_action_pressed("quickload"):
+		if SaveGame.exists():
+			get_tree().reload_current_scene()
+		else:
+			_show_message("Noch kein Spielstand vorhanden.")
 	elif event.is_action_pressed("tablet") and not _tablet.visible:
 		get_viewport().set_input_as_handled()
 		_open_tablet()
@@ -156,6 +186,16 @@ func _process(delta: float) -> void:
 
 	_message_t -= delta
 	_update_hud()
+
+	_autosave_t += delta
+	if _autosave_t >= float(Balancing.save.get("autosave_s", 30.0)):
+		_autosave_t = 0.0
+		_save_game(false)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_save_game(false)
 
 
 # --- Eingaben -------------------------------------------------------------
@@ -238,6 +278,7 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 	_remove_knot_marker(cable.id)
 	_views.erase(cable.id)
 	_system.remove_cable(cable.id)
+	_removed_ids.append(cable.id)
 	_done_count += 1
 
 	if cable.is_important():
@@ -274,15 +315,12 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		_fading.append(view)
 
 	if _system.cables.is_empty():
-		_spawn_zone(_zone.rng_seed + 1)
+		_spawn_zone(_zone.rng_seed + 1, null, _next_cable_id)
 		_show_message("Alles aufgeräumt – aber C.O.R.D. hat nachbestellt …")
 
 
 func _on_knot_hit(cable: CableData, reel: ReelData) -> void:
-	var m := _make_sphere(float(Balancing.knot["marker_radius_m"]), Color(0.85, 0.15, 0.1), 1.5)
-	add_child(m)
-	m.global_position = cable.path.points[0]
-	_knot_markers[cable.id] = m
+	_add_knot_marker(cable)
 	if reel == _arm_reel:
 		_show_message("Knoten! E drücken, um ihn zu lösen.")
 	else:
@@ -351,19 +389,27 @@ func _spawn_order(count: int) -> void:
 	var heap := HeapData.new(_zone.heaps.size(), hash([_zone.rng_seed, "order", _orders]), center, count,
 		radius, float(c["order_heap_peak_m"]), HeapData.Kind.HEAP)
 	heap.name = "Lieferung %d" % _orders
+	_add_order_heap(heap, _next_cable_id, true)
+
+
+## Gelieferten Haufen anlegen (beim Laden ohne Fall-Animation).
+func _add_order_heap(heap: HeapData, first_id: int, animate: bool) -> void:
+	var c: Dictionary = Balancing.cord
 	_zone.heaps.append(heap)
+	_order_heaps.append({ "heap": heap, "first_id": first_id })
 	var stagger: float = c["drop_stagger_s"]
 	var i := 0
-	for cable in heap.create_cables(_next_cable_id):
+	for cable in heap.create_cables(first_id):
 		_system.add_cable(cable)
 		var view := CableView.new()
 		add_child(view)
 		view.setup(cable)
-		view.position.y = float(c["drop_height_m"])
 		_views[cable.id] = view
-		_landing[cable.id] = -stagger * float(i) / maxf(count, 1)
+		if animate:
+			view.position.y = float(c["drop_height_m"])
+			_landing[cable.id] = -stagger * float(i) / maxf(heap.cable_count, 1)
 		i += 1
-	_next_cable_id += heap.cable_count
+	_next_cable_id = maxi(_next_cable_id, first_id + heap.cable_count)
 
 
 ## Fall-Animation der gelieferten Kabel; erst nach der Landung greifbar.
@@ -519,8 +565,11 @@ func _place_reel(kind: ReelData.Kind) -> void:
 		var away := pos - heap.center
 		away.y = 0.0
 		pos = heap.center + (away.normalized() if away.length() > 0.01 else Vector3.BACK) * (heap.radius + clearance)
-	var reel := ReelData.new(_next_reel_id, kind, pos)
-	_next_reel_id += 1
+	_add_reel(ReelData.new(_next_reel_id, kind, pos))
+
+
+func _add_reel(reel: ReelData) -> void:
+	_next_reel_id = maxi(_next_reel_id, reel.id + 1)
 	_system.add_reel(reel)
 	var view := ReelView.new()
 	add_child(view)
@@ -528,19 +577,28 @@ func _place_reel(kind: ReelData.Kind) -> void:
 	_reel_views[reel.id] = view
 
 
-func _spawn_zone(seed_value: int) -> void:
+## Erzeugt die Zone. `ports` = Ports für wichtige Kabel (null = alle gerade freien).
+func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> void:
 	_zone = ZoneData.from_config(seed_value)
-	# Wichtige Kabel nur für Ports, die noch frei sind und für die kein Knäuel unterwegs ist
 	var free_ports: Array[int] = []
-	for port in ServiceRack.port_count():
-		var taken := _rack.is_active(port)
-		for item: CoilItem in _items.values():
-			taken = taken or item.port_id == port
-		for c: CableData in _system.cables.values():
-			taken = taken or c.port_id == port
-		if not taken:
-			free_ports.append(port)
-	var cables := _zone.create_cables(_next_cable_id, free_ports)
+	if ports != null:
+		free_ports = ports
+	else:
+		# Wichtige Kabel nur für Ports, die noch frei sind und für die kein Knäuel unterwegs ist
+		for port in ServiceRack.port_count():
+			var taken := _rack.is_active(port)
+			for item: CoilItem in _items.values():
+				taken = taken or item.port_id == port
+			for c: CableData in _system.cables.values():
+				taken = taken or c.port_id == port
+			if not taken:
+				free_ports.append(port)
+	_zone_ports = free_ports
+	_zone_first_id = first_id
+	_next_cable_id = maxi(_next_cable_id, first_id)
+	_order_heaps.clear()
+	_removed_ids.clear()
+	var cables := _zone.create_cables(first_id, free_ports)
 	for cable in cables:
 		_system.add_cable(cable)
 		var view := CableView.new()
@@ -548,6 +606,15 @@ func _spawn_zone(seed_value: int) -> void:
 		view.setup(cable)
 		_views[cable.id] = view
 	_next_cable_id += cables.size()
+
+
+func _add_knot_marker(cable: CableData) -> void:
+	if _knot_markers.has(cable.id):
+		return
+	var m := _make_sphere(float(Balancing.knot["marker_radius_m"]), Color(0.85, 0.15, 0.1), 1.5)
+	add_child(m)
+	m.global_position = cable.path.points[0]
+	_knot_markers[cable.id] = m
 
 
 func _remove_knot_marker(cable_id: int) -> void:
@@ -626,6 +693,139 @@ func _make_sphere(radius: float, color: Color, glow: float) -> MeshInstance3D:
 	return m
 
 
+# --- Spielstand -------------------------------------------------------------
+
+func _save_game(announce: bool) -> void:
+	if not _saving_enabled:
+		return
+	if SaveGame.write(_collect_save()) and announce:
+		_show_message("Spielstand gespeichert.")
+
+
+## Alles, was sich nicht aus Seeds neu erzeugen lässt.
+func _collect_save() -> Dictionary:
+	var cables := []
+	for c: CableData in _system.cables.values():
+		if c.state != CableData.State.HEAP or c.pulled_m > 0.0 or c.knots_solved > 0:
+			cables.append(c.state_dict())
+	var reels := []
+	for r: ReelData in _system.reels.values():
+		if r.kind != ReelData.Kind.ARM:
+			reels.append(r.to_dict())
+	var items := []
+	for item: CoilItem in _items.values():
+		items.append(item.to_dict())
+	var orders := []
+	for o in _order_heaps:
+		orders.append({ "heap": (o["heap"] as HeapData).to_dict(), "first_id": o["first_id"] })
+	return {
+		"zone": { "seed": _zone.rng_seed, "ports": Array(_zone_ports), "first_id": _zone_first_id },
+		"orders": orders,
+		"removed_cables": Array(_removed_ids),
+		"cables": cables,
+		"arm_cable": _arm_reel.cable_id,
+		"reels": reels,
+		"items": items,
+		"economy": _economy.state.to_dict(),
+		"cord": _cord.to_dict(),
+		"player": _player.view_state(),
+		"counters": { "next_cable_id": _next_cable_id, "next_reel_id": _next_reel_id,
+			"next_item_id": _next_item_id, "done_count": _done_count, "orders": _orders },
+	}
+
+
+func _apply_save(d: Dictionary) -> void:
+	_economy.state.load_dict(d.get("economy", {}))
+	for port in _economy.state.active_ports:
+		_rack_view.set_port_active(port, true)
+	_rack_view.set_active_count(_rack.active_count(), ServiceRack.port_count())
+
+	for o: Dictionary in d.get("orders", []):
+		_add_order_heap(HeapData.from_dict(o["heap"]), int(o["first_id"]), false)
+	for id in d.get("removed_cables", []):
+		var cid := int(id)
+		if _views.has(cid):
+			_views[cid].queue_free()
+			_views.erase(cid)
+		_system.remove_cable(cid)
+		_removed_ids.append(cid)
+
+	for rd: Dictionary in d.get("reels", []):
+		var reel := ReelData.from_dict(rd)
+		reel.cable_id = -1
+		_add_reel(reel)
+
+	for cs: Dictionary in d.get("cables", []):
+		var cable: CableData = _system.cables.get(int(cs["id"]))
+		if cable == null:
+			continue
+		cable.load_state(cs)
+		if cable.state == CableData.State.HOOKED:
+			var reel: ReelData = _system.reels.get(cable.reel_id)
+			if reel == null:
+				cable.load_state({})  # Rolle fehlt: zurück in den Haufen
+				continue
+			reel.cable_id = cable.id
+			if reel == _arm_reel:
+				_player.holding = true
+				_player.tether_anchor = cable.path.points[0]
+			if cable.is_stuck():
+				_add_knot_marker(cable)
+
+	for idd: Dictionary in d.get("items", []):
+		var item := CoilItem.from_dict(idd)
+		_items[item.id] = item
+		var iv := CoilItemView.new()
+		add_child(iv)
+		iv.setup(item)
+		_item_views[item.id] = iv
+		if item.carried_by >= 0 and _arm_reel.is_free() and _carried == null:
+			_carried = item
+			_player.holding = true
+		else:
+			item.carried_by = -1
+			iv.lie_at(item.position)
+
+	var cnt: Dictionary = d.get("counters", {})
+	_next_cable_id = maxi(_next_cable_id, int(cnt.get("next_cable_id", 0)))
+	_next_reel_id = maxi(_next_reel_id, int(cnt.get("next_reel_id", 1)))
+	_next_item_id = maxi(_next_item_id, int(cnt.get("next_item_id", 0)))
+	_done_count = int(cnt.get("done_count", 0))
+	_orders = int(cnt.get("orders", 0))
+
+	if d.has("player"):
+		_player.set_view_state(d["player"])
+	_cord_view.global_position = _player.global_position + Vector3(-1.5, 1.6, 0)
+	_cord.load_dict(d.get("cord", {}))
+	if _cord.phase == CordLogic.Phase.ASKING:
+		_cord_view.set_asking(true, "Ersatz bestellen?")
+		_cord_prompt.show_question(_cord.answer_time())
+	_apply_upgrades()
+	_tablet.refresh()
+	_show_message("Spielstand geladen (%s)." % String(d.get("saved_at", "")).replace("T", " "))
+
+
+func _new_game() -> void:
+	SaveGame.delete()
+	SaveGame.force_new = true
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	get_tree().reload_current_scene()
+
+
+## Kurze Zusammenfassung des Zustands (für automatische Tests)
+func _summary() -> String:
+	var hooked := []
+	for r: ReelData in _system.reels.values():
+		var c := _system.cable_on(r)
+		if c:
+			hooked.append("%d@%d:%.2f/k%d" % [c.id, r.id, c.pulled_m, c.knots_solved])
+	hooked.sort()
+	return "geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
+		_economy.state.money, str(_economy.state.active_ports), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
+		_system.reels.size(), str(hooked), _items.size(), str(_carried != null), _done_count, _orders,
+		_cord.phase, _cord.time_left, str(SaveGame.vec_to(_player.global_position))]
+
+
 ## Testoptionen, z. B.:
 ## godot -- --money=50 --buy=crank,extra_reel --grab --important --noknots --pull=40 --hang --plug --tablet --orbit=-120
 func _apply_test_args() -> void:
@@ -668,6 +868,10 @@ func _apply_test_args() -> void:
 				_system.transfer(_arm_reel, reel)
 				_player.holding = false
 				break
+	if opts.has("solve"):
+		var held := _system.cable_on(_arm_reel)
+		if held:
+			held.knots_solved = held.knots_m.size()
 	if opts.has("pull"):
 		for reel: ReelData in _system.reels.values():
 			if not reel.is_free():
@@ -680,3 +884,14 @@ func _apply_test_args() -> void:
 		_cord.ask_now()
 	if opts.has("order"):
 		_spawn_order(int(Balancing.cord["order_count"]))
+		for id in _landing.keys():
+			_views[id].position.y = 0.0
+		_landing.clear()
+	if opts.has("cordtime"):
+		_cord.time_left = float(opts["cordtime"])
+	if opts.has("dump"):
+		print("ZUSTAND ", _summary())
+	if opts.has("saveexit"):
+		_saving_enabled = true
+		_save_game(false)
+		get_tree().quit()

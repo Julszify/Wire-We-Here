@@ -15,6 +15,7 @@ func _ready() -> void:
 	_test_important_ports()
 	_test_multipliers()
 	_test_cord()
+	_test_save_roundtrip()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -203,3 +204,47 @@ func _test_cord() -> void:
 	a.free()
 	b.free()
 	cord.free()
+
+
+func _test_save_roundtrip() -> void:
+	# GameState
+	var gs := GameState.new()
+	gs.money = 123.45
+	gs.upgrades = { "grip": 2, "crank": 1 }
+	gs.active_ports.append_array([0, 4])
+	var gs2 := GameState.new()
+	gs2.load_dict(JSON.parse_string(JSON.stringify(gs.to_dict())))
+	_check(is_equal_approx(gs2.money, 123.45) and gs2.level("grip") == 2 and gs2.active_ports == gs.active_ports, "GameState über JSON")
+
+	# C.O.R.D.: nach dem Laden gleiche Zufallsfolge
+	var a := CordLogic.new()
+	a.setup(99)
+	a.ask_now()
+	a.decline()
+	var b := CordLogic.new()
+	b.setup(1)
+	b.load_dict(JSON.parse_string(JSON.stringify(a.to_dict())))
+	_check(is_equal_approx(b.time_left, a.time_left) and b.phase == a.phase, "C.O.R.D.-Zustand über JSON")
+	a.ask_now()
+	a.decline()
+	b.ask_now()
+	b.decline()
+	_check(a.time_left == b.time_left, "C.O.R.D.-Zufall läuft nach dem Laden gleich weiter")
+	a.free()
+	b.free()
+
+	# Rolle, Knäuel, Haufen, Kabelzustand
+	var r := ReelData.new(3, ReelData.Kind.MOTOR, Vector3(1.5, 0, -2.25))
+	r.cable_id = 7
+	var r2 := ReelData.from_dict(JSON.parse_string(JSON.stringify(r.to_dict())))
+	_check(r2.id == 3 and r2.kind == ReelData.Kind.MOTOR and r2.position.is_equal_approx(r.position) and r2.cable_id == 7, "Rolle über JSON")
+	var h := HeapData.new(8, 4242, Vector3(3, 0, 4), 12, 2.5, 1.4)
+	var h2 := HeapData.from_dict(JSON.parse_string(JSON.stringify(h.to_dict())))
+	_check(h2.create_cables(0)[5].path.points == h.create_cables(0)[5].path.points, "Lieferungs-Haufen über JSON gleich")
+	var c := CableData.from_seed(1, 5, Vector3.ZERO)
+	c.state = CableData.State.HOOKED
+	c.pulled_m = 3.25
+	c.knots_solved = 1
+	var c2 := CableData.from_seed(1, 5, Vector3.ZERO)
+	c2.load_state(JSON.parse_string(JSON.stringify(c.state_dict())))
+	_check(c2.state == CableData.State.HOOKED and is_equal_approx(c2.pulled_m, 3.25) and c2.knots_solved == 1, "Kabelzustand über JSON")

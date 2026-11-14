@@ -77,3 +77,18 @@ func _wait_for_next() -> void:
 	phase = Phase.IDLE
 	var c: Dictionary = Balancing.cord
 	time_left = _rng.randf_range(float(c["ask_interval_min_s"]), float(c["ask_interval_max_s"]))
+
+
+func to_dict() -> Dictionary:
+	# Zufallszustand als Text, damit große Zahlen im JSON nicht ungenau werden
+	return { "phase": phase, "time_left": time_left, "rng_seed": str(_rng.seed), "rng_state": str(_rng.state),
+		"orders_placed": orders_placed, "orders_declined": orders_declined }
+
+
+func load_dict(d: Dictionary) -> void:
+	_rng.seed = String(d.get("rng_seed", "0")).to_int()
+	_rng.state = String(d.get("rng_state", "0")).to_int()
+	phase = int(d.get("phase", Phase.IDLE)) as Phase
+	time_left = float(d.get("time_left", 30.0))
+	orders_placed = int(d.get("orders_placed", 0))
+	orders_declined = int(d.get("orders_declined", 0))

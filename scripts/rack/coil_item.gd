@@ -24,3 +24,19 @@ static func from_cable(item_id: int, cable: CableData) -> CoilItem:
 
 func color() -> Color:
 	return Color.html(Balancing.cable["palette"][color_index])
+
+
+func to_dict() -> Dictionary:
+	return { "id": id, "port_id": port_id, "color_index": color_index, "visual_length": visual_length,
+		"position": SaveGame.vec_to(position), "carried_by": carried_by }
+
+
+static func from_dict(d: Dictionary) -> CoilItem:
+	var item := CoilItem.new()
+	item.id = int(d["id"])
+	item.port_id = int(d["port_id"])
+	item.color_index = int(d.get("color_index", 0))
+	item.visual_length = float(d.get("visual_length", 10.0))
+	item.position = SaveGame.vec_from(d.get("position", [0, 0, 0]))
+	item.carried_by = int(d.get("carried_by", -1))
+	return item

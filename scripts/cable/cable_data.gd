@@ -84,3 +84,17 @@ func is_stuck() -> bool:
 
 func color() -> Color:
 	return Color.html(Balancing.cable["palette"][color_index])
+
+
+## Veränderlicher Zustand für den Spielstand (Form kommt wieder aus dem Seed).
+func state_dict() -> Dictionary:
+	return { "id": id, "state": state, "pulled_m": pulled_m, "reel_id": reel_id,
+		"knots_solved": knots_solved, "knot_presses": knot_presses }
+
+
+func load_state(d: Dictionary) -> void:
+	state = int(d.get("state", State.HEAP)) as State
+	pulled_m = float(d.get("pulled_m", 0.0))
+	reel_id = int(d.get("reel_id", -1))
+	knots_solved = int(d.get("knots_solved", 0))
+	knot_presses = int(d.get("knot_presses", 0))

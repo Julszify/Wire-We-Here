@@ -45,3 +45,15 @@ func contains(pos: Vector3, margin: float = 0.0) -> bool:
 	if kind != Kind.HEAP:
 		return false
 	return Vector2(pos.x - center.x, pos.z - center.z).length() < radius + margin
+
+
+func to_dict() -> Dictionary:
+	return { "id": id, "seed": rng_seed, "center": SaveGame.vec_to(center), "count": cable_count,
+		"kind": kind, "radius": radius, "peak_height": peak_height, "name": name }
+
+
+static func from_dict(d: Dictionary) -> HeapData:
+	var h := HeapData.new(int(d["id"]), int(d["seed"]), SaveGame.vec_from(d["center"]), int(d["count"]),
+		float(d["radius"]), float(d["peak_height"]), int(d.get("kind", Kind.HEAP)) as Kind)
+	h.name = String(d.get("name", ""))
+	return h

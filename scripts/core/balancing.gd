@@ -20,6 +20,7 @@ var knot: Dictionary = {}
 var placement: Dictionary = {}
 var rack: Dictionary = {}
 var cord: Dictionary = {}
+var save: Dictionary = {}
 var tablet_order: Array = []
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
 var services: Array = []
@@ -55,6 +56,7 @@ func reload() -> void:
 	placement = parsed.get("placement", {})
 	rack = parsed.get("rack", {})
 	cord = parsed.get("cord", {})
+	save = parsed.get("save", {})
 	tablet_order = parsed.get("tablet_order", [])
 	services = _load_json(SERVICES_PATH).get("services", [])
 	zone = _load_json(ZONE_PATH)

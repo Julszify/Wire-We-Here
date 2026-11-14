@@ -66,6 +66,8 @@ Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
 **Wichtige Kabel (entschieden in M6, angepasst in M6.5):** genau 20 in der ganzen Zone, zufällig verteilt, leuchten und tragen ein Etikett (Port + Dienst). Man rollt sie normal auf; statt Geld entsteht ein beschriftetes Knäuel, das man zum Server-Schrank trägt und mit E einsteckt (Q legt es ab). Ports werden der Reihe nach vergeben. Reaktivierte Dienste schalten Upgrades frei (`data/services.json`, Feld `unlocks`).
 
+**Testoptionen:** `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` (Zustand ausgeben), weitere in `world.gd` → `_apply_test_args`.
+
 **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 
 **Technischer Hinweis:** In `.tscn`-Dateien Drehungen als `rotation = Vector3(...)` schreiben, nicht als Transform3D-Matrix; Godot speichert die Matrix zeilenweise, das führt leicht zu gespiegelten Drehungen.
@@ -120,6 +122,6 @@ Alle Werte gehören in Datendateien (Godot-Resources oder JSON), nicht in den Co
 6. ✅ Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
 6.5 ✅ Ganze Zone voller Kabel auf einmal: großer Kabelberg, 6 Haufen und Streukabel (ca. 525 Kabel, `data/zone.json`), genau 20 wichtige Kabel zufällig verteilt
 7. ✅ C.O.R.D.-Platzhalter und Bestellfalle (erste Frage nach 30 s, dann alle 45–90 s, 6 s Zeit für „Nein“, sonst fallen 100 Kabel neben den Spieler)
-8. Speichern und Laden
+8. ✅ Speichern und Laden (JSON unter user://savegame.json; automatisch alle 30 s und beim Schließen, F5 speichern, F9 laden, „Neues Spiel“ im Tablet; gespeichert werden nur Seeds + veränderlicher Zustand)
 
 Engine: Godot 4.7 mit GDScript (bestätigt).

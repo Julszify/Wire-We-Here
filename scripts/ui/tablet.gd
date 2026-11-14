@@ -4,6 +4,7 @@ extends Control
 ## Liest nur aus Economy und ruft Economy.buy auf – keine eigene Spiellogik.
 
 signal closed
+signal new_game_requested
 
 var economy: Economy
 var rack: ServiceRack
@@ -12,6 +13,8 @@ var _list: VBoxContainer
 var _money: Label
 var _services: Label
 var _rows: Dictionary = {}  # Upgrade-ID -> { level, button, desc }
+var _new_game: Button
+var _confirm := false
 
 
 func setup(eco: Economy, service_rack: ServiceRack) -> void:
@@ -66,10 +69,17 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 	_services = Label.new()
 	_services.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
 	box.add_child(_services)
+	var foot := HBoxContainer.new()
+	box.add_child(foot)
 	var hint := Label.new()
-	hint.text = "Tab oder Esc: schließen"
+	hint.text = "Tab oder Esc: schließen   ·   F5 speichern, F9 laden (speichert auch automatisch)"
 	hint.add_theme_color_override("font_color", Color(0.55, 0.6, 0.65))
-	box.add_child(hint)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(hint)
+	_new_game = Button.new()
+	_new_game.text = "Neues Spiel"
+	_new_game.pressed.connect(_on_new_game_pressed)
+	foot.add_child(_new_game)
 
 	economy.money_changed.connect(func(_m: float) -> void: refresh())
 	economy.upgrade_bought.connect(func(_id: String, _l: int) -> void: refresh())
@@ -132,6 +142,18 @@ func refresh() -> void:
 				button.text = Economy.format_money(economy.cost(id))
 				button.disabled = not economy.can_buy(id)
 	_services.text = "Dienste online: %d / %d" % [rack.active_count(), ServiceRack.port_count()]
+	if not visible:
+		_confirm = false
+		_new_game.text = "Neues Spiel"
+
+
+## Zweimal klicken, damit niemand aus Versehen alles löscht
+func _on_new_game_pressed() -> void:
+	if not _confirm:
+		_confirm = true
+		_new_game.text = "Wirklich alles löschen?"
+		return
+	new_game_requested.emit()
 
 
 func _unhandled_input(event: InputEvent) -> void:

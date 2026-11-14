@@ -35,3 +35,14 @@ func tuning() -> Dictionary:
 			return Balancing.hand_crank
 		_:
 			return Balancing.motor_reel
+
+
+func to_dict() -> Dictionary:
+	return { "id": id, "kind": kind, "position": SaveGame.vec_to(position), "cable_id": cable_id, "owner_id": owner_id }
+
+
+static func from_dict(d: Dictionary) -> ReelData:
+	var r := ReelData.new(int(d["id"]), int(d["kind"]) as Kind, SaveGame.vec_from(d.get("position", [0, 0, 0])))
+	r.cable_id = int(d.get("cable_id", -1))
+	r.owner_id = int(d.get("owner_id", 0))
+	return r

@@ -141,6 +141,19 @@ func facing() -> Vector3:
 	return f.normalized()
 
 
+## Position und Blickrichtung für den Spielstand
+func view_state() -> Dictionary:
+	return { "position": SaveGame.vec_to(global_position), "yaw": _yaw.rotation.y,
+		"pitch": _pitch.rotation.x, "body_yaw": _body.rotation.y }
+
+
+func set_view_state(d: Dictionary) -> void:
+	global_position = SaveGame.vec_from(d.get("position", [0, 0, 0]))
+	_yaw.rotation.y = float(d.get("yaw", 0.0))
+	_pitch.rotation.x = float(d.get("pitch", -0.5))
+	_body.rotation.y = float(d.get("body_yaw", 0.0))
+
+
 ## Globale Lage des Unterarms, um den das Kabel gewickelt wird
 func arm_transform() -> Transform3D:
 	return _arm.global_transform
