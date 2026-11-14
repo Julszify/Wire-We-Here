@@ -26,6 +26,11 @@ var holding := false:
 		_update_arm_pose()
 ## Haltepunkt des Kabels im Haufen und maximale Entfernung davon
 var tether_anchor := Vector3.ZERO
+## Aus, solange z. B. das Tablet offen ist
+var input_enabled := true
+## Dauerzug-Upgrade: Züge pro Sekunde bei gehaltener Taste (0 = aus)
+var auto_pull_rate := 0.0
+var _auto_pull_t := 0.0
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
@@ -39,6 +44,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not input_enabled:
+		return
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		# Erster Klick fängt die Maus wieder ein und zählt nicht als Zug
 		if event is InputEventMouseButton and event.pressed:
@@ -63,7 +70,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	var p: Dictionary = Balancing.player
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") if input_enabled else Vector2.ZERO
 	var dir := (_yaw.global_basis * Vector3(input.x, 0.0, input.y))
 	dir.y = 0.0
 	dir = dir.normalized()
@@ -91,6 +98,22 @@ func _physics_process(delta: float) -> void:
 	if face.length_squared() > 1e-4:
 		var target := atan2(-face.x, -face.z)
 		_body.rotation.y = lerp_angle(_body.rotation.y, target, 1.0 - exp(-12.0 * delta))
+
+
+func _process(delta: float) -> void:
+	# Dauerzug: gehaltene Zieh-Taste löst regelmäßig Züge aus
+	var holding_key := input_enabled and auto_pull_rate > 0.0 \
+		and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_action_pressed("pull")
+	if not holding_key:
+		_auto_pull_t = 0.0
+		return
+	_auto_pull_t += delta
+	var interval := 1.0 / auto_pull_rate
+	# Der erste Zug kommt schon vom Tastendruck selbst
+	while _auto_pull_t >= interval:
+		_auto_pull_t -= interval
+		pull_pressed.emit()
+		_wiggle_arm()
 
 
 ## Strahl durch die Bildschirmmitte (Fadenkreuz): [Ursprung, Richtung]

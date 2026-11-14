@@ -7,6 +7,10 @@ var money: float = 0.0
 var total_earned: float = 0.0
 ## Upgrade-ID -> Stufe bzw. Anzahl
 var upgrades: Dictionary = {}
+## Belegte Ports im Server-Schrank (= reaktivierte Dienste)
+var active_ports: Array[int] = []
+## Nächster Port, der einem wichtigen Kabel zugeteilt wird
+var next_port: int = 0
 
 
 func level(upgrade_id: String) -> int:

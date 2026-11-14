@@ -3,6 +3,7 @@ extends Node
 ## Kein Spielcode soll Zahlenwerte fest einbauen, sondern hier nachschlagen.
 
 const DATA_PATH := "res://data/balancing.json"
+const SERVICES_PATH := "res://data/services.json"
 
 var cable: Dictionary = {}
 var heap: Dictionary = {}
@@ -16,6 +17,10 @@ var player: Dictionary = {}
 var arm: Dictionary = {}
 var knot: Dictionary = {}
 var placement: Dictionary = {}
+var rack: Dictionary = {}
+var tablet_order: Array = []
+## Ein Dienst pro Port: { "name", optional "unlocks" }
+var services: Array = []
 
 
 func _init() -> void:
@@ -44,3 +49,10 @@ func reload() -> void:
 	arm = parsed.get("arm", {})
 	knot = parsed.get("knot", {})
 	placement = parsed.get("placement", {})
+	rack = parsed.get("rack", {})
+	tablet_order = parsed.get("tablet_order", [])
+	var sfile := FileAccess.open(SERVICES_PATH, FileAccess.READ)
+	if sfile:
+		var sp: Variant = JSON.parse_string(sfile.get_as_text())
+		if typeof(sp) == TYPE_DICTIONARY:
+			services = sp.get("services", [])

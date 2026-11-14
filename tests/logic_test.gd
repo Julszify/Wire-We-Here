@@ -11,6 +11,9 @@ func _ready() -> void:
 	_test_transfer_and_motor()
 	_test_economy()
 	_test_determinism()
+	_test_rack_and_unlocks()
+	_test_important_ports()
+	_test_multipliers()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -102,3 +105,53 @@ func _test_determinism() -> void:
 	for i in 5:
 		same = same and a[i].length_m == b[i].length_m and a[i].path.points == b[i].path.points and a[i].knots_m == b[i].knots_m
 	_check(same, "Gleicher Seed = gleicher Haufen")
+
+
+func _test_rack_and_unlocks() -> void:
+	var eco := Economy.new()
+	add_child(eco)
+	var rack := ServiceRack.new(eco.state)
+	_check(ServiceRack.port_count() == 20, "20 Ports im Schrank")
+	eco.state.money = 1000.0
+	_check(eco.is_locked("grip") and not eco.buy("grip"), "Festerer Griff anfangs gesperrt")
+	_check(not eco.is_locked("crank") and not eco.is_locked("extra_reel"), "Kurbel und Motorrolle frei")
+	var port := eco.locked_by("grip")
+	var events := []
+	rack.service_activated.connect(func(p, _n, u): events.append([p, u]))
+	_check(rack.plug(port), "Einstecken")
+	_check(not rack.plug(port), "Port nicht doppelt belegbar")
+	_check(events.size() == 1 and events[0][1] == "grip", "Signal mit Freischaltung")
+	_check(not eco.is_locked("grip") and eco.buy("grip"), "Festerer Griff nach Dienst kaufbar")
+	_check(is_equal_approx(eco.factor("grip"), 1.5), "Griff-Faktor 1,5")
+	rack.free()
+	eco.queue_free()
+
+
+func _test_important_ports() -> void:
+	var heap := HeapData.new(0, 99, Vector3.ZERO, 20)
+	var cables := heap.create_cables(0, 5, 20)
+	var ports := []
+	for c in cables:
+		if c.is_important():
+			ports.append(c.port_id)
+	_check(ports == [5, 6, 7], "Drei wichtige Kabel mit fortlaufenden Ports: %s" % [ports])
+	var full := heap.create_cables(0, 19, 20)
+	var n := 0
+	for c in full:
+		if c.is_important():
+			n += 1
+	_check(n == 1, "Keine Ports über 20 hinaus")
+
+
+func _test_multipliers() -> void:
+	var sys := CableSystem.new()
+	var arm := ReelData.new(0, ReelData.Kind.ARM)
+	sys.add_reel(arm)
+	var c := CableData.from_seed(1, 5, Vector3.ZERO)
+	c.knots_m = PackedFloat32Array()
+	sys.add_cable(c)
+	sys.hook(c, arm)
+	sys.press_multiplier = 1.5
+	sys.press(arm)
+	_check(is_equal_approx(arm.pending_m, 0.25 * 1.5), "Festerer Griff wirkt auf Tastendruck")
+	sys.free()

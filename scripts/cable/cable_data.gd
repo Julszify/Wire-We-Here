@@ -16,6 +16,8 @@ var length_m: float = 0.0
 ## Positionen der Knoten in gezogenen Metern, aufsteigend
 var knots_m: PackedFloat32Array = PackedFloat32Array()
 var color_index: int = 0
+## Wichtiges Kabel: gehört an diesen Port im Server-Schrank (-1 = gewöhnliches Kabel)
+var port_id: int = -1
 ## Sichtbare Bahn im Haufen (abgeleitet, wird nicht gespeichert)
 var path: CablePath
 
@@ -53,6 +55,10 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3) -> CableD
 
 	d.color_index = rng.randi_range(0, (c["palette"] as Array).size() - 1)
 	return d
+
+
+func is_important() -> bool:
+	return port_id >= 0
 
 
 ## Fortschritt 0..1

@@ -15,8 +15,7 @@ func _ready() -> void:
 ## Bezahlung für ein fertig aufgerolltes Kabel. Gibt den Betrag zurück.
 func pay_for_cable(length_m: float) -> float:
 	var per_meter: float = Balancing.economy["money_per_meter"]
-	var copper: Dictionary = Balancing.upgrades.get("copper", {})
-	per_meter *= pow(float(copper.get("effect_factor", 1.0)), state.level("copper"))
+	per_meter *= factor("copper")
 	var amount := length_m * per_meter
 	state.money += amount
 	state.total_earned += amount
@@ -34,8 +33,27 @@ func is_maxed(upgrade_id: String) -> bool:
 	return u.has("max_count") and state.level(upgrade_id) >= int(u["max_count"])
 
 
+## Gesperrt, solange ein Dienst, der dieses Upgrade freischaltet, noch nicht läuft.
+func is_locked(upgrade_id: String) -> bool:
+	return locked_by(upgrade_id) >= 0
+
+
+## Port des Dienstes, der das Upgrade noch sperrt, oder -1.
+func locked_by(upgrade_id: String) -> int:
+	for port in Balancing.services.size():
+		if String(Balancing.services[port].get("unlocks", "")) == upgrade_id and not state.active_ports.has(port):
+			return port
+	return -1
+
+
 func can_buy(upgrade_id: String) -> bool:
-	return not is_maxed(upgrade_id) and state.money >= cost(upgrade_id) - 1e-6
+	return not is_locked(upgrade_id) and not is_maxed(upgrade_id) and state.money >= cost(upgrade_id) - 1e-6
+
+
+## Wirkungsfaktor eines Upgrades: effect_factor ^ Stufe (1.0 ohne Upgrade)
+func factor(upgrade_id: String) -> float:
+	var u: Dictionary = Balancing.upgrades.get(upgrade_id, {})
+	return pow(float(u.get("effect_factor", 1.0)), state.level(upgrade_id))
 
 
 func buy(upgrade_id: String) -> bool:
@@ -46,6 +64,10 @@ func buy(upgrade_id: String) -> bool:
 	money_changed.emit(state.money)
 	upgrade_bought.emit(upgrade_id, state.level(upgrade_id))
 	return true
+
+
+func upgrade_description(upgrade_id: String) -> String:
+	return String(Balancing.upgrades[upgrade_id].get("description", ""))
 
 
 func upgrade_name(upgrade_id: String) -> String:

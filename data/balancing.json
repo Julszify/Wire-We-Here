@@ -30,7 +30,8 @@
 		"base_height_m": 0.25,
 		"peak_extra_height_m": 1.7,
 		"end_height_m": 0.12,
-		"cable_count": 20
+		"cable_count": 20,
+		"important_per_heap": 3
 	},
 	"economy": {
 		"money_per_meter": 0.5,
@@ -41,39 +42,44 @@
 			"name": "Handkurbel",
 			"base_cost": 8.0,
 			"cost_growth": 1.0,
-			"max_count": 1
+			"max_count": 1,
+			"description": "Aufstellbare Rolle mit Kurbel: 0,75 m pro Druck statt 0,25 m."
 		},
 		"grip": {
 			"name": "Festerer Griff",
 			"base_cost": 10.0,
 			"cost_growth": 1.9,
-			"effect_factor": 1.5
+			"effect_factor": 1.5,
+			"description": "Jeder Zug holt 50 % mehr Kabel raus (Arm und Kurbel)."
 		},
 		"motor": {
 			"name": "Stärkere Motoren",
 			"base_cost": 40.0,
 			"cost_growth": 2.2,
-			"effect_factor": 1.4
+			"effect_factor": 1.4,
+			"description": "Alle Motorrollen ziehen 40 % schneller."
 		},
 		"extra_reel": {
 			"name": "Motorrolle",
 			"base_cost": 15.0,
 			"cost_growth": 1.8,
-			"max_count": 8
+			"max_count": 8,
+			"description": "Stellt eine Motorrolle auf, die eingehängte Kabel von selbst zieht."
 		},
 		"copper": {
 			"name": "Kupferhändler",
 			"base_cost": 60.0,
 			"cost_growth": 2.3,
-			"effect_factor": 1.35
+			"effect_factor": 1.35,
+			"description": "Jeder Meter bringt 35 % mehr Geld."
 		},
 		"auto_pull": {
 			"name": "Dauerzug",
-			"_kommentar": "Taste gedrückt halten statt wiederholt drücken",
 			"base_cost": 30.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
-			"presses_per_second": 4.0
+			"presses_per_second": 4.0,
+			"description": "Zieh-Taste gedrückt halten statt hämmern."
 		}
 	},
 	"hand_crank": {
@@ -129,5 +135,21 @@
 	"placement": {
 		"distance_ahead_m": 2.2,
 		"min_heap_clearance_m": 1.3
-	}
+	},
+	"rack": {
+		"position": [
+			-5.5,
+			0.0,
+			3.5
+		],
+		"reach_m": 3.0
+	},
+	"tablet_order": [
+		"crank",
+		"extra_reel",
+		"grip",
+		"auto_pull",
+		"motor",
+		"copper"
+	]
 }

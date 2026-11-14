@@ -16,6 +16,10 @@ signal knot_solved(cable: CableData)
 var cables: Dictionary = {}  # id -> CableData
 var reels: Dictionary = {}   # id -> ReelData
 
+## Upgrade-Wirkungen, von außen gesetzt (Festerer Griff, Stärkere Motoren)
+var press_multiplier: float = 1.0
+var motor_multiplier: float = 1.0
+
 
 func add_cable(cable: CableData) -> void:
 	cables[cable.id] = cable
@@ -72,7 +76,7 @@ func press(reel: ReelData) -> void:
 	var cable := cable_on(reel)
 	if cable.is_stuck():
 		return
-	reel.pending_m += float(reel.tuning()["pull_per_press_m"])
+	reel.pending_m += float(reel.tuning()["pull_per_press_m"]) * press_multiplier
 
 
 ## Ein Tastendruck am Knoten. Nach genügend Drücken ist der Knoten gelöst.
@@ -127,9 +131,9 @@ func _process(delta: float) -> void:
 		if reel.is_free():
 			continue
 		if reel.kind == ReelData.Kind.MOTOR:
-			pull(reel, float(Balancing.motor_reel["pull_speed_m_per_s"]) * delta)
+			pull(reel, float(Balancing.motor_reel["pull_speed_m_per_s"]) * motor_multiplier * delta)
 		elif reel.pending_m > 0.0:
-			var feed: float = reel.tuning()["feed_speed_m_per_s"]
+			var feed: float = float(reel.tuning()["feed_speed_m_per_s"]) * press_multiplier
 			var step := minf(reel.pending_m, feed * delta)
 			reel.pending_m -= step
 			pull(reel, step)

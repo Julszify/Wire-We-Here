@@ -1,0 +1,69 @@
+{
+	"_kommentar": "Dienste im Server-Schrank, ein Eintrag pro Port. 'unlocks' schaltet ein Upgrade im Tablet frei.",
+	"services": [
+		{
+			"name": "Wolkig-Mail",
+			"unlocks": "grip"
+		},
+		{
+			"name": "Kantinen-Speiseplan",
+			"unlocks": "auto_pull"
+		},
+		{
+			"name": "Kaffeemaschinen-Cloud",
+			"unlocks": "motor"
+		},
+		{
+			"name": "Druckerwarteschlange"
+		},
+		{
+			"name": "Chef-Kalender",
+			"unlocks": "copper"
+		},
+		{
+			"name": "Intranet-Witzseite"
+		},
+		{
+			"name": "Zeiterfassung"
+		},
+		{
+			"name": "Videokonferenz (nur Ton)"
+		},
+		{
+			"name": "Passwort zurücksetzen"
+		},
+		{
+			"name": "Gehaltsabrechnung"
+		},
+		{
+			"name": "Wetterdienst „Wolkig“"
+		},
+		{
+			"name": "Backup vom Backup"
+		},
+		{
+			"name": "Fax-zu-Cloud-Brücke"
+		},
+		{
+			"name": "Parkplatz-Reservierung"
+		},
+		{
+			"name": "Geburtstagsliste"
+		},
+		{
+			"name": "Stammtisch-Buchung"
+		},
+		{
+			"name": "Ticket-System"
+		},
+		{
+			"name": "Ersatzteil-Bestellung"
+		},
+		{
+			"name": "Aufzugsmusik-Stream"
+		},
+		{
+			"name": "C.O.R.D.-Abschaltknopf"
+		}
+	]
+}

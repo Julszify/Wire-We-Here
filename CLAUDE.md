@@ -62,7 +62,9 @@ Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
 
 Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
-**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Vorläufiger Laden bis M6: Taste 1 Handkurbel, Taste 2 Motorrolle (wird vor der Figur aufgestellt).
+**Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Tab öffnet das Tablet (Upgrades kaufen, Spiel läuft weiter); gekaufte Rollen werden vor der Figur aufgestellt.
+
+**Wichtige Kabel (entschieden in M6):** 3 pro Haufen, leuchten und tragen ein Etikett (Port + Dienst). Man rollt sie normal auf; statt Geld entsteht ein beschriftetes Knäuel, das man zum Server-Schrank trägt und mit E einsteckt (Q legt es ab). Ports werden der Reihe nach vergeben. Reaktivierte Dienste schalten Upgrades frei (`data/services.json`, Feld `unlocks`).
 
 **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 
@@ -115,7 +117,7 @@ Alle Werte gehören in Datendateien (Godot-Resources oder JSON), nicht in den Co
 3. ✅ Kabel an eine Rolle hängen und per Taste ziehen, inklusive Aufwickeln
 4. ✅ Haufen mit 20 Kabeln, Spielfigur, Anvisieren, Kabelende greifen und per Hand um den Arm wickeln
 5. ✅ Geld, Knoten, Handkurbel als erstes Upgrade, Motorrolle
-6. Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
+6. ✅ Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
 7. C.O.R.D.-Platzhalter und Bestellfalle
 8. Speichern und Laden
 
