@@ -31,7 +31,8 @@ var knot_presses: int = 0
 
 
 ## Erzeugt ein Kabel vollständig aus dem Seed. Gleicher Seed = gleiches Kabel.
-static func from_seed(cable_id: int, cable_seed: int, center: Vector3) -> CableData:
+## `heap` gibt Form und Größe vor (null = Standard-Haufen aus balancing.json).
+static func from_seed(cable_id: int, cable_seed: int, center: Vector3, heap: HeapData = null) -> CableData:
 	var c: Dictionary = Balancing.cable
 	var rng := RandomNumberGenerator.new()
 	rng.seed = cable_seed
@@ -41,7 +42,12 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3) -> CableD
 	d.rng_seed = cable_seed
 	d.heap_center = center
 	# Reihenfolge der Zufallsaufrufe nicht ändern, sonst ändern sich alle Haufen
-	d.path = CablePath.generate_heap_path(rng, center)
+	if heap and heap.kind == HeapData.Kind.SCATTER:
+		d.path = CablePath.generate_scatter_path(rng, center, heap.radius)
+	elif heap:
+		d.path = CablePath.generate_heap_path(rng, center, heap.radius, heap.peak_height)
+	else:
+		d.path = CablePath.generate_heap_path(rng, center)
 	d.length_m = rng.randf_range(c["length_min_m"], c["length_max_m"])
 
 	var knot_count := 0

@@ -11,10 +11,14 @@ var length: float = 0.0
 
 
 ## Erzeugt eine zufällige Haufen-Bahn um `center`. Verbraucht Zufallszahlen aus `rng`.
-static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3) -> CablePath:
+## `radius` und `peak` (zusätzliche Höhe in der Mitte) bestimmen die Größe des Haufens.
+static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radius: float = -1.0, peak: float = -1.0) -> CablePath:
 	var h: Dictionary = Balancing.heap
 	var c: Dictionary = Balancing.cable
-	var radius: float = h["radius_m"]
+	if radius <= 0.0:
+		radius = h["radius_m"]
+	if peak <= 0.0:
+		peak = h["peak_extra_height_m"]
 	var inner: float = radius * float(h["inner_fraction"])
 
 	# Startpunkt am Rand des Haufens, damit das Ende gut erreichbar ist
@@ -28,13 +32,37 @@ static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3) -> C
 	for i in count:
 		var r := sqrt(rng.randf()) * inner
 		var t := rng.randf() * TAU
-		var height_max: float = h["base_height_m"] + h["peak_extra_height_m"] * (1.0 - pow(r / radius, 2.0))
+		var height_max: float = h["base_height_m"] + peak * (1.0 - pow(r / radius, 2.0))
 		var y: float = h["min_height_m"] + rng.randf() * height_max
 		ctrl.append(center + Vector3(r * cos(t), y, r * sin(t)))
 
 	var dense := catmull_rom_centripetal(ctrl, 24)
 	var path := CablePath.new()
 	path.points = resample_even(dense, int(c["path_samples"]))
+	path.length = polyline_length(path.points)
+	return path
+
+
+## Einzelnes Kabel, das quer über den Boden läuft (Zufallsweg mit leichten Kurven).
+## Index 0 ist ein Ende auf dem Boden, an dem man es greifen kann.
+static func generate_scatter_path(rng: RandomNumberGenerator, center: Vector3, area_radius: float) -> CablePath:
+	var sc: Dictionary = Balancing.zone.get("scatter", {})
+	var ctrl := PackedVector3Array()
+	var r := sqrt(rng.randf()) * area_radius
+	var a := rng.randf() * TAU
+	var pos := center + Vector3(r * cos(a), 0.0, r * sin(a))
+	var heading := rng.randf() * TAU
+	var count := rng.randi_range(int(sc.get("points_min", 5)), int(sc.get("points_max", 8)))
+	var turn := deg_to_rad(float(sc.get("turn_max_deg", 70.0)))
+	for i in count:
+		pos.y = rng.randf_range(float(sc.get("height_min_m", 0.06)), float(sc.get("height_max_m", 0.16)))
+		ctrl.append(pos)
+		heading += rng.randf_range(-turn, turn)
+		var step := rng.randf_range(float(sc.get("step_min_m", 1.8)), float(sc.get("step_max_m", 3.2)))
+		pos += Vector3(cos(heading), 0.0, sin(heading)) * step
+	var dense := catmull_rom_centripetal(ctrl, 16)
+	var path := CablePath.new()
+	path.points = resample_even(dense, int(Balancing.cable["path_samples"]))
 	path.length = polyline_length(path.points)
 	return path
 

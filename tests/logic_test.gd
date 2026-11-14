@@ -128,19 +128,34 @@ func _test_rack_and_unlocks() -> void:
 
 
 func _test_important_ports() -> void:
-	var heap := HeapData.new(0, 99, Vector3.ZERO, 20)
-	var cables := heap.create_cables(0, 5, 20)
+	var zone := ZoneData.from_config(1234)
+	var free: Array[int] = []
+	for p in 20:
+		free.append(p)
+	var cables := zone.create_cables(0, free)
+	_check(cables.size() == zone.cable_total() and cables.size() >= 500, "Über 500 Kabel in der Zone (%d)" % cables.size())
 	var ports := []
+	var heaps_with_important := {}
 	for c in cables:
 		if c.is_important():
 			ports.append(c.port_id)
-	_check(ports == [5, 6, 7], "Drei wichtige Kabel mit fortlaufenden Ports: %s" % [ports])
-	var full := heap.create_cables(0, 19, 20)
+	ports.sort()
+	_check(ports == free, "Genau 20 wichtige Kabel, Ports 0–19")
+	var ids := {}
+	for c in cables:
+		ids[c.id] = true
+	_check(ids.size() == cables.size(), "Kabel-IDs eindeutig")
+	var again := ZoneData.from_config(1234).create_cables(0, free)
+	var same := true
+	for i in [0, 100, 300, cables.size() - 1]:
+		same = same and again[i].path.points == cables[i].path.points and again[i].port_id == cables[i].port_id
+	_check(same, "Zone reproduzierbar aus dem Seed")
+	var few: Array[int] = [3, 7]
 	var n := 0
-	for c in full:
+	for c in ZoneData.from_config(1234).create_cables(0, few):
 		if c.is_important():
 			n += 1
-	_check(n == 1, "Keine Ports über 20 hinaus")
+	_check(n == 2, "Nur freie Ports werden vergeben")
 
 
 func _test_multipliers() -> void:

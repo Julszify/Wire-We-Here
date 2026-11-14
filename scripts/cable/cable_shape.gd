@@ -11,7 +11,7 @@ extends RefCounted
 static func build_on_reel(cable: CableData, reel_pos: Vector3) -> Dictionary:
 	var anchor := cable.path.points[0]
 	var feed_angle := atan2(anchor.z - reel_pos.z, anchor.x - reel_pos.x)
-	var coil := coil_points(reel_pos, cable.progress() * cable.path.length, feed_angle)
+	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle)
 	var coil_pts: PackedVector3Array = coil["points"]
 	var coil_end := coil_pts[coil_pts.size() - 1]
 	# Verbindungsstück leicht nach oben gebogen
@@ -22,13 +22,19 @@ static func build_on_reel(cable: CableData, reel_pos: Vector3) -> Dictionary:
 ## Kabel um den Arm gewickelt. `arm` ist die globale Lage des Unterarms
 ## (Ursprung am Ellbogen, Hand Richtung -Z, außen Richtung -X).
 static func build_on_arm(cable: CableData, arm: Transform3D) -> PackedVector3Array:
-	var coil_pts := arm_coil_points(arm, cable.progress() * cable.path.length)
+	var coil_pts := arm_coil_points(arm, cable.progress() * coil_length(cable))
 	var anchor := cable.path.points[0]
 	var coil_end := coil_pts[coil_pts.size() - 1]
 	# Verbindungsstück hängt durch, aber nicht durch den Boden
 	var mid_y := maxf((anchor.y + coil_end.y) * 0.5 - float(Balancing.arm["connector_sag_m"]),
 		float(Balancing.cable["radius_m"]))
 	return _assemble(cable, coil_pts, mid_y)
+
+
+## Sichtbare Länge der Wicklung bei voll aufgerolltem Kabel (begrenzt, damit
+## lange Bahnen im großen Berg keine riesigen Knäuel ergeben).
+static func coil_length(cable: CableData) -> float:
+	return minf(cable.path.length, float(Balancing.cable.get("coil_visual_max_m", 18.0)))
 
 
 ## Haufenrest + Verbindungsstück (quadratische Bézierkurve) + Wicklung von außen nach innen.

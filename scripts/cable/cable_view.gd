@@ -11,14 +11,9 @@ var _label: Label3D
 func setup(cable: CableData) -> void:
 	data = cable
 	mesh = _mesh
-	_mat = StandardMaterial3D.new()
-	_mat.albedo_color = cable.color()
-	_mat.roughness = 0.35
-	_mat.metallic = 0.05
-	_mat.clearcoat_enabled = true
-	_mat.clearcoat = 0.4
 	if cable.is_important():
-		# Wichtige Kabel leuchten schwach und tragen ein Etikett
+		# Wichtige Kabel leuchten schwach und tragen ein Etikett (eigenes Material)
+		_mat = _new_material(cable.color())
 		_mat.emission_enabled = true
 		_mat.emission = cable.color().lightened(0.3)
 		_mat.emission_energy_multiplier = 0.6
@@ -33,6 +28,9 @@ func setup(cable: CableData) -> void:
 		_label.visibility_range_end = 9.0
 		add_child(_label)
 		_label.position = cable.path.points[0] + Vector3(0, 0.35, 0)
+	else:
+		# Gewöhnliche Kabel teilen sich ein Material pro Farbe (viel schneller bei hunderten Kabeln)
+		_mat = _shared_material(cable.color_index, cable.color())
 	material_override = _mat
 	show_in_heap()
 
@@ -59,8 +57,31 @@ func show_on_arm(arm: Transform3D) -> void:
 func set_fade(alpha: float) -> void:
 	if _label:
 		_label.visible = alpha >= 1.0
+	if _SHARED.values().has(_mat):
+		# Geteiltes Material nicht für alle Kabel ausblenden: vorher kopieren
+		_mat = _mat.duplicate()
+		material_override = _mat
 	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if alpha < 1.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
 	_mat.albedo_color.a = alpha
+
+
+static var _SHARED: Dictionary = {}  # Farbindex -> StandardMaterial3D
+
+
+static func _shared_material(index: int, color: Color) -> StandardMaterial3D:
+	if not _SHARED.has(index):
+		_SHARED[index] = _new_material(color)
+	return _SHARED[index]
+
+
+static func _new_material(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.35
+	m.metallic = 0.05
+	m.clearcoat_enabled = true
+	m.clearcoat = 0.4
+	return m
 
 
 func _build(pts: PackedVector3Array) -> void:

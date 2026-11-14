@@ -1,0 +1,112 @@
+{
+	"_kommentar": "Anordnung der Schubladen-Ebene. Alle Kabel liegen von Anfang an da. Winkel 90° (Richtung +Z) bleibt frei für Schrank und Start.",
+	"seed": 1234,
+	"heaps": [
+		{
+			"name": "Kabelberg",
+			"center": [
+				0,
+				0,
+				0
+			],
+			"radius": 6.0,
+			"peak_height": 3.2,
+			"count": 220
+		},
+		{
+			"name": "Haufen 1",
+			"center": [
+				15.0,
+				0,
+				0.0
+			],
+			"radius": 3.0,
+			"peak_height": 1.8,
+			"count": 42
+		},
+		{
+			"name": "Haufen 2",
+			"center": [
+				8.25,
+				0,
+				14.29
+			],
+			"radius": 2.5,
+			"peak_height": 1.5,
+			"count": 32
+		},
+		{
+			"name": "Haufen 3",
+			"center": [
+				-7.5,
+				0,
+				12.99
+			],
+			"radius": 3.5,
+			"peak_height": 2.0,
+			"count": 50
+		},
+		{
+			"name": "Haufen 4",
+			"center": [
+				-16.5,
+				0,
+				0.0
+			],
+			"radius": 2.2,
+			"peak_height": 1.3,
+			"count": 28
+		},
+		{
+			"name": "Haufen 5",
+			"center": [
+				-7.5,
+				0,
+				-12.99
+			],
+			"radius": 3.2,
+			"peak_height": 1.9,
+			"count": 45
+		},
+		{
+			"name": "Haufen 6",
+			"center": [
+				8.25,
+				0,
+				-14.29
+			],
+			"radius": 2.8,
+			"peak_height": 1.6,
+			"count": 38
+		}
+	],
+	"scatter": {
+		"_kommentar": "Einzelne Kabel quer über den Boden",
+		"center": [
+			0,
+			0,
+			0
+		],
+		"radius": 22.0,
+		"count": 70,
+		"step_min_m": 1.8,
+		"step_max_m": 3.2,
+		"turn_max_deg": 70,
+		"points_min": 5,
+		"points_max": 8,
+		"height_min_m": 0.06,
+		"height_max_m": 0.16
+	},
+	"important_count": 20,
+	"rack_position": [
+		0.0,
+		0.0,
+		10.5
+	],
+	"player_start": [
+		3.0,
+		0.0,
+		13.0
+	],
+	"floor_size_m": 90
+}

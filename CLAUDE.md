@@ -64,7 +64,7 @@ Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
 **Steuerung (Platzhalter, Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Maus umsehen, E Kabelende greifen, Leertaste/Linksklick ziehen bzw. wickeln, Q loslassen (Fortschritt geht verloren), Esc Maus freigeben. Mit Kabel am Arm eine Rolle anvisieren + E = einhängen; Knoten mit E lösen (3 Drücke). Tab öffnet das Tablet (Upgrades kaufen, Spiel läuft weiter); gekaufte Rollen werden vor der Figur aufgestellt.
 
-**Wichtige Kabel (entschieden in M6):** 3 pro Haufen, leuchten und tragen ein Etikett (Port + Dienst). Man rollt sie normal auf; statt Geld entsteht ein beschriftetes Knäuel, das man zum Server-Schrank trägt und mit E einsteckt (Q legt es ab). Ports werden der Reihe nach vergeben. Reaktivierte Dienste schalten Upgrades frei (`data/services.json`, Feld `unlocks`).
+**Wichtige Kabel (entschieden in M6, angepasst in M6.5):** genau 20 in der ganzen Zone, zufällig verteilt, leuchten und tragen ein Etikett (Port + Dienst). Man rollt sie normal auf; statt Geld entsteht ein beschriftetes Knäuel, das man zum Server-Schrank trägt und mit E einsteckt (Q legt es ab). Ports werden der Reihe nach vergeben. Reaktivierte Dienste schalten Upgrades frei (`data/services.json`, Feld `unlocks`).
 
 **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 
@@ -118,6 +118,7 @@ Alle Werte gehören in Datendateien (Godot-Resources oder JSON), nicht in den Co
 4. ✅ Haufen mit 20 Kabeln, Spielfigur, Anvisieren, Kabelende greifen und per Hand um den Arm wickeln
 5. ✅ Geld, Knoten, Handkurbel als erstes Upgrade, Motorrolle
 6. ✅ Upgrade-Menü (inkl. Dauerzug), Server-Schrank mit 20 Ports, wichtige Kabel
+6.5 ✅ Ganze Zone voller Kabel auf einmal: großer Kabelberg, 6 Haufen und Streukabel (ca. 525 Kabel, `data/zone.json`), genau 20 wichtige Kabel zufällig verteilt
 7. C.O.R.D.-Platzhalter und Bestellfalle
 8. Speichern und Laden
 

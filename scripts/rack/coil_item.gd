@@ -18,7 +18,7 @@ static func from_cable(item_id: int, cable: CableData) -> CoilItem:
 	item.id = item_id
 	item.port_id = cable.port_id
 	item.color_index = cable.color_index
-	item.visual_length = cable.path.length
+	item.visual_length = CableShape.coil_length(cable)
 	return item
 
 

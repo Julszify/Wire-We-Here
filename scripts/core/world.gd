@@ -2,8 +2,8 @@ extends Node3D
 ## Schubladen-Ebene: verbindet Spielfigur, Kabel-Logik, Wirtschaft, Server-Schrank und Darstellung.
 ## Die Logik steckt in CableSystem, Economy und ServiceRack (Daten), hier wird nur verdrahtet und angezeigt.
 
-@export var heap_seed: int = 1234
-@export var heap_center := Vector3.ZERO
+## Mitte des großen Kabelbergs (Blickrichtung beim Start)
+const ZONE_CENTER := Vector3.ZERO
 
 const PLAYER_ID := 0
 
@@ -21,7 +21,7 @@ var _rack: ServiceRack
 var _rack_view: RackView
 var _rack_pos: Vector3
 var _tablet: Tablet
-var _heap: HeapData
+var _zone: ZoneData
 var _arm_reel: ReelData
 var _views: Dictionary = {}       # Kabel-ID -> CableView
 var _reel_views: Dictionary = {}  # Rollen-ID -> ReelView
@@ -81,8 +81,10 @@ func _ready() -> void:
 
 	_end_marker = _make_sphere(0.1, Color(1.0, 0.85, 0.3), 2.0)
 	add_child(_end_marker)
-	_spawn_heap(heap_seed)
-	_player.look_toward(heap_center)
+	var start: Array = Balancing.zone.get("player_start", [0, 0, 10])
+	_player.global_position = Vector3(start[0], start[1], start[2])
+	_spawn_zone(int(Balancing.zone.get("seed", 1234)))
+	_player.look_toward(ZONE_CENTER)
 	_apply_upgrades()
 
 	# Nur zum automatischen Testen, siehe _apply_test_args
@@ -227,9 +229,9 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 			_carried = item
 			_player.holding = true
 		else:
-			var out := reel.position - heap_center
+			var out := _player.global_position - reel.position
 			out.y = 0.0
-			item.position = reel.position + out.normalized() * 1.4
+			item.position = reel.position + (out.normalized() if out.length() > 0.01 else Vector3.BACK) * 1.4
 			iv.lie_at(item.position)
 		_show_message("Wichtiges Kabel fertig! Zum Server-Schrank bringen: Port %d · %s" % [item.port_id + 1, ServiceRack.service_name(item.port_id)])
 	else:
@@ -246,8 +248,8 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		_fading.append(view)
 
 	if _system.cables.is_empty():
-		_spawn_heap(_heap.rng_seed + 1)
-		_show_message("Haufen leer – Nachschub ist da.")
+		_spawn_zone(_zone.rng_seed + 1)
+		_show_message("Alles aufgeräumt – aber C.O.R.D. hat nachbestellt …")
 
 
 func _on_knot_hit(cable: CableData, reel: ReelData) -> void:
@@ -373,13 +375,13 @@ func _find_item(origin: Vector3, dir: Vector3, player_pos: Vector3) -> CoilItem:
 
 
 func _build_rack() -> void:
-	var p: Array = Balancing.rack["position"]
+	var p: Array = Balancing.zone.get("rack_position", [0, 0, 10])
 	_rack_pos = Vector3(p[0], p[1], p[2])
 	_rack_view = RackView.new()
 	add_child(_rack_view)
 	_rack_view.position = _rack_pos
 	# Vorderseite (+Z) zum Haufen drehen
-	var to_heap := heap_center - _rack_pos
+	var to_heap := ZONE_CENTER - _rack_pos
 	_rack_view.rotation.y = atan2(to_heap.x, to_heap.z)
 	_rack_view.setup(ServiceRack.port_count())
 
@@ -388,12 +390,13 @@ func _place_reel(kind: ReelData.Kind) -> void:
 	var pl: Dictionary = Balancing.placement
 	var pos := _player.global_position + _player.facing() * float(pl["distance_ahead_m"])
 	pos.y = 0.0
-	# Nicht in den Haufen stellen
-	var away := pos - heap_center
-	away.y = 0.0
-	var min_d: float = float(Balancing.heap["radius_m"]) + float(pl["min_heap_clearance_m"])
-	if away.length() < min_d:
-		pos = heap_center + (away.normalized() if away.length() > 0.01 else Vector3.BACK) * min_d
+	# Nicht in einen Haufen stellen: an den Rand schieben
+	var clearance: float = pl["min_heap_clearance_m"]
+	var heap := _zone.heap_at(pos, clearance)
+	if heap:
+		var away := pos - heap.center
+		away.y = 0.0
+		pos = heap.center + (away.normalized() if away.length() > 0.01 else Vector3.BACK) * (heap.radius + clearance)
 	var reel := ReelData.new(_next_reel_id, kind, pos)
 	_next_reel_id += 1
 	_system.add_reel(reel)
@@ -403,18 +406,26 @@ func _place_reel(kind: ReelData.Kind) -> void:
 	_reel_views[reel.id] = view
 
 
-func _spawn_heap(seed_value: int) -> void:
-	_heap = HeapData.new(0, seed_value, heap_center, int(Balancing.heap["cable_count"]))
-	var state := _economy.state
-	for cable in _heap.create_cables(_next_cable_id, state.next_port, ServiceRack.port_count()):
-		if cable.is_important():
-			state.next_port = maxi(state.next_port, cable.port_id + 1)
+func _spawn_zone(seed_value: int) -> void:
+	_zone = ZoneData.from_config(seed_value)
+	# Wichtige Kabel nur für Ports, die noch frei sind und für die kein Knäuel unterwegs ist
+	var free_ports: Array[int] = []
+	for port in ServiceRack.port_count():
+		var taken := _rack.is_active(port)
+		for item: CoilItem in _items.values():
+			taken = taken or item.port_id == port
+		for c: CableData in _system.cables.values():
+			taken = taken or c.port_id == port
+		if not taken:
+			free_ports.append(port)
+	var cables := _zone.create_cables(_next_cable_id, free_ports)
+	for cable in cables:
 		_system.add_cable(cable)
 		var view := CableView.new()
 		add_child(view)
 		view.setup(cable)
 		_views[cable.id] = view
-	_next_cable_id += _heap.cable_count
+	_next_cable_id += cables.size()
 
 
 func _remove_knot_marker(cable_id: int) -> void:
@@ -515,10 +526,10 @@ func _apply_test_args() -> void:
 			if best == null or c.path.points[0].distance_to(_player.global_position) < best.path.points[0].distance_to(_player.global_position):
 				best = c
 		var end := best.path.points[0]
-		var away := end - heap_center
+		var away := end - best.heap_center
 		away.y = 0.0
 		_player.global_position = end + away.normalized() * 1.5
-		_player.look_toward(heap_center)
+		_player.look_toward(best.heap_center)
 		if opts.has("orbit"):
 			_player.orbit_camera(float(opts["orbit"]))
 		_target_end = best
