@@ -60,6 +60,7 @@ var _order_heaps: Array[Dictionary] = []  # { "heap": HeapData, "first_id": int 
 var _removed_ids: Array[int] = []     # fertig aufgerollte Kabel (fehlen beim Neuerzeugen)
 var _saving_enabled := true
 var _autosave_t := 0.0
+var _dump_after := -1  # nur für Tests: Zustand nach so vielen Bildern ausgeben
 
 
 func _ready() -> void:
@@ -152,6 +153,11 @@ func _process(delta: float) -> void:
 	_time += delta
 	var arm := _player.arm_transform()
 	_arm_reel.position = arm.origin
+	# Leine nur, solange ein Kabel aus dem Haufen am Arm hängt
+	var on_arm := _system.cable_on(_arm_reel)
+	_player.tethered = on_arm != null
+	if on_arm:
+		_player.tether_anchor = on_arm.path.points[0]
 	_update_targets()
 
 	# Eingehängte Kabel jeden Frame neu formen (Figur bewegt sich, Rollen drehen)
@@ -186,6 +192,10 @@ func _process(delta: float) -> void:
 
 	_message_t -= delta
 	_update_hud()
+	if _dump_after >= 0:
+		_dump_after -= 1
+		if _dump_after == 0:
+			print("ZUSTAND ", _summary())
 
 	_autosave_t += delta
 	if _autosave_t >= float(Balancing.save.get("autosave_s", 30.0)):
@@ -282,8 +292,11 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 	_done_count += 1
 
 	if cable.is_important():
-		# Wichtiges Kabel: wird zum beschrifteten Knäuel statt zu Geld
+		# Wichtiges Kabel: wird zum beschrifteten Knäuel und bringt einen Teil des Meterpreises
 		view.queue_free()
+		var part := _economy.pay_for_cable(cable.length_m, float(Balancing.economy.get("important_pay_factor", 0.5)))
+		var pay_at := (_player.global_position + Vector3(0, 2.1, 0)) if reel == _arm_reel else (reel.position + Vector3(0, 1.6, 0))
+		FloatText.spawn(self, pay_at, "+" + Economy.format_money(part))
 		var item := CoilItem.from_cable(_next_item_id, cable)
 		_next_item_id += 1
 		_items[item.id] = item
@@ -636,6 +649,8 @@ func _update_hud() -> void:
 		_hint.text = "Knäuel zum Server-Schrank bringen   ·   Q: ablegen"
 	elif held and _target_reel and _target_reel.is_free():
 		_hint.text = "E: Kabel an %s einhängen" % ("Motorrolle" if _target_reel.kind == ReelData.Kind.MOTOR else "Handkurbel")
+	elif held and _player.at_tether_limit:
+		_hint.text = "Das Kabel ist gespannt – erst aufwickeln oder an eine Rolle hängen (Q: loslassen)"
 	elif held:
 		_hint.text = "Leertaste / Linksklick: wickeln   ·   Q: loslassen"
 	elif _target_item:
@@ -889,6 +904,11 @@ func _apply_test_args() -> void:
 		_landing.clear()
 	if opts.has("cordtime"):
 		_cord.time_left = float(opts["cordtime"])
+	if opts.has("teleport"):
+		var xz := String(opts["teleport"]).split(",")
+		_player.global_position = Vector3(float(xz[0]), 0.05, float(xz[1]))
+	if opts.has("dumpafter"):
+		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):
 		print("ZUSTAND ", _summary())
 	if opts.has("saveexit"):

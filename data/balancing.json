@@ -34,7 +34,9 @@
 	},
 	"economy": {
 		"money_per_meter": 0.5,
-		"starting_money": 0.0
+		"starting_money": 0.0,
+		"important_pay_factor": 0.5,
+		"_kommentar": "important_pay_factor: Anteil des normalen Meterpreises, den ein wichtiges Kabel beim Aufrollen bringt"
 	},
 	"upgrades": {
 		"crank": {

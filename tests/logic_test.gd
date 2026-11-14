@@ -91,6 +91,9 @@ func _test_economy() -> void:
 	var paid := eco.pay_for_cable(20.0)
 	_check(is_equal_approx(paid, 20.0 * float(Balancing.economy["money_per_meter"])), "Bezahlung pro Meter")
 	_check(not eco.buy("extra_reel") or eco.state.money >= 0.0, "Kein Minus-Kontostand")
+	var before := eco.state.money
+	var half := eco.pay_for_cable(20.0, 0.5)
+	_check(is_equal_approx(half, paid * 0.5) and is_equal_approx(eco.state.money, before + half), "Wichtiges Kabel bringt halben Preis")
 	eco.state.money = 100.0
 	_check(eco.buy("crank"), "Handkurbel kaufen")
 	_check(eco.is_maxed("crank") and not eco.buy("crank"), "Handkurbel nur einmal")

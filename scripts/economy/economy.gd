@@ -13,8 +13,9 @@ func _ready() -> void:
 
 
 ## Bezahlung für ein fertig aufgerolltes Kabel. Gibt den Betrag zurück.
-func pay_for_cable(length_m: float) -> float:
-	var per_meter: float = Balancing.economy["money_per_meter"]
+## `factor` < 1 z. B. für wichtige Kabel, die zusätzlich einen Dienst reaktivieren.
+func pay_for_cable(length_m: float, factor: float = 1.0) -> float:
+	var per_meter: float = float(Balancing.economy["money_per_meter"]) * factor
 	per_meter *= factor("copper")
 	var amount := length_m * per_meter
 	state.money += amount

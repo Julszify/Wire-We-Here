@@ -26,6 +26,10 @@ var holding := false:
 		_update_arm_pose()
 ## Haltepunkt des Kabels im Haufen und maximale Entfernung davon
 var tether_anchor := Vector3.ZERO
+## Leine aktiv: nur solange ein Kabel aus dem Haufen am Arm hängt (nicht beim Tragen eines Knäuels)
+var tethered := false
+## Steht die Figur gerade am Ende der Leine?
+var at_tether_limit := false
 ## Aus, solange z. B. das Tablet offen ist
 var input_enabled := true
 ## Dauerzug-Upgrade: Züge pro Sekunde bei gehaltener Taste (0 = aus)
@@ -82,17 +86,19 @@ func _physics_process(delta: float) -> void:
 	_animate_walk(delta, Vector2(velocity.x, velocity.z).length(), float(p["walk_speed_m_per_s"]))
 
 	# Mit Kabel in der Hand: nicht weiter als die Leine vom Haufen weg
-	if holding:
+	at_tether_limit = false
+	if tethered:
 		var offset := global_position - tether_anchor
 		offset.y = 0.0
 		var max_len: float = p["tether_length_m"]
+		at_tether_limit = offset.length() > max_len - 0.05 and dir.dot(offset) > 0.0
 		if offset.length() > max_len:
 			var fixed := tether_anchor + offset.normalized() * max_len
 			global_position = Vector3(fixed.x, global_position.y, fixed.z)
 
 	# Körper dreht sich in Laufrichtung; mit Kabel schaut er zum Haufen
 	var face := dir
-	if holding:
+	if tethered:
 		face = tether_anchor - global_position
 		face.y = 0.0
 	if face.length_squared() > 1e-4:
