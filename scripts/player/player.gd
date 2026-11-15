@@ -56,16 +56,10 @@ const MODEL_PARTS := {
 const RIG_PATH := "res://assets/models/player/tripo/admin_tripo.glb"
 ## Modell ist ca. 1 m hoch und schaut nach +Z; Spielfigur ist ca. 1,75 m und schaut nach -Z
 const RIG_SCALE := 1.75
-## Beim Tripo-Rig hängt der Oberarm fast ganz am Schulter-Knochen (der Arm-Knochen ist sehr kurz),
-## deshalb werden Schulter und Arm gemeinsam ausgerichtet.
-const RIG_BONES := { "leg_l": "mixamorig_LeftUpLeg", "leg_r": "mixamorig_RightUpLeg",
-	"sh_l": "mixamorig_LeftShoulder", "sh_r": "mixamorig_RightShoulder", "arm_l": "mixamorig_LeftArm",
-	"arm_r": "mixamorig_RightArm", "fore_l": "mixamorig_LeftForeArm", "fore_r": "mixamorig_RightForeArm" }
 var _rig: Node3D
 var _skel: Skeleton3D
-var _bone: Dictionary = {}     # Kurzname -> Knochen-Index
-var _wiggle := 0.0             # kleine Wickelbewegung des Unterarms (wird per Tween gesetzt)
-var _to_skel := Basis()        # Richtungen vom Modell-Raum (+Z vorn, +X links) in den Skelett-Raum
+var _anim: PlayerAnimator      # stellt die Knochen (Laufen, Arbeiten mit Kabeln, Seilbahn)
+var _wiggle := 0.0             # Wickelzug pro Tastendruck (wird per Tween gesetzt)
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
@@ -75,6 +69,17 @@ var _jump_buffer := 0.0
 var _air_time := 0.0
 ## Tempo-Faktor aus reaktivierten Diensten
 var speed_factor := 1.0
+## Trägt eine Rolle (rechte Hand)
+var carrying := false
+## Griff der Handkurbel, an der gerade gedreht wird (Weltposition)
+var crank_point := Vector3.ZERO
+var _crank_t := 0.0
+var _crank_center := Vector3.ZERO
+var _last_body_yaw := 0.0
+## Nur für Tests (--anim): Lauftempo bzw. Ziehen gegen die Leine vortäuschen
+var debug_speed := 0.0
+var debug_strain := false
+var debug_no_look := false
 
 
 func _ready() -> void:
@@ -146,7 +151,13 @@ func _physics_process(delta: float) -> void:
 		_jump_buffer = 0.0
 		_air_time = 1.0  # kein zweiter Sprung in der Coyote-Zeit
 	move_and_slide()
-	_animate_walk(delta, Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0, float(p["walk_speed_m_per_s"]))
+	# Tempo mit Vorzeichen: rückwärts (z. B. mit Kabel vom Haufen weg) laufen die Beine andersherum
+	var ground_speed := Vector2(velocity.x, velocity.z).length()
+	if Vector3(velocity.x, 0.0, velocity.z).dot(facing()) < -0.3 * ground_speed:
+		ground_speed = -ground_speed
+	if debug_speed != 0.0:
+		ground_speed = debug_speed
+	_animate_walk(delta, ground_speed, float(p["walk_speed_m_per_s"]))
 
 	# Mit Kabel in der Hand: nicht weiter als die Leine vom Haufen weg
 	at_tether_limit = false
@@ -163,6 +174,9 @@ func _physics_process(delta: float) -> void:
 	var face := dir
 	if tethered:
 		face = tether_anchor - global_position
+		face.y = 0.0
+	elif _crank_t > 0.0 and dir == Vector3.ZERO:
+		face = _crank_center - global_position
 		face.y = 0.0
 	if face.length_squared() > 1e-4:
 		var target := atan2(-face.x, -face.z)
@@ -238,7 +252,7 @@ func set_view_state(d: Dictionary) -> void:
 func arm_transform() -> Transform3D:
 	if _skel == null:
 		return _arm.global_transform
-	var elbow := _skel.global_transform * _skel.get_bone_global_pose(_bone["fore_l"])
+	var elbow := _skel.global_transform * _skel.get_bone_global_pose(_anim.bone("fore_l"))
 	var hand_dir := elbow.basis.y.normalized()
 	var z := -hand_dir
 	var x := Vector3.UP.cross(z).normalized()
@@ -256,10 +270,14 @@ func back_transform(index: int) -> Transform3D:
 	return _body.global_transform * local
 
 
-## Einfaches Beine- und Armschwingen, Stärke abhängig vom Tempo
+## Einfaches Beine- und Armschwingen, Stärke abhängig vom Tempo (Rückfall-Figur aus Einzelteilen);
+## beim geriggten Modell stellt der PlayerAnimator die Knochen.
 func _animate_walk(delta: float, speed: float, walk_speed: float) -> void:
-	_walk_phase += delta * speed * 2.4
-	var amount := clampf(speed / walk_speed, 0.0, 1.0)
+	if _anim:
+		_update_animator(delta, speed)
+		return
+	_walk_phase += delta * absf(speed) * 2.4
+	var amount := clampf(absf(speed) / walk_speed, 0.0, 1.0)
 	var swing := sin(_walk_phase) * 0.6 * amount
 	var k := 1.0 - exp(-15.0 * delta)
 	_leg_l.rotation.x = lerpf(_leg_l.rotation.x, swing, k)
@@ -268,8 +286,49 @@ func _animate_walk(delta: float, speed: float, walk_speed: float) -> void:
 	# Linker Arm schwingt nur ohne Kabel; mit Kabel bleibt er ruhig
 	var left := 0.0 if holding else swing * 0.8
 	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, left, k)
-	if _skel:
-		_pose_rig()
+
+
+## Zustand an den Animator geben und Knochen stellen
+func _update_animator(delta: float, speed: float) -> void:
+	var p: Dictionary = Balancing.player
+	_anim.walk_speed = float(p["walk_speed_m_per_s"]) * speed_factor
+	_anim.sprint_speed = float(p["sprint_speed_m_per_s"]) * speed_factor
+	_anim.speed = speed
+	_anim.on_floor = is_on_floor() or riding
+	var yaw := _body.rotation.y
+	_anim.turn_rate = wrapf(yaw - _last_body_yaw, -PI, PI) / maxf(delta, 1e-4)
+	_last_body_yaw = yaw
+	_anim.holding = holding
+	_anim.riding = riding
+	_anim.carrying = carrying
+	_anim.straining = at_tether_limit or debug_strain
+	_anim.wind = _wiggle
+	_anim.look_yaw = 0.0 if debug_no_look else wrapf(_yaw.rotation.y - yaw, -PI, PI)
+	_anim.look_pitch = 0.0 if debug_no_look else (_pitch.rotation.x + 0.35) * 0.6
+	_crank_t = maxf(_crank_t - delta, 0.0)
+	if _crank_t > 0.0:
+		var shoulder := _skel.global_transform * _skel.get_bone_global_pose(_anim.bone("arm_r")).origin
+		_anim.crank_dir = (_rig.global_basis.orthonormalized().inverse() * (crank_point - shoulder)).normalized()
+	else:
+		_anim.crank_dir = Vector3.ZERO
+	_anim.update(delta)
+
+
+## Kurze Bewegung abspielen: "tug" (Knoten-Ruck), "reach" (Einstecken), "pickup" (Aufheben)
+func act(kind: String) -> void:
+	if _anim:
+		_anim.trigger(kind)
+
+
+## An einer Handkurbel drehen: Hand greift den Griff (Weltposition), Körper dreht sich hin
+func crank(handle: Vector3, center: Vector3) -> void:
+	crank_point = handle
+	_crank_center = center
+	_crank_t = 0.45
+
+
+func is_cranking() -> bool:
+	return _crank_t > 0.0
 
 
 ## Geriggtes Modell laden und unter den Körper hängen; Grundformen ausblenden. false, wenn es fehlt.
@@ -285,13 +344,6 @@ func _apply_rig() -> bool:
 		_rig.free()
 		return false
 	_skel = skels[0]
-	for key: String in RIG_BONES:
-		_bone[key] = _skel.find_bone(String(RIG_BONES[key]))
-		if int(_bone[key]) < 0:
-			push_warning("Figur-Skelett: Knochen %s fehlt" % RIG_BONES[key])
-			_rig.free()
-			_skel = null
-			return false
 	# Das Skelett kann im Modell gedreht sein: Basis vom Skelett bis zur Modell-Wurzel aufmultiplizieren
 	var chain := Basis()
 	var n: Node = _skel
@@ -299,57 +351,21 @@ func _apply_rig() -> bool:
 		if n is Node3D:
 			chain = (n as Node3D).transform.basis * chain
 		n = n.get_parent()
-	_to_skel = chain.orthonormalized().inverse()
 	_rig.name = "Rig"
 	_rig.rotation.y = PI
 	_rig.scale = Vector3.ONE * RIG_SCALE
+	_anim = PlayerAnimator.new()
+	if not _anim.setup(_skel, _rig, chain.orthonormalized().inverse()):
+		_rig.free()
+		_skel = null
+		_anim = null
+		return false
 	for mi in _body.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).visible = false
 	_body.add_child(_rig)
-	_pose_rig()
+	_last_body_yaw = _body.rotation.y
+	_anim.update(0.0)
 	return true
-
-
-## Knochen so drehen, dass ihre Längsachse (Y) in `dir` zeigt (Richtung im Modell-Raum: +Z vorn, +X links)
-func _aim_bone(bone: int, dir: Vector3) -> void:
-	var rest := _skel.get_bone_global_rest(bone)
-	var q := Quaternion(rest.basis.y.normalized(), (_to_skel * dir).normalized())
-	var want := Basis(q) * rest.basis
-	var parent := _skel.get_bone_parent(bone)
-	var parent_basis := _skel.get_bone_global_pose(parent).basis if parent >= 0 else Basis.IDENTITY
-	_skel.set_bone_pose_rotation(bone, Quaternion((parent_basis.inverse() * want).orthonormalized()))
-
-
-## Pose aus Laufen und Haltung: Beine und Arme schwingen, Arme hängen am Körper, mit Kabel zeigt der
-## linke Unterarm waagerecht nach vorn (leicht nach außen), damit das Kabel darum gewickelt werden kann.
-func _pose_rig() -> void:
-	var swing := _leg_l.rotation.x  # Schwung aus _animate_walk (Bogenmaß)
-	var arm_swing := _arm_r.rotation.x
-	_aim_bone(_bone["leg_l"], Vector3(0.05, -cos(swing), -sin(swing)))
-	_aim_bone(_bone["leg_r"], Vector3(-0.05, -cos(swing), sin(swing)))
-	# Arme nur mäßig absenken: bei steilerem Winkel verschwindet der Oberarm im runden Bauch
-	var up_r := Vector3(-0.6, -0.8 * cos(arm_swing), -0.8 * sin(arm_swing))
-	_aim_bone(_bone["sh_r"], up_r)
-	_aim_bone(_bone["arm_r"], up_r)
-	_aim_bone(_bone["fore_r"], Vector3(-0.35, -0.85, 0.3 - sin(arm_swing) * 0.5))
-	if riding:
-		# An der Seilbahn: beide Arme nach oben zum Laufwagen
-		for side in [["sh_l", "arm_l", "fore_l", 1.0], ["sh_r", "arm_r", "fore_r", -1.0]]:
-			var up := Vector3(0.25 * float(side[3]), 1.0, 0.05)
-			_aim_bone(_bone[side[0]], up)
-			_aim_bone(_bone[side[1]], up)
-			_aim_bone(_bone[side[2]], Vector3(-0.1 * float(side[3]), 1.0, 0.0))
-	elif holding:
-		_aim_bone(_bone["sh_l"], Vector3(0.62, -0.75, 0.2))
-		_aim_bone(_bone["arm_l"], Vector3(0.62, -0.75, 0.2))
-		var fwd := Vector3(sin(deg_to_rad(30)), 0.08 + _wiggle, cos(deg_to_rad(30)))
-		_aim_bone(_bone["fore_l"], fwd)
-	else:
-		var left_swing := _arm_l.rotation.x
-		var up_l := Vector3(0.6, -0.8 * cos(left_swing), 0.8 * sin(left_swing))
-		_aim_bone(_bone["sh_l"], up_l)
-		_aim_bone(_bone["arm_l"], up_l)
-		_aim_bone(_bone["fore_l"], Vector3(0.35, -0.85, 0.3 + sin(left_swing) * 0.5))
 
 
 func _apply_model() -> void:
@@ -392,9 +408,10 @@ func _wiggle_arm() -> void:
 	if _skel:
 		if _arm_tween:
 			_arm_tween.kill()
+		_anim.trigger("wind")
 		_arm_tween = create_tween()
-		_arm_tween.tween_property(self, "_wiggle", 0.35, 0.06)
-		_arm_tween.tween_property(self, "_wiggle", 0.0, 0.12)
+		_arm_tween.tween_property(self, "_wiggle", 1.0, 0.06)
+		_arm_tween.tween_property(self, "_wiggle", 0.0, 0.14)
 		return
 	# Kleine Wickelbewegung pro Tastendruck
 	if _arm_tween:

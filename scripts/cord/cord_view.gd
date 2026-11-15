@@ -9,6 +9,11 @@ var _body: Node3D
 var _speech: Label3D
 var _asking := false
 var _t := 0.0
+var _vel := Vector3.ZERO        # geglättete Fluggeschwindigkeit (für die Neigung)
+var _mood := ""                 # "sulk" nach einem Nein, "happy" nach einer Bestellung
+var _mood_t := 0.0
+const SULK_S := 3.0
+const HAPPY_S := 1.2
 
 const CALM := Color(0.3, 0.9, 1.0)
 const ALARM := Color(1.0, 0.2, 0.15)
@@ -188,7 +193,10 @@ func follow(player_pos: Vector3, player_facing: Vector3, delta: float) -> void:
 	var right := player_facing.cross(Vector3.UP).normalized()
 	var target := player_pos - player_facing * float(c["follow_behind_m"]) \
 		+ right * float(c["follow_side_m"]) + Vector3(0, float(c["hover_height_m"]), 0)
+	var before := global_position
 	global_position = global_position.lerp(target, 1.0 - exp(-float(c["follow_speed"]) * delta))
+	if delta > 0.0:
+		_vel = _vel.lerp((global_position - before) / delta, 1.0 - exp(-6.0 * delta))
 	var look := player_pos + Vector3(0, 1.3, 0) - global_position
 	look.y = 0.0
 	if look.length_squared() > 0.01:
@@ -203,13 +211,60 @@ func set_asking(asking: bool, text_value: String = "") -> void:
 		_set_ring(CALM)
 
 
+## Reaktion zeigen: "declined" (beleidigt: sinkt, schaut weg, Band gedimmt), "placed" (dreht sich vor Freude)
+func react(kind: String) -> void:
+	_mood = "sulk" if kind == "declined" else "happy"
+	_mood_t = 0.0
+
+
 func _process(delta: float) -> void:
 	_t += delta
-	_body.position.y = sin(_t * 2.2) * 0.06
-	_body.rotation.z = sin(_t * 1.3) * 0.05
+	_mood_t += delta
+	# Schweben und in Flugrichtung neigen (vorn runter beim Vorwärtsfliegen, seitlich in die Kurve)
+	var local_vel := global_basis.inverse() * _vel
+	var bob_speed := 2.2
+	var bob_height := 0.06
+	var pos := Vector3.ZERO
+	var rot := Vector3(clampf(local_vel.z * 0.06, -0.35, 0.35), sin(_t * 0.7) * 0.12, \
+		clampf(-local_vel.x * 0.06, -0.35, 0.35) + sin(_t * 1.3) * 0.05)
+	if _asking:
+		# Aufgeregt: schneller wippen, zittern, Blick zum Spieler
+		bob_speed = 6.0
+		bob_height = 0.1
+		pos.x = sin(_t * 41.0) * 0.015
+		pos.z = cos(_t * 37.0) * 0.015
+		rot.y = sin(_t * 9.0) * 0.08
+		rot.x -= 0.12
+	elif _mood == "sulk" and _mood_t < SULK_S:
+		# Beleidigt: sinkt ab, kippt nach vorn, dreht sich weg und schüttelt langsam den Kopf
+		var w := _ease_in_out(_mood_t, SULK_S)
+		pos.y -= 0.3 * w
+		rot.x += 0.35 * w
+		rot.y += (0.9 + sin(_mood_t * 3.0) * 0.25) * w
+		bob_speed = 1.0
+		bob_height = 0.025
+		_set_ring(CALM.darkened(0.55 * w))
+	elif _mood == "happy" and _mood_t < HAPPY_S:
+		# Zufrieden: kleiner Hüpfer und eine ganze Drehung
+		var x := _mood_t / HAPPY_S
+		pos.y += sin(x * PI) * 0.35
+		rot.y += smoothstep(0.0, 1.0, x) * TAU
+	elif _mood != "":
+		_mood = ""
+		_set_ring(CALM)
+	pos.y += sin(_t * bob_speed) * bob_height
+	_body.position = _body.position.lerp(pos, 1.0 - exp(-12.0 * delta)) if not _asking else pos
+	_body.rotation = Vector3(lerp_angle(_body.rotation.x, rot.x, 1.0 - exp(-8.0 * delta)), \
+		rot.y if _mood == "happy" else lerp_angle(_body.rotation.y, rot.y, 1.0 - exp(-6.0 * delta)), \
+		lerp_angle(_body.rotation.z, rot.z, 1.0 - exp(-8.0 * delta)))
 	if _asking:
 		# Blinken: rot / dunkelrot
 		_set_ring(ALARM if fmod(_t, 0.5) < 0.3 else ALARM.darkened(0.6))
+
+
+## Weicher Verlauf 0 -> 1 -> (hält) -> 0 über die Dauer
+static func _ease_in_out(t: float, length: float) -> float:
+	return smoothstep(0.0, 0.2, t / length) * (1.0 - smoothstep(0.75, 1.0, t / length))
 
 
 func _set_ring(color: Color) -> void:

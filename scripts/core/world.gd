@@ -24,6 +24,8 @@ var _room: ServerRoomView
 var _props: YardProps
 # Werkzeug zum Mitnehmen, Seilbahn, Wegweiser
 var _carried_reel: ReelData            # gerade getragene Handkurbel oder Motorrolle
+var _test_anim := ""                   # Testoption --anim: vorgeführte Bewegung
+var _cranking_reel: ReelData           # Handkurbel, an der zuletzt gedreht wurde (Hand folgt dem Griff)
 var _wagon: WagonData
 var _wagon_view: WagonView
 var _wagon_confirm_t := 0.0            # zweites E zum Ankoppeln trotz eingehängter Kabel
@@ -239,6 +241,11 @@ func _process(delta: float) -> void:
 		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
 	_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
 	_update_carried_reel()
+	_player.carrying = _carried_reel != null
+	if _test_anim != "":
+		_run_test_anim()
+	if _cranking_reel and _player.is_cranking() and _reel_views.has(_cranking_reel.id):
+		_player.crank_point = _reel_views[_cranking_reel.id].handle_point()
 	_update_wagon(delta)
 	_update_ride(delta)
 	_wagon_confirm_t = maxf(_wagon_confirm_t - delta, 0.0)
@@ -306,12 +313,15 @@ func _on_interact() -> void:
 	# 1. Knoten am eigenen Kabel lösen geht immer, ohne zu zielen
 	if held and held.is_stuck():
 		_system.untie(held)
+		_player.act("tug")
 	# 2. Anvisierter Knoten (an einer Rolle)
 	elif _target_knot:
 		_system.untie(_target_knot)
+		_player.act("tug")
 	# 3. Knäuel aus der Tasche in die Schränke stecken (alle auf einmal)
 	elif not _bag.is_empty() and _target_rack:
 		_deliver_bag()
+		_player.act("reach")
 	# 4. Kabel vom Arm an eine freie Rolle hängen
 	elif held and _target_reel and _target_reel.is_free():
 		_system.transfer(_arm_reel, _target_reel)
@@ -326,12 +336,14 @@ func _on_interact() -> void:
 		_toggle_wagon()
 	elif not held and _target_reel and _target_reel.is_movable() and _target_reel.is_free():
 		_pick_up_reel(_target_reel)
+		_player.act("pickup")
 	# 4c. Seilbahn
 	elif not held and not _target_station.is_empty():
 		_start_ride(_target_station[0], _target_station[1])
 	# 5. Knäuel vom Boden aufheben
 	elif _target_item:
 		_pick_up(_target_item)
+		_player.act("pickup")
 	# 6. Kabelende greifen
 	elif _target_end and not _arm_busy():
 		if _target_tail:
@@ -351,6 +363,8 @@ func _on_pull() -> void:
 	var crank := CableTargeting.nearest_reel(_system.reels.values(), _player.global_position, ReelData.Kind.HAND)
 	if crank and not crank.is_free():
 		_system.press(crank)
+		_cranking_reel = crank
+		_player.crank(_reel_views[crank.id].handle_point(), crank.position)
 
 
 func _on_release() -> void:
@@ -516,12 +530,14 @@ func _on_order_requested(answer_time: float) -> void:
 
 func _on_order_declined() -> void:
 	_cord_view.set_asking(false)
+	_cord_view.react("declined")
 	_cord_prompt.visible = false
 	_show_message("C.O.R.D.: „Bestellung storniert. Ich merke mir das.“")
 
 
 func _on_order_placed(count: int) -> void:
 	_cord_view.set_asking(false)
+	_cord_view.react("placed")
 	_cord_prompt.visible = false
 	_spawn_order(count)
 	_show_message("C.O.R.D.: „Ersatz bestellt: %d Kabel. Gern geschehen!“" % count)
@@ -1416,6 +1432,26 @@ func _summary() -> String:
 
 ## Testoptionen, z. B.:
 ## godot -- --money=50 --buy=crank,extra_reel --grab --important --noknots --pull=40 --hang --plug --tablet --orbit=-120
+## Testoption --anim: Bewegungen regelmäßig auslösen
+func _run_test_anim() -> void:
+	var f := _player.facing()
+	var beat := int(_time * 60.0) % 40 == 0
+	match _test_anim:
+		"strain":
+			_player.debug_strain = true
+		"crank":
+			var a := _time * 7.0
+			var center := _player.global_position + f * 1.3
+			var side := f.cross(Vector3.UP)
+			_player.crank(center + Vector3(0, 1.3, 0) + (side * cos(a) + f * sin(a)) * 0.66, center)
+		"tug", "reach", "pickup":
+			if beat:
+				_player.act(_test_anim)
+		"wind":
+			if int(_time * 60.0) % 12 == 0:
+				_player._wiggle_arm()
+
+
 func _apply_test_args() -> void:
 	var opts := {}
 	for arg in OS.get_cmdline_user_args():
@@ -1568,14 +1604,29 @@ func _apply_test_args() -> void:
 		# Kamera nah an die Figur (für Bilder der Figur)
 		_player._spring.spring_length = 2.2
 		_player._pitch.rotation.x = -0.12
+	if opts.has("anim"):
+		# Bewegung der Figur vorführen (für Bilder): walk, run, back, strain, crank, tug, reach, pickup, wind
+		_test_anim = String(opts["anim"])
+		# Kamera mittig auf die ganze Figur
+		_player._spring.position.x = 0.0
+		_player._spring.spring_length = 3.2
+		_player._pitch.rotation.x = -0.1
+		_player.debug_no_look = true
+		if opts.has("grab") and opts.has("orbit"):
+			_player.orbit_camera(float(opts["orbit"]))
+		match _test_anim:
+			"walk": _player.debug_speed = 4.0
+			"run": _player.debug_speed = 7.0
+			"back": _player.debug_speed = -3.0
+			"sulk": _cord_view.react("declined")
+			"happy": _cord_view.react("placed")
 	if opts.has("rigdump") and _player._skel:
 		var sk: Skeleton3D = _player._skel
-		for key: String in _player._bone:
-			var b: int = _player._bone[key]
+		for key: String in PlayerAnimator.BONES:
+			var b: int = _player._anim.bone(key)
 			var gp := sk.global_transform * sk.get_bone_global_pose(b)
 			print("RIG %-7s pose_y=%s  welt_pos=%s  relativ=%s" % [key, str(sk.get_bone_global_pose(b).basis.y.normalized().snapped(Vector3.ONE * 0.01)),
 				str(gp.origin.snapped(Vector3.ONE * 0.01)), str((_player.global_transform.affine_inverse() * gp.origin).snapped(Vector3.ONE * 0.01))])
-		print("RIG to_skel=", _player._to_skel)
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

@@ -81,6 +81,12 @@ func setup(reel: ReelData) -> void:
 
 
 ## Getragen: verkleinert neben der Figur; abgestellt: normale Größe am Boden
+## Weltposition des Kurbelgriffs (dreht sich mit); nur bei der Handkurbel sinnvoll
+func handle_point() -> Vector3:
+	var drum_h: float = float(Balancing.reel["drum_height_m"]) * scale_of(data)
+	return _spin.global_transform * Vector3(0.66, 0.21 + drum_h + 0.2, 0.0)
+
+
 func set_carried(carried: bool) -> void:
 	scale = Vector3.ONE * (0.45 if carried else 1.0)
 
