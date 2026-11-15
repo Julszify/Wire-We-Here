@@ -50,7 +50,15 @@
 					[-640, -585, 130, 130]
 				]
 			},
-			"ground": "platten"
+			"ground": "platten",
+			"important_cables": 50,
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": ["wohnviertel"],
+				"_kommentar": "Zaun am Rand des Campus; Lücken nur zu den Vierteln in exits (dort liegt die Sperre)"
+			}
 		},
 		{
 			"id": "wohnviertel",
@@ -69,7 +77,18 @@
 				"h_max": 11,
 				"fill": 0.75
 			},
-			"ground": "gras"
+			"ground": "gras",
+			"important_cables": 100,
+			"cables": {
+				"seed": 2001,
+				"crossing_heaps": 9,
+				"heap_count": [18, 32],
+				"heap_radius": [2.6, 3.6],
+				"heap_peak": [1.0, 1.7],
+				"street_cables": 70,
+				"street_length_m": [14, 30],
+				"_kommentar": "Haufen auf Straßenkreuzungen (zufällig ausgewählt), Kabel entlang der Straßen"
+			}
 		},
 		{
 			"id": "altstadt",
@@ -91,7 +110,8 @@
 					[-120, 0, 70, 70]
 				]
 			},
-			"ground": "pflaster"
+			"ground": "pflaster",
+			"important_cables": 150
 		},
 		{
 			"id": "gamer",
@@ -110,7 +130,8 @@
 				"h_max": 22,
 				"fill": 0.85
 			},
-			"ground": "platten"
+			"ground": "platten",
+			"important_cables": 200
 		},
 		{
 			"id": "buero",
@@ -129,7 +150,8 @@
 				"h_max": 120,
 				"fill": 0.9
 			},
-			"ground": "platten"
+			"ground": "platten",
+			"important_cables": 250
 		},
 		{
 			"id": "lieferzentrum",
@@ -146,7 +168,8 @@
 				"h_max": 14,
 				"fill": 0.9
 			},
-			"ground": "beton"
+			"ground": "beton",
+			"important_cables": 200
 		},
 		{
 			"id": "stadion",
@@ -160,7 +183,8 @@
 				"h_min": 24,
 				"h_max": 24
 			},
-			"ground": "beton"
+			"ground": "beton",
+			"important_cables": 250
 		},
 		{
 			"id": "hafen",
@@ -174,7 +198,8 @@
 				"h_min": 10,
 				"h_max": 14
 			},
-			"ground": "beton"
+			"ground": "beton",
+			"important_cables": 300
 		},
 		{
 			"id": "krater",
@@ -188,7 +213,8 @@
 				"h_min": 8,
 				"h_max": 12
 			},
-			"ground": "kies"
+			"ground": "kies",
+			"important_cables": 350
 		}
 	],
 	"crater": {
@@ -251,5 +277,44 @@
 		"auto_slope_overlay": "fels",
 		"coast": "sand",
 		"crater": "kies"
+	},
+	"important_plan": {
+		"_kommentar": "Plan der 2000 wichtigen Kabel (GDD). Jedes Viertel hat einen eigenen Schrank im Serverraum der Basis; jede volle Reihe reaktiviert einen Dienst. Die ersten 20 Campus-Ports sind die Einzel-Dienste aus services.json (Tutorial).",
+		"total": 2000,
+		"row_size": 10,
+		"tutorial_ports": 20,
+		"order": [
+			"campus",
+			"wohnviertel",
+			"altstadt",
+			"gamer",
+			"buero",
+			"lieferzentrum",
+			"stadion",
+			"hafen",
+			"krater",
+			"turm"
+		],
+		"turm": 150,
+		"delivery": "sammeln: mehrere Knäuel aufnehmen und gesammelt zur Basis bringen; Kapazität wächst mit Upgrades"
+	},
+	"barriers": [
+		{
+			"id": "sperre_wohnviertel",
+			"name": "Kabelberg vor dem Wohnviertel",
+			"road": ["campus", "wohnviertel"],
+			"offset_m": -3,
+			"count": 140,
+			"radius_m": 8.0,
+			"peak_m": 3.6,
+			"clear_fraction": 0.75,
+			"seed": 3001
+		}
+	],
+	"streaming": {
+		"load_m": 150,
+		"unload_m": 220,
+		"cables_per_frame": 30,
+		"_kommentar": "Einheiten (Viertel, Sperren) laden, wenn der Spieler näher als load_m an ihrem Rand ist, und entladen ab unload_m"
 	}
 }

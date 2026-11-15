@@ -46,6 +46,8 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3, heap: Hea
 	# Reihenfolge der Zufallsaufrufe nicht ändern, sonst ändern sich alle Haufen
 	if heap and heap.kind == HeapData.Kind.SCATTER:
 		d.path = CablePath.generate_scatter_path(rng, center, heap.radius)
+	elif heap and heap.kind == HeapData.Kind.STREET:
+		d.path = CablePath.generate_street_path(rng, center, heap.dir, heap.radius)
 	elif heap:
 		d.path = CablePath.generate_heap_path(rng, center, heap.radius, heap.peak_height)
 	else:

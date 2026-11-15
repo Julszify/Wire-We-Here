@@ -64,6 +64,14 @@ var _saving_enabled := true
 var _autosave_t := 0.0
 var _dump_after := -1  # nur für Tests: Zustand nach so vielen Bildern ausgeben
 
+# Kabel in der Stadt (Viertel und Sperren), die je nach Abstand geladen und entladen werden
+var _units: Array[CableUnit] = []
+var _unit_loaded: Dictionary = {}     # Einheit-ID -> true, solange geladen (oder in der Warteschlange)
+var _load_queue: Array[Array] = []    # [Einheit, Index des nächsten Kabels]
+var _stored_states: Dictionary = {}   # Kabel-ID -> Zustand, für Kabel entladener Einheiten
+var _blockers: Dictionary = {}        # Einheit-ID -> StaticBody3D (Sperre noch nicht abgetragen)
+var _stream_t := 0.0
+
 
 func _ready() -> void:
 	_build_city()
@@ -130,8 +138,11 @@ func _ready() -> void:
 	_hud.add_child(_cord_prompt)
 	_tablet.new_game_requested.connect(_new_game)
 
+	_units = CableUnit.build_all(_city)
 	if not save.is_empty():
 		_apply_save(save)
+	_update_blockers()
+	_stream_update(true)
 
 	# Nur zum automatischen Testen, siehe _apply_test_args
 	_apply_test_args()
@@ -210,6 +221,12 @@ func _process(delta: float) -> void:
 		if float(v.get_meta("t")) >= 1.0:
 			_fading.erase(v)
 			v.queue_free()
+
+	_stream_t -= delta
+	if _stream_t <= 0.0:
+		_stream_t = 0.5
+		_stream_update(false)
+	_process_load_queue()
 
 	_message_t -= delta
 	_update_hud()
@@ -348,7 +365,10 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		FloatText.spawn(self, pay_pos, "+" + Economy.format_money(amount))
 		_fading.append(view)
 
-	if _system.cables.is_empty():
+	var unit := _unit_of(cable.id)
+	if unit and unit.barrier:
+		_update_blockers()
+	if _yard_cable_count() == 0:
 		_spawn_zone(_zone.rng_seed + 1, null, _next_cable_id)
 		_show_message("Alles aufgeräumt – aber C.O.R.D. hat nachbestellt …")
 
@@ -645,6 +665,141 @@ func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> v
 	_next_cable_id += cables.size()
 
 
+# --- Kabel in der Stadt: Laden und Entladen -------------------------------
+
+## Lädt Einheiten in der Nähe und entlädt weit entfernte. `now` = sofort vollständig laden (Spielstart).
+func _stream_update(now: bool) -> void:
+	var cfg: Dictionary = _city.layout.raw().get("streaming", {})
+	var load_m := float(cfg.get("load_m", 150.0))
+	var unload_m := float(cfg.get("unload_m", 220.0))
+	var p := _player.global_position
+	for u in _units:
+		var dist := u.distance_to(p)
+		if dist < load_m and not _unit_loaded.has(u.id):
+			_load_unit(u, now)
+		elif dist > unload_m and _unit_loaded.has(u.id) and not _unit_busy(u):
+			_unload_unit(u)
+
+
+## Einheit laden: Kabel kommen über die Warteschlange (einige pro Bild), damit nichts ruckelt
+func _load_unit(u: CableUnit, now: bool) -> void:
+	if _unit_loaded.has(u.id):
+		if now:
+			for entry in _load_queue:
+				if entry[0] == u:
+					while entry[1] < u.cable_total():
+						_spawn_unit_cable(u, entry[1])
+						entry[1] += 1
+			_load_queue = _load_queue.filter(func(e: Array) -> bool: return e[0] != u)
+		return
+	_unit_loaded[u.id] = true
+	if now:
+		for i in u.cable_total():
+			_spawn_unit_cable(u, i)
+	else:
+		_load_queue.append([u, 0])
+
+
+func _process_load_queue() -> void:
+	var budget := int(_city.layout.raw().get("streaming", {}).get("cables_per_frame", 30))
+	while budget > 0 and not _load_queue.is_empty():
+		var entry: Array = _load_queue[0]
+		var u: CableUnit = entry[0]
+		if entry[1] >= u.cable_total():
+			_load_queue.pop_front()
+			continue
+		_spawn_unit_cable(u, entry[1])
+		entry[1] += 1
+		budget -= 1
+
+
+func _spawn_unit_cable(u: CableUnit, index: int) -> void:
+	var cid := u.first_id + index
+	if _removed_ids.has(cid) or _system.cables.has(cid):
+		return
+	var cable := u.make_cable(index)
+	if _stored_states.has(cid):
+		var st: Dictionary = _stored_states[cid]
+		_stored_states.erase(cid)
+		if int(st.get("state", 0)) != CableData.State.HOOKED:
+			cable.load_state(st)
+	_system.add_cable(cable)
+	var view := CableView.new()
+	add_child(view)
+	view.setup(cable)
+	_views[cid] = view
+
+
+## Einheit entladen: Kabel aus der Szene nehmen, veränderte Zustände für später aufheben
+func _unload_unit(u: CableUnit) -> void:
+	_unit_loaded.erase(u.id)
+	_load_queue = _load_queue.filter(func(e: Array) -> bool: return e[0] != u)
+	for cid in range(u.first_id, u.last_id() + 1):
+		var c: CableData = _system.cables.get(cid)
+		if c == null:
+			continue
+		if c.pulled_m > 0.0 or c.knots_solved > 0:
+			_stored_states[cid] = c.state_dict()
+		_remove_knot_marker(cid)
+		if _views.has(cid):
+			_views[cid].queue_free()
+			_views.erase(cid)
+		_system.remove_cable(cid)
+
+
+## Eine Einheit bleibt geladen, solange eins ihrer Kabel an einer Rolle oder am Arm hängt
+func _unit_busy(u: CableUnit) -> bool:
+	for reel: ReelData in _system.reels.values():
+		if reel.cable_id >= 0 and u.owns(reel.cable_id):
+			return true
+	return false
+
+
+func _unit_of(cable_id: int) -> CableUnit:
+	if cable_id < CableUnit.ID_BASE:
+		return null
+	for u in _units:
+		if u.owns(cable_id):
+			return u
+	return null
+
+
+## Kabel der Hinterhof-Zone (inkl. Lieferungen), die noch nicht aufgerollt sind
+func _yard_cable_count() -> int:
+	var n := 0
+	for cid: int in _system.cables.keys():
+		if cid < CableUnit.ID_BASE:
+			n += 1
+	return n
+
+
+## Sperren: Blockade in der Zaunlücke, bis genug Kabel des Bergs abgetragen sind
+func _update_blockers() -> void:
+	for u in _units:
+		if not u.barrier:
+			continue
+		var removed := 0
+		for cid in _removed_ids:
+			if u.owns(cid):
+				removed += 1
+		var cleared := removed >= int(ceil(u.cable_total() * u.clear_fraction))
+		if cleared and _blockers.has(u.id):
+			_blockers[u.id].queue_free()
+			_blockers.erase(u.id)
+			_show_message("%s abgetragen – der Weg ist frei!" % u.name)
+		elif not cleared and not _blockers.has(u.id):
+			var body := StaticBody3D.new()
+			body.name = "Blocker_%s" % u.id
+			var col := CollisionShape3D.new()
+			var shape := BoxShape3D.new()
+			shape.size = u.blocker_size
+			col.shape = shape
+			body.add_child(col)
+			add_child(body)
+			body.global_position = u.blocker_center
+			_blockers[u.id] = body
+
+
 func _add_knot_marker(cable: CableData) -> void:
 	if _knot_markers.has(cable.id):
 		return
@@ -747,6 +902,8 @@ func _collect_save() -> Dictionary:
 	for c: CableData in _system.cables.values():
 		if c.state != CableData.State.HEAP or c.pulled_m > 0.0 or c.knots_solved > 0:
 			cables.append(c.state_dict())
+	for st: Dictionary in _stored_states.values():
+		cables.append(st)
 	var reels := []
 	for r: ReelData in _system.reels.values():
 		if r.kind != ReelData.Kind.ARM:
@@ -794,9 +951,20 @@ func _apply_save(d: Dictionary) -> void:
 		reel.cable_id = -1
 		_add_reel(reel)
 
+	# Stadt-Einheiten in der Nähe sofort laden, ebenso Einheiten mit eingehängten Kabeln
+	if d.has("player"):
+		_player.set_view_state(d["player"])
+	for cs: Dictionary in d.get("cables", []):
+		var u := _unit_of(int(cs["id"]))
+		if u and int(cs.get("state", 0)) == CableData.State.HOOKED:
+			_load_unit(u, true)
+	_stream_update(true)
+
 	for cs: Dictionary in d.get("cables", []):
 		var cable: CableData = _system.cables.get(int(cs["id"]))
 		if cable == null:
+			if _unit_of(int(cs["id"])):
+				_stored_states[int(cs["id"])] = cs  # Einheit gerade entladen: Zustand aufheben
 			continue
 		cable.load_state(cs)
 		if cable.state == CableData.State.HOOKED:
@@ -859,7 +1027,16 @@ func _summary() -> String:
 		if c:
 			hooked.append("%d@%d:%.2f/k%d" % [c.id, r.id, c.pulled_m, c.knots_solved])
 	hooked.sort()
-	return "geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
+	var loaded := []
+	for u in _units:
+		if _unit_loaded.has(u.id):
+			loaded.append(u.id)
+	var gp := _player.global_position
+	var hit := get_world_3d().direct_space_state.intersect_ray(
+		PhysicsRayQueryParameters3D.create(gp + Vector3(0, 0.5, 0), gp + Vector3(0, -60, 0), 1, [_player.get_rid()]))
+	var under := "%s@%.1f" % [hit["collider"].name, hit["position"].y] if hit else "nichts"
+	return ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
+		str(loaded), _blockers.size(),
 		_economy.state.money, str(_economy.state.active_ports), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
 		_system.reels.size(), str(hooked), _items.size(), str(_carried != null), _done_count, _orders,
 		_cord.phase, _cord.time_left, str(SaveGame.vec_to(_player.global_position))]
@@ -931,6 +1108,33 @@ func _apply_test_args() -> void:
 	if opts.has("teleport"):
 		var xz := String(opts["teleport"]).split(",")
 		_player.global_position = Vector3(float(xz[0]), 0.05, float(xz[1]))
+	if opts.has("clearbarrier"):
+		# Sperre zu clear_fraction abtragen, als wären die Kabel aufgerollt
+		for u in _units:
+			if not u.barrier:
+				continue
+			var needed := int(ceil(u.cable_total() * u.clear_fraction))
+			for cid in range(u.first_id, u.first_id + needed):
+				_removed_ids.append(cid)
+				if _views.has(cid):
+					_views[cid].queue_free()
+					_views.erase(cid)
+				_system.remove_cable(cid)
+		_update_blockers()
+	if opts.has("streamtest"):
+		# Halb gezogenes Kabel einer Stadt-Einheit: entladen, Spielstand, wieder laden
+		var u: CableUnit = _units.filter(func(x: CableUnit) -> bool: return not x.barrier)[0]
+		_load_unit(u, true)
+		var c: CableData = _system.cables[u.first_id + 3]
+		c.pulled_m = 5.5
+		c.knots_solved = 1
+		_unload_unit(u)
+		var stored := _stored_states.has(c.id)
+		var in_save: bool = (_collect_save()["cables"] as Array).any(func(st: Dictionary) -> bool: return int(st["id"]) == c.id)
+		_load_unit(u, true)
+		var back: CableData = _system.cables.get(c.id)
+		print("STREAMTEST gespeichert=%s im_spielstand=%s zurueck=%s gezogen=%.1f knoten=%d" % [
+			stored, in_save, back != null, back.pulled_m if back else -1.0, back.knots_solved if back else -1])
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

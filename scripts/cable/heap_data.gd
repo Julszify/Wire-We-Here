@@ -3,7 +3,7 @@ extends RefCounted
 ## Eine Gruppe von Kabeln: ein Haufen (rund, in der Mitte höher) oder Streukabel über eine Fläche.
 ## Die einzelnen Kabel-Seeds werden aus dem Seed der Gruppe abgeleitet (reproduzierbar).
 
-enum Kind { HEAP, SCATTER }
+enum Kind { HEAP, SCATTER, STREET }
 
 var id: int = 0
 var rng_seed: int = 0
@@ -14,6 +14,8 @@ var kind: Kind = Kind.HEAP
 var radius: float = 0.0
 ## Haufen: zusätzliche Höhe in der Mitte
 var peak_height: float = 0.0
+## Straßenkabel: Richtung, in die das Kabel vom greifbaren Ende aus liegt (radius = Länge)
+var dir: Vector3 = Vector3.FORWARD
 var name: String = ""
 
 
@@ -49,11 +51,13 @@ func contains(pos: Vector3, margin: float = 0.0) -> bool:
 
 func to_dict() -> Dictionary:
 	return { "id": id, "seed": rng_seed, "center": SaveGame.vec_to(center), "count": cable_count,
-		"kind": kind, "radius": radius, "peak_height": peak_height, "name": name }
+		"kind": kind, "radius": radius, "peak_height": peak_height, "name": name, "dir": SaveGame.vec_to(dir) }
 
 
 static func from_dict(d: Dictionary) -> HeapData:
 	var h := HeapData.new(int(d["id"]), int(d["seed"]), SaveGame.vec_from(d["center"]), int(d["count"]),
 		float(d["radius"]), float(d["peak_height"]), int(d.get("kind", Kind.HEAP)) as Kind)
 	h.name = String(d.get("name", ""))
+	if d.has("dir"):
+		h.dir = SaveGame.vec_from(d["dir"])
 	return h

@@ -101,6 +101,27 @@ static func generate_scatter_path(rng: RandomNumberGenerator, center: Vector3, a
 	return path
 
 
+## Kabel, das eine Straße entlang liegt: vom greifbaren Ende `start` aus in Richtung `dir`, `length` Meter,
+## mit leichten Schlenkern zur Seite. Höhe relativ zu start.y (Straßen liegen auf verschiedenen Höhen).
+static func generate_street_path(rng: RandomNumberGenerator, start: Vector3, dir: Vector3, length: float) -> CablePath:
+	var forward := Vector3(dir.x, 0.0, dir.z).normalized()
+	var side := forward.cross(Vector3.UP)
+	var count := maxi(3, int(length / 4.0))
+	var ctrl := PackedVector3Array()
+	var lateral := 0.0
+	for i in count + 1:
+		var t := float(i) / count
+		lateral = clampf(lateral + rng.randf_range(-0.8, 0.8), -1.6, 1.6)
+		var p := start + forward * (t * length) + side * lateral
+		p.y = start.y + rng.randf_range(0.06, 0.14)
+		ctrl.append(p)
+	var dense := catmull_rom_centripetal(ctrl, 12)
+	var path := CablePath.new()
+	path.points = resample_even(dense, int(Balancing.cable["path_samples"]))
+	path.length = polyline_length(path.points)
+	return path
+
+
 ## Zentripetale Catmull-Rom-Kurve durch alle Punkte; `steps` Abtastungen pro Segment.
 static func catmull_rom_centripetal(ctrl: PackedVector3Array, steps: int) -> PackedVector3Array:
 	var out := PackedVector3Array()

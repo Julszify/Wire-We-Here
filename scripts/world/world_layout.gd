@@ -147,6 +147,28 @@ func ground_at(x: float, z: float, h: float, slope: float) -> Array:
 	return [grass, rock, rock_w]
 
 
+## Straßen-Rasterlinien eines Viertels in einer Achse: Mittelachse plus je block_m nach außen,
+## solange noch Platz für ein Grundstück ist (Blockout und Kabelverteilung nutzen dieselben Linien).
+static func grid_lines(center: float, half: float, block: float) -> Array:
+	var lines := [center]
+	var k := 1
+	while k * block < half - block * 0.45:
+		lines.push_front(center - k * block)
+		lines.append(center + k * block)
+		k += 1
+	return lines
+
+
+## Randmitte von `from` in Richtung `to` (liegt auf einer Mittelachsen-Straße; dort enden die Hauptstraßen)
+func exit_point(from: Dictionary, to: Dictionary) -> Vector2:
+	var c := _v2(from["center"])
+	var half := _v2(from["size"]) * 0.5
+	var dir := _v2(to["center"]) - c
+	if absf(dir.x) > absf(dir.y):
+		return c + Vector2(signf(dir.x) * half.x, 0.0)
+	return c + Vector2(0.0, signf(dir.y) * half.y)
+
+
 ## Nördlichste Stelle, an der Meer sein kann (Küstenlinie minus Welle, etwas Puffer)
 func sea_north_edge_m() -> float:
 	var coast: Dictionary = _d["coast"]

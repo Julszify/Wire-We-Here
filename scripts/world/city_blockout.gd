@@ -43,8 +43,8 @@ func _build_main_roads() -> void:
 		var b := layout.district(String(link[1]))
 		if a.is_empty() or b.is_empty():
 			continue
-		var p0 := _exit_point(a, b)
-		var p1 := _exit_point(b, a)
+		var p0 := layout.exit_point(a, b)
+		var p1 := layout.exit_point(b, a)
 		var line := PackedVector2Array([p0, p1])
 		_roads.append(line)
 		_add_ribbon(st, p0, p1, _road_w, ROAD_COLOR)
@@ -53,16 +53,6 @@ func _build_main_roads() -> void:
 	mi.mesh = st.commit()
 	mi.material_override = _material
 	add_child(mi)
-
-
-## Randmitte von `from` in Richtung `to` (liegt immer auf einer Mittelachsen-Straße)
-func _exit_point(from: Dictionary, to: Dictionary) -> Vector2:
-	var c := WorldLayout._v2(from["center"])
-	var half := WorldLayout._v2(from["size"]) * 0.5
-	var dir := WorldLayout._v2(to["center"]) - c
-	if absf(dir.x) > absf(dir.y):
-		return c + Vector2(signf(dir.x) * half.x, 0.0)
-	return c + Vector2(0.0, signf(dir.y) * half.y)
 
 
 ## Straßenband von a nach b, alle 2 m (= Rasterweite des Geländes) an die Geländehöhe angepasst
@@ -110,6 +100,8 @@ func _build_district(d: Dictionary) -> void:
 	var body := StaticBody3D.new()
 	body.name = "Blockout_%s" % d["id"]
 	var ctx := { "d": d, "bo": bo, "rng": rng, "st": st, "body": body, "y": float(d["height_m"]) }
+	if d.has("wall"):
+		_build_wall(ctx)
 	match String(bo.get("style", "grid")):
 		"grid", "towers", "warehouse":
 			_style_grid(ctx)
@@ -139,8 +131,8 @@ func _style_grid(ctx: Dictionary) -> void:
 	var style := String(bo["style"])
 
 	# Straßen (Linien in x und z durch die Mitte, dann im Raster nach außen)
-	var xs := _grid_lines(c.x, half.x, block)
-	var zs := _grid_lines(c.y, half.y, block)
+	var xs := WorldLayout.grid_lines(c.x, half.x, block)
+	var zs := WorldLayout.grid_lines(c.y, half.y, block)
 	for x in xs:
 		_box(ctx, Vector3(x, y + STREET_TOP - 0.1, c.y), Vector3(street, 0.2, half.y * 2.0), STREET_COLOR, false)
 	for z in zs:
@@ -167,17 +159,6 @@ func _style_grid(ctx: Dictionary) -> void:
 					_lot(ctx, cell.grow(-4.0), rng.randf_range(float(bo["h_min"]), float(bo["h_max"])))
 				_:
 					_fill_block(ctx, cell)
-
-
-## Rasterlinien: Mittelachse plus je block_m nach außen, solange noch Platz für ein Grundstück ist
-func _grid_lines(center: float, half: float, block: float) -> Array:
-	var lines := [center]
-	var k := 1
-	while k * block < half - block * 0.45:
-		lines.push_front(center - k * block)
-		lines.append(center + k * block)
-		k += 1
-	return lines
 
 
 ## Block mit mehreren Häusern am Rand entlang (Hof in der Mitte), Lücken nach fill
@@ -239,6 +220,45 @@ func _is_kept_free(bo: Dictionary, cell: Rect2) -> bool:
 		if free.intersects(cell):
 			return true
 	return false
+
+
+## Zaun am Rand des Viertels mit Lücken zu den Vierteln in wall.exits (dort liegen die Sperren)
+func _build_wall(ctx: Dictionary) -> void:
+	var d: Dictionary = ctx["d"]
+	var w: Dictionary = d["wall"]
+	var c := WorldLayout._v2(d["center"])
+	var half := WorldLayout._v2(d["size"]) * 0.5
+	var y: float = ctx["y"]
+	var h := float(w["height_m"])
+	var t := float(w["thickness_m"])
+	var gap := float(w["gap_m"])
+	var gaps: Array[Vector2] = []
+	for exit_id: String in w.get("exits", []):
+		gaps.append(layout.exit_point(d, layout.district(exit_id)))
+	var color := Color(0.55, 0.57, 0.6)
+	var corners := [c + Vector2(-half.x, -half.y), c + Vector2(half.x, -half.y), c + Vector2(half.x, half.y),
+		c + Vector2(-half.x, half.y)]
+	for i in 4:
+		var a: Vector2 = corners[i]
+		var b: Vector2 = corners[(i + 1) % 4]
+		# Abschnitte zwischen den Lücken auf dieser Seite
+		var cuts: Array[float] = [0.0]
+		var length := a.distance_to(b)
+		for g in gaps:
+			if Geometry2D.get_closest_point_to_segment(g, a, b).distance_to(g) < 0.5:
+				var tg := a.distance_to(g)
+				cuts.append(tg - gap * 0.5)
+				cuts.append(tg + gap * 0.5)
+		cuts.append(length)
+		var dir := (b - a) / length
+		for k in range(0, cuts.size(), 2):
+			var s0: float = cuts[k]
+			var s1: float = cuts[k + 1]
+			if s1 - s0 < 0.5:
+				continue
+			var mid := a + dir * (s0 + s1) * 0.5
+			var size := Vector3(absf(dir.x) * (s1 - s0) + absf(dir.y) * t, h, absf(dir.y) * (s1 - s0) + absf(dir.x) * t)
+			_box(ctx, Vector3(mid.x, y + h * 0.5 - 0.3, mid.y), size + Vector3(0, 0.6, 0), color, true)
 
 
 # ---------------------------------------------------------------- Sonderformen

@@ -35,6 +35,11 @@ func ground_height(global_x: float, global_z: float) -> float:
 	return layout.height(global_x - offset.x, global_z - offset.z) + offset.y
 
 
+## Punkt der Karte (x, z in world.json) als Szenen-Position auf dem Gelände
+func to_scene(p: Vector2) -> Vector3:
+	return Vector3(p.x + offset.x, layout.height(p.x, p.y) + offset.y, p.y + offset.z)
+
+
 ## Viertel an einer Stelle der Szene (leer, wenn keins)
 func district_at(global_x: float, global_z: float) -> Dictionary:
 	return layout.district_at(global_x - offset.x, global_z - offset.z)
