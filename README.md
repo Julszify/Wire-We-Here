@@ -2,15 +2,15 @@
 
 *Arbeitstitel, alternativ „Wire We Here?“*
 
-Ein 3D-Incremental-Game mit offener Welt, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für bessere Werkzeuge. Wichtige Kabel gehören an feste Ports im Serverraum und bringen nach und nach die Cloud-Dienste der Welt zurück.
+Ein 3D-Incremental-Game mit offener Welt, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für bessere Werkzeuge. Wichtige Kabel werden zu Knäueln, die du in der Tasche sammelst und im Serverraum einsteckst. So kommen nach und nach die Cloud-Dienste der Welt zurück.
 
-![Start im Wolkig-Hinterhof](docs/screenshot_hinterhof.jpg)
+![Wolkig-Hinterhof mit Kabelhaufen und Serverraum](docs/screenshot_hinterhof.jpg)
 
 ## Worum es geht
 
 Drei Chefs der Wolkig AG ersetzen am Stammtisch die IT-Abteilung durch eine schnell zusammengebastelte KI namens **C.O.R.D.** (Cable Ordering & Repair Daemon). C.O.R.D. bestellt bei jedem defekten Kabel Ersatz, tauscht aber nie etwas aus. Die Kabelberge wachsen, bis die Cloud weltweit ausfällt. Du bist der gefeuerte IT-Admin, der das Chaos beseitigen soll.
 
-**Kernschleife:** Kabelende finden → per Hand, Handkurbel oder Motorrolle aufwickeln → Knoten lösen → Geld. Gewöhnliche Kabel bringen Geld, wichtige Kabel reaktivieren Dienste und schalten Upgrades frei.
+**Kernschleife:** Kabelende finden → per Hand, Handkurbel oder Motorrolle aufwickeln → Knoten lösen → Geld. Gewöhnliche Kabel bringen Geld. Wichtige Kabel reaktivieren Dienste; die schalten Upgrades frei oder wirken dauerhaft, zum Beispiel mit mehr Geld pro Meter.
 
 ## Stand
 
@@ -18,17 +18,22 @@ Das Spiel ist in Entwicklung. Spielbar ist der **Vertical Slice**, eingebettet i
 
 | Bereich | Stand |
 | --- | --- |
-| Kabel ziehen und aufwickeln | per Hand um den Arm, Handkurbel, Motorrollen, Dauerzug |
-| Knoten, Geld, Upgrades | Knoten lösen mit E, Geld pro Meter, Tablet mit 6 Upgrades |
+| Kabel ziehen und aufwickeln | per Hand um den Arm, Handkurbel, Motorrollen, Dauerzug; jedes Kabel ist an beiden Enden greifbar |
+| Knoten, Geld, Upgrades | Knoten lösen mit E, Geld pro Meter, Tablet mit 7 Upgrades |
+| Bewegung | laufen, rennen, springen |
 | Serverraum | begehbare Halle mit zehn Schränken und 2000 Ports; wichtige Kabel werden zu Knäueln, die man in der Tasche sammelt und einsteckt |
 | Dienste | 20 Einzel-Dienste und Reihen à 10 Ports; sie schalten Upgrades frei oder wirken dauerhaft (mehr Geld, schneller laufen, größere Tasche …) |
-| C.O.R.D. | folgt dem Spieler und stellt die Bestellfrage (ohne „Nein“ fallen 100 Kabel vom Himmel) |
+| C.O.R.D. | folgt dem Spieler und stellt die Bestellfrage (ohne „Nein“ fallen 100 Kabel vom Himmel); Port 20 gibt einen Abschaltknopf für 5 Minuten Ruhe |
 | Hinterhof | Bäume, Bänke, Laternen, Paletten und ein Lieferwagen rund um den Serverraum |
 | Stadt | ca. 2 × 2 km mit Gelände, Bodentexturen und Straßen; Wohnviertel mit Häusern, sonst graue Gebäudeblöcke (Blockout) |
 | Kabel in der Stadt | Hinterhof, eine Sperre vor dem Wohnviertel und das Wohnviertel, zusammen 150 wichtige Kabel; Laden und Entladen pro Viertel |
 | Speichern | Spielstand als JSON, automatisch alle 30 s |
 
 **Geplant:** Kabel für die übrigen acht Viertel, Klettern, Seilbahnen, weitere Gebäude, Ton, Koop für 2–4 Spieler, Steam.
+
+![Im Serverraum: ein Schrank je Viertel, jedes Lämpchen ist ein Port](docs/screenshot_serverraum.jpg)
+
+![Wohnviertel mit Häusern und Kabelhaufen auf den Kreuzungen](docs/screenshot_wohnviertel.jpg)
 
 ![Luftbild der Stadt](docs/screenshot_stadt.jpg)
 
@@ -63,15 +68,16 @@ Beim ersten Start nach einer Änderung an `data/world.json` erzeugt das Spiel H�
 - **Deterministisch:** Zufall nur über Seeds. Haufen, Kabelformen und wichtige Kabel entstehen beim Laden neu; gespeichert wird nur, was sich verändert hat. Das ist auch die Grundlage für Koop.
 - **Stadt:** Gelände mit [Terrain3D](https://github.com/TokisanGames/Terrain3D), erzeugt aus `data/world.json`; Straßen und Gebäudeblöcke entstehen beim Start aus denselben Daten.
 - **Modelle:** C.O.R.D., Spielfigur, Stecker, Wohnhäuser und der Serverraum entstehen per Python-Skript in Blender (`tools/blender/`), die Bodentexturen per GDScript (`scripts/debug/make_terrain_textures.gd`).
-- **Balancing:** alle Werte in `data/balancing.json`, nicht im Code.
+- **Serverraum:** 2000 Ports in zehn Schränken. Die ersten 20 sind Einzel-Dienste, der Rest bildet Reihen à 10 Ports; eine volle Reihe ist ein Dienst (`scripts/rack/rack_plan.gd`, `data/services.json`).
+- **Balancing:** alle Werte in `data/balancing.json`, nicht im Code. `tests/balance_sim.tscn` rechnet einen groben Spielverlauf durch.
 
 ## Projektstruktur
 
 ```
-data/       balancing.json, zone.json (Hinterhof), world.json (Stadt), services.json (Dienste)
+data/       balancing.json, zone.json (Hinterhof mit Ausstattung), world.json (Stadt), services.json (Dienste)
 scenes/     world.tscn (Hauptszene), city_preview.tscn (Stadt-Vorschau), player.tscn
 scripts/    cable/    Kabelbahnen, Röhren-Mesh, Haufen, Stecker, CableSystem
-            world/    Stadt-Layout, Gelände, Blockout, Kabel-Einheiten der Viertel
+            world/    Stadt-Layout, Gelände, Blockout, Kabel-Einheiten der Viertel, Hof-Ausstattung
             reel/     Aufwickler (Arm, Kurbel, Motor)
             rack/     Serverraum, Port-Plan, Knäuel
             economy/  Geld und Upgrades
@@ -98,6 +104,12 @@ Muss „ALLE TESTS OK“ ausgeben. Die Hauptszene kennt Testoptionen nach `--`, 
 
 ```bash
 godot res://scenes/world.tscn -- --nosave --grab --pull=10
+```
+
+Der grobe Spielverlauf fürs Balancing (wann kommt welcher Kauf, welcher Dienst):
+
+```bash
+godot --headless res://tests/balance_sim.tscn
 ```
 
 Die vollständige Liste steht in `scripts/core/world.gd` unter `_apply_test_args`. Für Testläufe immer `--nosave` angeben, sonst wird der echte Spielstand geladen und überschrieben.
