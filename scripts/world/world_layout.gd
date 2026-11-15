@@ -29,6 +29,11 @@ static func load_default() -> WorldLayout:
 	return w
 
 
+## Rohdaten aus world.json (für Teile, die nur ein Abschnitt braucht, z. B. roads, crater)
+func raw() -> Dictionary:
+	return _d
+
+
 func district(id: String) -> Dictionary:
 	for d in districts:
 		if d["id"] == id:

@@ -23,6 +23,12 @@ func _ready() -> void:
 	terrain = CityTerrain.build(self, layout)
 	CityTerrain.build_sea(self, layout)
 	print("STADT-GELAENDE erzeugt in %d ms" % (Time.get_ticks_msec() - t0))
+	var t1 := Time.get_ticks_msec()
+	var blockout := CityBlockout.new()
+	blockout.name = "Blockout"
+	add_child(blockout)
+	blockout.build(layout)
+	print("BLOCKOUT %d Gebäude in %d ms" % [blockout.building_count, Time.get_ticks_msec() - t1])
 	_build_district_signs()
 	_build_landmarks()
 

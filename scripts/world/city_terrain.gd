@@ -8,12 +8,12 @@ extends RefCounted
 static func build(parent: Node, layout: WorldLayout) -> Terrain3D:
 	var t := Terrain3D.new()
 	t.name = "Terrain3D"
+	t.free_editor_textures = false  # vor add_child, sonst warnt Terrain3D beim Eintritt in den Baum
 	parent.add_child(t)
 	t.region_size = Terrain3D.SIZE_1024
 	t.vertex_spacing = layout.vertex_spacing_m
 	t.material.world_background = Terrain3DMaterial.NONE
 	t.show_checkered = true  # Blockout: Schachbrett zeigt Maßstab und Steigung
-	t.free_editor_textures = false
 	var half := layout.size_m * 0.5
 	t.data.import_images([height_image(layout), null, null], Vector3(-half, 0.0, -half), 0.0, 1.0)
 	return t

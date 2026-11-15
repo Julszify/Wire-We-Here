@@ -4,28 +4,230 @@
 	"vertex_spacing_m": 2.0,
 	"valley_height_m": 8.0,
 	"sea_floor_m": -12.0,
-	"coast": { "z_m": 640.0, "wobble_m": 40.0, "width_m": 120.0 },
+	"coast": {
+		"z_m": 640.0,
+		"wobble_m": 40.0,
+		"width_m": 120.0
+	},
 	"hills": [
-		{ "side": "north", "from_m": -820, "to_m": -1010, "height_m": 50 },
-		{ "side": "east", "from_m": 860, "to_m": 1020, "height_m": 55 },
-		{ "side": "west", "from_m": -880, "to_m": -1020, "height_m": 40 }
+		{
+			"side": "north",
+			"from_m": -820,
+			"to_m": -1010,
+			"height_m": 50
+		},
+		{
+			"side": "east",
+			"from_m": 860,
+			"to_m": 1020,
+			"height_m": 55
+		},
+		{
+			"side": "west",
+			"from_m": -880,
+			"to_m": -1020,
+			"height_m": 40
+		}
 	],
 	"districts": [
-		{ "id": "campus", "name": "Wolkig-Campus", "center": [-700, -650], "size": [360, 300], "height_m": 33, "edge_m": 120 },
-		{ "id": "wohnviertel", "name": "Wohnviertel", "center": [-620, -200], "size": [380, 360], "height_m": 12, "edge_m": 80 },
-		{ "id": "altstadt", "name": "Altstadt", "center": [-120, 0], "size": [380, 320], "height_m": 9, "edge_m": 70 },
-		{ "id": "gamer", "name": "Gamer-Viertel", "center": [-60, -480], "size": [360, 260], "height_m": 11, "edge_m": 70 },
-		{ "id": "buero", "name": "Büroviertel", "center": [420, -420], "size": [420, 340], "height_m": 14, "edge_m": 80 },
-		{ "id": "lieferzentrum", "name": "C.O.R.D.s Lieferzentrum", "center": [-650, 300], "size": [360, 260], "height_m": 6, "edge_m": 70 },
-		{ "id": "stadion", "name": "Stadion", "center": [640, 0], "size": [300, 300], "height_m": 16, "edge_m": 90 },
-		{ "id": "hafen", "name": "Hafen", "center": [120, 590], "size": [560, 170], "height_m": 3, "edge_m": 60 },
-		{ "id": "krater", "name": "Rechenzentrums-Krater", "center": [650, 430], "size": [300, 300], "height_m": -1, "edge_m": 0 }
+		{
+			"id": "campus",
+			"name": "Wolkig-Campus",
+			"center": [-700, -650],
+			"size": [360, 300],
+			"height_m": 33,
+			"edge_m": 120,
+			"blockout": {
+				"style": "grid",
+				"block_m": 90,
+				"street_m": 14,
+				"lot_min": 30,
+				"lot_max": 45,
+				"h_min": 14,
+				"h_max": 30,
+				"fill": 0.7,
+				"keep_free": [
+					[-640, -585, 150, 110]
+				]
+			}
+		},
+		{
+			"id": "wohnviertel",
+			"name": "Wohnviertel",
+			"center": [-620, -200],
+			"size": [380, 360],
+			"height_m": 12,
+			"edge_m": 80,
+			"blockout": {
+				"style": "grid",
+				"block_m": 60,
+				"street_m": 10,
+				"lot_min": 11,
+				"lot_max": 15,
+				"h_min": 7,
+				"h_max": 11,
+				"fill": 0.75
+			}
+		},
+		{
+			"id": "altstadt",
+			"name": "Altstadt",
+			"center": [-120, 0],
+			"size": [380, 320],
+			"height_m": 9,
+			"edge_m": 70,
+			"blockout": {
+				"style": "grid",
+				"block_m": 45,
+				"street_m": 8,
+				"lot_min": 9,
+				"lot_max": 14,
+				"h_min": 9,
+				"h_max": 15,
+				"fill": 0.95,
+				"keep_free": [
+					[-120, 0, 70, 70]
+				]
+			}
+		},
+		{
+			"id": "gamer",
+			"name": "Gamer-Viertel",
+			"center": [-60, -480],
+			"size": [360, 260],
+			"height_m": 11,
+			"edge_m": 70,
+			"blockout": {
+				"style": "grid",
+				"block_m": 55,
+				"street_m": 10,
+				"lot_min": 14,
+				"lot_max": 22,
+				"h_min": 10,
+				"h_max": 22,
+				"fill": 0.85
+			}
+		},
+		{
+			"id": "buero",
+			"name": "Büroviertel",
+			"center": [420, -420],
+			"size": [420, 340],
+			"height_m": 14,
+			"edge_m": 80,
+			"blockout": {
+				"style": "towers",
+				"block_m": 85,
+				"street_m": 16,
+				"lot_min": 30,
+				"lot_max": 42,
+				"h_min": 40,
+				"h_max": 120,
+				"fill": 0.9
+			}
+		},
+		{
+			"id": "lieferzentrum",
+			"name": "C.O.R.D.s Lieferzentrum",
+			"center": [-650, 300],
+			"size": [360, 260],
+			"height_m": 6,
+			"edge_m": 70,
+			"blockout": {
+				"style": "warehouse",
+				"block_m": 110,
+				"street_m": 18,
+				"h_min": 10,
+				"h_max": 14,
+				"fill": 0.9
+			}
+		},
+		{
+			"id": "stadion",
+			"name": "Stadion",
+			"center": [640, 0],
+			"size": [300, 300],
+			"height_m": 16,
+			"edge_m": 90,
+			"blockout": {
+				"style": "stadium",
+				"h_min": 24,
+				"h_max": 24
+			}
+		},
+		{
+			"id": "hafen",
+			"name": "Hafen",
+			"center": [120, 590],
+			"size": [560, 170],
+			"height_m": 3,
+			"edge_m": 60,
+			"blockout": {
+				"style": "harbor",
+				"h_min": 10,
+				"h_max": 14
+			}
+		},
+		{
+			"id": "krater",
+			"name": "Rechenzentrums-Krater",
+			"center": [650, 430],
+			"size": [300, 300],
+			"height_m": -1,
+			"edge_m": 0,
+			"blockout": {
+				"style": "crater",
+				"h_min": 8,
+				"h_max": 12
+			}
+		}
 	],
-	"crater": { "center": [650, 430], "rim_radius_m": 200, "rim_height_m": 15, "floor_m": 2, "floor_radius_m": 70 },
-	"harbor_basin": { "center": [120, 735], "size": [320, 130], "depth_m": -8 },
+	"crater": {
+		"center": [650, 430],
+		"rim_radius_m": 200,
+		"rim_height_m": 15,
+		"floor_m": 2,
+		"floor_radius_m": 70
+	},
+	"harbor_basin": {
+		"center": [120, 735],
+		"size": [320, 130],
+		"depth_m": -8
+	},
 	"landmarks": [
-		{ "id": "turm", "name": "Wolkig-Turm", "district": "campus", "pos": [-700, -700], "size": [36, 200, 36] },
-		{ "id": "basis", "name": "Basis (Hinterhof)", "district": "campus", "pos": [-640, -600], "size": [24, 6, 16] }
+		{
+			"id": "turm",
+			"name": "Wolkig-Turm",
+			"district": "campus",
+			"pos": [-700, -700],
+			"size": [36, 200, 36]
+		},
+		{
+			"id": "basis",
+			"name": "Basis (Hinterhof)",
+			"district": "campus",
+			"pos": [-640, -600],
+			"size": [24, 6, 16]
+		}
 	],
-	"spawn": [-640, -570]
+	"spawn": [-640, -570],
+	"roads": {
+		"width_m": 12,
+		"_kommentar": "Hauptstraßen zwischen Vierteln (von Rand zu Rand, folgen dem Gelände)",
+		"links": [
+			["campus", "wohnviertel"],
+			["campus", "gamer"],
+			["wohnviertel", "altstadt"],
+			["wohnviertel", "lieferzentrum"],
+			["altstadt", "gamer"],
+			["altstadt", "buero"],
+			["altstadt", "hafen"],
+			["altstadt", "lieferzentrum"],
+			["gamer", "buero"],
+			["buero", "stadion"],
+			["stadion", "krater"],
+			["hafen", "krater"],
+			["lieferzentrum", "hafen"]
+		]
+	}
 }
