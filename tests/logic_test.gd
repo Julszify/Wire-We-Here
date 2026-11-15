@@ -432,7 +432,11 @@ func _test_altstadt_plan() -> void:
 		if dd.has("cables"):
 			units[dd["id"]] = int(dd["cables"]["unit"])
 	_check(units["sperre_wohnviertel"] == 0 and units["wohnviertel"] == 1, "Alte Einheiten behalten ihre Nummer")
-	_check(units.values().size() == 4 and units["altstadt"] == 3 and units["sperre_altstadt"] == 2, "Neue Einheiten 2 und 3")
+	_check(units["altstadt"] == 3 and units["sperre_altstadt"] == 2, "Altstadt und zweite Sperre behalten 2 und 3")
+	var seen := {}
+	for n: int in units.values():
+		seen[n] = true
+	_check(seen.size() == units.size(), "Jede Einheit hat eine eigene Nummer (%d Einheiten)" % units.size())
 
 
 func _test_zipline_path() -> void:

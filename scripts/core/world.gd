@@ -72,7 +72,10 @@ var _orders := 0
 var _zone_ports: Array[int] = []      # Ports, die bei der Zonen-Erzeugung frei waren
 var _zone_first_id := 0               # erste Kabel-ID der Zone
 var _order_heaps: Array[Dictionary] = []  # { "heap": HeapData, "first_id": int }
-var _removed_ids: Array[int] = []     # fertig aufgerollte Kabel (fehlen beim Neuerzeugen)
+var _removed_ids: Dictionary = {}     # Kabel-ID -> true: fertig aufgerollt (fehlen beim Neuerzeugen)
+var _batcher: CableBatcher             # zeichnet ruhende Kabel blockweise
+var _heap_count_cache := 0
+var _heap_count_t := 0.0
 var _saving_enabled := true
 var _autosave_t := 0.0
 var _dump_after := -1  # nur für Tests: Zustand nach so vielen Bildern ausgeben
@@ -80,7 +83,6 @@ var _dump_after := -1  # nur für Tests: Zustand nach so vielen Bildern ausgeben
 # Kabel in der Stadt (Viertel und Sperren), die je nach Abstand geladen und entladen werden
 var _units: Array[CableUnit] = []
 var _unit_loaded: Dictionary = {}     # Einheit-ID -> true, solange geladen (oder in der Warteschlange)
-var _load_queue: Array[Array] = []    # [Einheit, Index des nächsten Kabels]
 var _stored_states: Dictionary = {}   # Kabel-ID -> Zustand, für Kabel entladener Einheiten
 var _blockers: Dictionary = {}        # Einheit-ID -> StaticBody3D (Sperre noch nicht abgetragen)
 var _stream_t := 0.0
@@ -94,6 +96,11 @@ func _ready() -> void:
 	_system = CableSystem.new()
 	add_child(_system)
 	_system.cable_completed.connect(_on_cable_completed)
+	_system.cable_hooked.connect(_on_cable_hooked)
+	_batcher = CableBatcher.new()
+	_batcher.name = "CableBatches"
+	add_child(_batcher)
+	_batcher.camera = _player.camera
 	_system.cable_released.connect(_on_cable_released)
 	_system.knot_hit.connect(_on_knot_hit)
 	_system.knot_progress.connect(_on_knot_progress)
@@ -207,7 +214,20 @@ func _physics_process(_delta: float) -> void:
 		_player.velocity = Vector3.ZERO
 
 
+## Leistungstest (--perf): Rechenzeit einzelner Teile in Mikrosekunden, aufsummiert bis zur Ausgabe
+var _prof: Dictionary = {}
+var _prof_frames := 0
+
+
+func _prof_add(key: String, since_us: int) -> int:
+	var now := Time.get_ticks_usec()
+	_prof[key] = int(_prof.get(key, 0)) + (now - since_us)
+	return now
+
+
 func _process(delta: float) -> void:
+	var t_start := Time.get_ticks_usec()
+	_prof_frames += 1
 	_time += delta
 	var arm := _player.arm_transform()
 	_arm_reel.position = arm.origin
@@ -216,7 +236,9 @@ func _process(delta: float) -> void:
 	_player.tethered = on_arm != null
 	if on_arm:
 		_player.tether_anchor = on_arm.path.points[0]
+	var t_mark := Time.get_ticks_usec()
 	_update_targets()
+	t_mark = _prof_add("ziele", t_mark)
 
 	# Eingehängte Kabel jeden Frame neu formen (Figur bewegt sich, Rollen drehen)
 	for reel: ReelData in _system.reels.values():
@@ -272,10 +294,12 @@ func _process(delta: float) -> void:
 	if _stream_t <= 0.0:
 		_stream_t = 0.5
 		_stream_update(false)
-	_process_load_queue()
 
 	_message_t -= delta
+	t_mark = Time.get_ticks_usec()
 	_update_hud()
+	_prof_add("hud", t_mark)
+	_prof_add("world", t_start)
 	if _dump_after >= 0:
 		_dump_after -= 1
 		if _dump_after == 0:
@@ -395,7 +419,13 @@ func _on_cable_released(cable: CableData, reel: ReelData) -> void:
 	_remove_knot_marker(cable.id)
 	if reel == _arm_reel:
 		_player.holding = false
-	_views[cable.id].show_in_heap()
+	if _batcher.has(cable.id):
+		# Ruhende Kabel zeichnet wieder der Block
+		_views[cable.id].queue_free()
+		_views.erase(cable.id)
+		_batcher.set_hidden(cable.id, false)
+	else:
+		_views[cable.id].show_in_heap()
 	_show_message("Losgelassen – das Kabel rutscht zurück in den Haufen.")
 
 
@@ -404,7 +434,7 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 	_remove_knot_marker(cable.id)
 	_views.erase(cable.id)
 	_system.remove_cable(cable.id)
-	_removed_ids.append(cable.id)
+	_removed_ids[cable.id] = true
 	_done_count += 1
 
 	if cable.is_important():
@@ -598,10 +628,12 @@ func _update_landing(delta: float) -> void:
 			_landing.erase(id)
 
 
+## Kabel mit Enden in Reichweite (aus dem Raster der Kabelenden); gelieferte erst nach der Landung
 func _grabbable_cables() -> Array:
+	var near := _system.cables_near(_player.global_position, float(Balancing.player["reach_m"]) + 0.5)
 	if _landing.is_empty():
-		return _system.cables.values()
-	return _system.cables.values().filter(func(c: CableData) -> bool: return not _landing.has(c.id))
+		return near
+	return near.filter(func(c: CableData) -> bool: return not _landing.has(c.id))
 
 
 ## Freier Platz für einen neuen Haufen in der Nähe des Spielers.
@@ -640,7 +672,8 @@ func _apply_upgrades() -> void:
 	_system.press_multiplier = _economy.factor("grip") * _economy.bonus("press")
 	_system.motor_multiplier = _economy.factor("motor") * _economy.bonus("motor")
 	_system.untie_delta = int(_economy.bonus("knot_presses"))
-	_player.speed_factor = _economy.bonus("walk")
+	# Lauftempo gedeckelt, damit viele kleine Dienst-Boni die Figur nicht unsteuerbar schnell machen
+	_player.speed_factor = minf(_economy.bonus("walk"), float(Balancing.player.get("max_speed_factor", 1.6)))
 	var auto: Dictionary = Balancing.upgrades.get("auto_pull", {})
 	_player.auto_pull_rate = float(auto.get("presses_per_second", 0.0)) if _economy.state.level("auto_pull") > 0 else 0.0
 	if _cord:
@@ -700,7 +733,7 @@ func _update_targets() -> void:
 	var origin: Vector3 = ray[0]
 	var dir: Vector3 = ray[1]
 	var pos := _player.global_position
-	_target_knot = CableTargeting.find_knot(_system.cables.values(), origin, dir, pos)
+	_target_knot = CableTargeting.find_knot(_system.hooked_cables(), origin, dir, pos)
 	_target_reel = null
 	_target_end = null
 	_target_item = null
@@ -802,7 +835,10 @@ func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> v
 	_zone_first_id = first_id
 	_next_cable_id = maxi(_next_cable_id, first_id)
 	_order_heaps.clear()
-	_removed_ids.clear()
+	for cid: int in _removed_ids.keys():
+		if cid < CableUnit.ID_BASE:
+			_removed_ids.erase(cid)
+	_batcher.remove_owner("zone")
 	var cables := _zone.create_cables(first_id, free_ports)
 	# Streukabel dürfen nicht durch die Wand des Serverraums laufen: an die Vorderwand schieben
 	var room := ServerRoomView.rect().grow(0.6)
@@ -812,10 +848,32 @@ func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> v
 			if room.has_point(Vector2(pt.x, pt.z)):
 				cable.path.points[i].z = room.position.y
 		_system.add_cable(cable)
-		var view := CableView.new()
-		add_child(view)
-		view.setup(cable)
-		_views[cable.id] = view
+		if cable.is_important():
+			_make_view(cable)
+	# Gewöhnliche Kabel blockweise je Haufen zeichnen
+	var groups: Dictionary = {}  # Haufen-Mitte -> [Kabel]
+	for cable in cables:
+		if not cable.is_important():
+			if not groups.has(cable.heap_center):
+				groups[cable.heap_center] = []
+			(groups[cable.heap_center] as Array).append(cable)
+	var plan_in: Array = []
+	var flat: Array[CableData] = []
+	for center: Vector3 in groups:
+		var list: Array = groups[center]
+		var ids := PackedInt32Array()
+		var reach := 0.0
+		for c: CableData in list:
+			ids.append(flat.size())
+			flat.append(c)
+			for pt in [c.path.points[0], c.path.points[c.path.points.size() - 1]]:
+				reach = maxf(reach, Vector2(pt.x - center.x, pt.z - center.z).length())
+		plan_in.append({ "indices": ids, "center": center, "radius": reach / 1.3 })
+	for pl: Dictionary in CableBatch.plan(plan_in):
+		var part: Array[CableData] = []
+		for i in (pl["indices"] as PackedInt32Array):
+			part.append(flat[i])
+		_batcher.add_now("zone", part, pl["origin"], float(pl["extent"]))
 	_next_cable_id += cables.size()
 
 
@@ -835,59 +893,73 @@ func _stream_update(now: bool) -> void:
 			_unload_unit(u)
 
 
-## Einheit laden: Kabel kommen über die Warteschlange (einige pro Bild), damit nichts ruckelt
+## Einheit laden: Kabel und Meshes entstehen blockweise in Threads und kommen nach und nach dazu.
+## `now` = warten, bis alles da ist (Spielstart, Spielstand mit eingehängten Kabeln).
 func _load_unit(u: CableUnit, now: bool) -> void:
 	if _unit_loaded.has(u.id):
 		if now:
-			for entry in _load_queue:
-				if entry[0] == u:
-					while entry[1] < u.cable_total():
-						_spawn_unit_cable(u, entry[1])
-						entry[1] += 1
-			_load_queue = _load_queue.filter(func(e: Array) -> bool: return e[0] != u)
+			_batcher.finish_owner(u.id)
 		return
 	_unit_loaded[u.id] = true
-	if now:
-		for i in u.cable_total():
-			_spawn_unit_cable(u, i)
-	else:
-		_load_queue.append([u, 0])
+	var skip := {}
+	for cid: int in _removed_ids.keys():
+		if u.owns(cid):
+			skip[cid] = true
+	_batcher.load_async(u.id, u.batch_plan(), u.make_cable, skip, _on_unit_batch.bind(u), now)
 
 
-func _process_load_queue() -> void:
-	var budget := int(_city.layout.raw().get("streaming", {}).get("cables_per_frame", 30))
-	while budget > 0 and not _load_queue.is_empty():
-		var entry: Array = _load_queue[0]
-		var u: CableUnit = entry[0]
-		if entry[1] >= u.cable_total():
-			_load_queue.pop_front()
-			continue
-		_spawn_unit_cable(u, entry[1])
-		entry[1] += 1
-		budget -= 1
-
-
-func _spawn_unit_cable(u: CableUnit, index: int) -> void:
-	var cid := u.first_id + index
-	if _removed_ids.has(cid) or _system.cables.has(cid):
+## Ein Block einer Einheit ist fertig: Kabel in die Logik übernehmen, gemerkte Zustände zurückholen
+func _on_unit_batch(batch: CableBatch, normal: Array[CableData], important: Array[CableData], u: CableUnit) -> void:
+	if not _unit_loaded.has(u.id):
 		return
-	var cable := u.make_cable(index)
-	if _stored_states.has(cid):
-		var st: Dictionary = _stored_states[cid]
-		_stored_states.erase(cid)
-		if int(st.get("state", 0)) != CableData.State.HOOKED:
-			cable.load_state(st)
-	_system.add_cable(cable)
+	for list: Array[CableData] in [normal, important]:
+		for cable in list:
+			var cid := cable.id
+			if _removed_ids.has(cid) or _system.cables.has(cid):
+				if batch:
+					batch.set_hidden(cid, true)
+				continue
+			if _stored_states.has(cid):
+				var st: Dictionary = _stored_states[cid]
+				_stored_states.erase(cid)
+				if int(st.get("state", 0)) != CableData.State.HOOKED:
+					cable.load_state(st)
+			_system.add_cable(cable)
+	for cable in important:
+		if _system.cables.get(cable.id) == cable:
+			_make_view(cable)
+
+
+## Einzelne Darstellung für ein Kabel (wichtige, gegriffene und gelieferte Kabel)
+func _make_view(cable: CableData) -> CableView:
 	var view := CableView.new()
 	add_child(view)
 	view.setup(cable)
-	_views[cid] = view
+	_views[cable.id] = view
+	return view
+
+
+## Gegriffen bzw. umgehängt: Kabel bekommt eine eigene Darstellung, im Block wird es ausgeblendet
+func _on_cable_hooked(cable: CableData, _reel: ReelData) -> void:
+	if not _views.has(cable.id):
+		_make_view(cable)
+	_batcher.set_hidden(cable.id, true)
+
+
+## Kabel ganz aus dem Spiel nehmen (fertig gemeldet, Spielstand, Test): Logik, Darstellung, Block
+func _drop_cable(cid: int) -> void:
+	_removed_ids[cid] = true
+	if _views.has(cid):
+		_views[cid].queue_free()
+		_views.erase(cid)
+	_batcher.set_hidden(cid, true)
+	_system.remove_cable(cid)
 
 
 ## Einheit entladen: Kabel aus der Szene nehmen, veränderte Zustände für später aufheben
 func _unload_unit(u: CableUnit) -> void:
 	_unit_loaded.erase(u.id)
-	_load_queue = _load_queue.filter(func(e: Array) -> bool: return e[0] != u)
+	_batcher.remove_owner(u.id)
 	for cid in range(u.first_id, u.last_id() + 1):
 		var c: CableData = _system.cables.get(cid)
 		if c == null:
@@ -933,7 +1005,7 @@ func _update_blockers() -> void:
 		if not u.barrier:
 			continue
 		var removed := 0
-		for cid in _removed_ids:
+		for cid: int in _removed_ids.keys():
 			if u.owns(cid):
 				removed += 1
 		var cleared := removed >= int(ceil(u.cable_total() * u.clear_fraction))
@@ -1031,11 +1103,17 @@ func _update_hud() -> void:
 	_shop.text = "Tab: Tablet (Upgrades)"
 
 
+## Kabel im Haufen (nur einmal pro Sekunde gezählt; bei zehntausenden Kabeln zu teuer für jedes Bild)
 func _heap_count() -> int:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _heap_count_t < 1.0:
+		return _heap_count_cache
+	_heap_count_t = now
 	var n := 0
 	for c: CableData in _system.cables.values():
 		if c.state == CableData.State.HEAP:
 			n += 1
+	_heap_count_cache = n
 	return n
 
 
@@ -1297,7 +1375,7 @@ func _collect_save() -> Dictionary:
 	return {
 		"zone": { "seed": _zone.rng_seed, "ports": Array(_zone_ports), "first_id": _zone_first_id },
 		"orders": orders,
-		"removed_cables": Array(_removed_ids),
+		"removed_cables": _removed_ids.keys(),
 		"cables": cables,
 		"arm_cable": _arm_reel.cable_id,
 		"reels": reels,
@@ -1319,12 +1397,7 @@ func _apply_save(d: Dictionary) -> void:
 	for o: Dictionary in d.get("orders", []):
 		_add_order_heap(HeapData.from_dict(o["heap"]), int(o["first_id"]), false)
 	for id in d.get("removed_cables", []):
-		var cid := int(id)
-		if _views.has(cid):
-			_views[cid].queue_free()
-			_views.erase(cid)
-		_system.remove_cable(cid)
-		_removed_ids.append(cid)
+		_drop_cable(int(id))
 
 	for rd: Dictionary in d.get("reels", []):
 		var reel := ReelData.from_dict(rd)
@@ -1355,6 +1428,7 @@ func _apply_save(d: Dictionary) -> void:
 				cable.load_state({})  # Rolle fehlt: zurück in den Haufen
 				continue
 			reel.cable_id = cable.id
+			_on_cable_hooked(cable, reel)
 			if reel == _arm_reel:
 				_player.holding = true
 				_player.tether_anchor = cable.path.points[0]
@@ -1457,6 +1531,11 @@ func _apply_test_args() -> void:
 	for arg in OS.get_cmdline_user_args():
 		var parts := arg.trim_prefix("--").split("=")
 		opts[parts[0]] = parts[1] if parts.size() > 1 else ""
+	if opts.has("teleport"):
+		# Zuerst versetzen und die Kabel dort sofort laden, damit z. B. --grab dort greift
+		var at := String(opts["teleport"]).split(",")
+		_player.global_position = Vector3(float(at[0]), 0.05, float(at[1]))
+		_stream_update(true)
 	if opts.has("money"):
 		_economy.state.money = float(opts["money"])
 	if opts.has("noknots"):
@@ -1536,16 +1615,13 @@ func _apply_test_args() -> void:
 				continue
 			var needed := int(ceil(u.cable_total() * u.clear_fraction))
 			for cid in range(u.first_id, u.first_id + needed):
-				_removed_ids.append(cid)
-				if _views.has(cid):
-					_views[cid].queue_free()
-					_views.erase(cid)
-				_system.remove_cable(cid)
+				_drop_cable(cid)
 		_update_blockers()
 	if opts.has("streamtest"):
 		# Halb gezogenes Kabel einer Stadt-Einheit: entladen, Spielstand, wieder laden
 		var u: CableUnit = _units.filter(func(x: CableUnit) -> bool: return not x.barrier)[0]
 		_load_unit(u, true)
+		print("STREAMTEST geladen=%d von %d (Blöcke %d)" % [range(u.first_id, u.last_id() + 1).filter(func(i: int) -> bool: return _system.cables.has(i)).size(), u.cable_total(), _batcher.batch_count()])
 		var c: CableData = _system.cables[u.first_id + 3]
 		c.pulled_m = 5.5
 		c.knots_solved = 1
@@ -1627,6 +1703,34 @@ func _apply_test_args() -> void:
 			var gp := sk.global_transform * sk.get_bone_global_pose(b)
 			print("RIG %-7s pose_y=%s  welt_pos=%s  relativ=%s" % [key, str(sk.get_bone_global_pose(b).basis.y.normalized().snapped(Vector3.ONE * 0.01)),
 				str(gp.origin.snapped(Vector3.ONE * 0.01)), str((_player.global_transform.affine_inverse() * gp.origin).snapped(Vector3.ONE * 0.01))])
+	if opts.has("unitstats"):
+		# Kabel je Einheit (Viertel, Sperre) mit Zahl der Haufen und wichtigen Kabel
+		var total := 0
+		for u in _units:
+			var kinds := {}
+			for h in u.heaps:
+				kinds[h.kind] = int(kinds.get(h.kind, 0)) + 1
+			print("UNIT %-22s kabel=%6d haufen=%d wichtig=%d" % [u.id, u.cable_total(), u.heaps.size(), u.important.size()], " ", kinds)
+			total += u.cable_total()
+		print("UNIT summe=", total)
+	if opts.has("perf"):
+		# Alle 2 s Bildrate, Rechenzeit und Zeichenlast ausgeben (Leistungstest)
+		var timer := Timer.new()
+		timer.wait_time = 2.0
+		timer.autostart = true
+		add_child(timer)
+		timer.timeout.connect(func() -> void:
+			print("PERF fps=%d proc=%.1fms objekte=%d dreiecke=%dk drawcalls=%d kabel=%d bloecke=%d" % [
+				Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+				int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0),
+				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), _system.cables.size(),
+				_batcher.batch_count()], " ", _batcher.stats(), " us/bild: ",
+				", ".join(_prof.keys().map(func(k: String) -> String: return "%s=%d" % [k, int(_prof[k]) / maxi(_prof_frames, 1)])),
+				" batcher=%d" % (_batcher.prof_us / maxi(_prof_frames, 1)))
+			_prof.clear()
+			_batcher.prof_us = 0
+			_prof_frames = 0)
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

@@ -70,6 +70,23 @@ func make_cable(index: int) -> CableData:
 	return null
 
 
+## Aufteilung der Kabel in Blöcke für die Darstellung (CableBatch.plan), nach Haufen und Lage
+func batch_plan() -> Array:
+	var groups: Array = []
+	var start := 0
+	for h in heaps:
+		var ids := PackedInt32Array()
+		ids.resize(h.cable_count)
+		for k in h.cable_count:
+			ids[k] = start + k
+		var center := h.center
+		if h.kind == HeapData.Kind.STREET:
+			center += h.dir * h.radius * 0.5  # Straßenkabel: Mitte der Strecke
+		groups.append({ "indices": ids, "center": center, "radius": h.radius * (0.6 if h.kind == HeapData.Kind.STREET else 1.0) })
+		start += h.cable_count
+	return CableBatch.plan(groups)
+
+
 ## Verteilt die Reihen-Ports eines Schranks (RackPlan) zufällig, aber reproduzierbar auf die Kabel
 func _assign_important(section_id: String, unit_seed: int) -> void:
 	important.clear()
@@ -185,6 +202,35 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 		u.heaps.append(heap)
 		hid += 1
 
+	# Haufen auf Straßenabschnitten zwischen den Kreuzungen (für viele Kabel je Viertel)
+	var seg: Dictionary = cfg.get("segment_heaps", {})
+	if not seg.is_empty():
+		var spots: Array[Vector2] = []
+		var bz := [c.y - half.y] + zs + [c.y + half.y]
+		var bx := [c.x - half.x] + xs + [c.x + half.x]
+		for x in xs:
+			for j in bz.size() - 1:
+				if float(bz[j + 1]) - float(bz[j]) > street * 2.0:
+					spots.append(Vector2(x, (float(bz[j]) + float(bz[j + 1])) * 0.5))
+		for z in zs:
+			for i in bx.size() - 1:
+				if float(bx[i + 1]) - float(bx[i]) > street * 2.0:
+					spots.append(Vector2((float(bx[i]) + float(bx[i + 1])) * 0.5, z))
+		spots = spots.filter(func(p: Vector2) -> bool:
+			for e: Dictionary in extra:
+				if p.distance_to(WorldLayout._v2(e["at"])) < float(e["radius"]) + 10.0:
+					return false
+			return true)
+		for k in mini(int(seg.get("count", 0)), spots.size()):
+			var p: Vector2 = spots.pop_at(rng.randi_range(0, spots.size() - 1))
+			var heap := HeapData.new(hid, rng.randi(), city.to_scene(p),
+				rng.randi_range(int(seg["heap_count"][0]), int(seg["heap_count"][1])),
+				rng.randf_range(float(seg["heap_radius"][0]), float(seg["heap_radius"][1])),
+				rng.randf_range(float(seg["heap_peak"][0]), float(seg["heap_peak"][1])), HeapData.Kind.HEAP)
+			heap.name = "%s, Straße" % u.name
+			u.heaps.append(heap)
+			hid += 1
+
 	# Einzelne Kabel entlang der Straßen (je ein "Haufen" mit einem Kabel)
 	for k in int(cfg.get("street_cables", 0)):
 		var along_x := rng.randf() < 0.5
@@ -200,5 +246,6 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 		heap.name = "%s, Straße" % u.name
 		u.heaps.append(heap)
 		hid += 1
-	u._assign_important(u.id, int(cfg.get("seed", 1)))
+	# section: Schrank, zu dem die wichtigen Kabel gehören (Standard: das Viertel selbst; z. B. "turm" auf dem Campus)
+	u._assign_important(String(cfg.get("section", u.id)), int(cfg.get("seed", 1)))
 	return u

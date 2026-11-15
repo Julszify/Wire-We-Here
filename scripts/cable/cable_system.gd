@@ -23,12 +23,69 @@ var motor_multiplier: float = 1.0
 var untie_delta: int = 0
 
 
+## Raster der Kabelenden (Zelle -> Kabel), damit das Anvisieren bei zehntausenden Kabeln schnell bleibt
+const GRID_CELL_M := 4.0
+var _grid: Dictionary = {}
+
+
 func add_cable(cable: CableData) -> void:
 	cables[cable.id] = cable
+	_index(cable, true)
 
 
 func remove_cable(cable_id: int) -> void:
+	var cable: CableData = cables.get(cable_id)
+	if cable:
+		_index(cable, false)
 	cables.erase(cable_id)
+
+
+## Kabel, deren Enden in Zellen um `pos` liegen (Radius in Metern); ein Kabel kann doppelt vorkommen
+func cables_near(pos: Vector3, radius: float) -> Array:
+	var out: Array = []
+	var lo := _cell(pos - Vector3(radius, 0, radius))
+	var hi := _cell(pos + Vector3(radius, 0, radius))
+	for x in range(lo.x, hi.x + 1):
+		for z in range(lo.y, hi.y + 1):
+			var list: Variant = _grid.get(Vector2i(x, z))
+			if list != null:
+				out.append_array(list)
+	return out
+
+
+## Kabel, die gerade an einem Aufwickler hängen
+func hooked_cables() -> Array:
+	var out: Array = []
+	for reel: ReelData in reels.values():
+		var c := cable_on(reel)
+		if c:
+			out.append(c)
+	return out
+
+
+func _cell(p: Vector3) -> Vector2i:
+	return Vector2i(floori(p.x / GRID_CELL_M), floori(p.z / GRID_CELL_M))
+
+
+func _index(cable: CableData, add: bool) -> void:
+	var pts := cable.path.points
+	if pts.is_empty():
+		return
+	var keys := [_cell(pts[0])]
+	var tail := _cell(pts[pts.size() - 1])
+	if tail != keys[0]:
+		keys.append(tail)
+	for k: Vector2i in keys:
+		var list: Array = _grid.get(k, [])
+		if add:
+			list.append(cable)
+			_grid[k] = list
+		else:
+			list.erase(cable)
+			if list.is_empty():
+				_grid.erase(k)
+			else:
+				_grid[k] = list
 
 
 func add_reel(reel: ReelData) -> void:

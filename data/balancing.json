@@ -175,6 +175,7 @@
 		"reach_m": 2.8,
 		"aim_radius_m": 0.35,
 		"tether_length_m": 6.0,
+		"max_speed_factor": 1.6,
 		"reel_reach_m": 3.2
 	},
 	"arm": {
@@ -258,5 +259,17 @@
 		"path": "user://savegame.json",
 		"autosave_s": 30.0,
 		"version": 1
+	},
+	"cable_batch": {
+		"_kommentar": "Ruhende Kabel werden blockweise (bis 256 Kabel) als ein Mesh gezeichnet. lods: nah, mittel, fern. step = jeder wievielte Bahnpunkt, sides = Ecken der Röhre, radius_scale = dicker in der Ferne (gegen Flimmern), show_m = sichtbar bis (plus Ausdehnung des Blocks), build_m/free_m = nah/mittel wird gebaut bzw. freigegeben (Meter zur Kamera)",
+		"lods": [
+			{ "step": 4, "sides": 5, "plugs": true, "shadows": true, "show_m": 22, "build_m": 35, "free_m": 55 },
+			{ "step": 8, "sides": 4, "radius_scale": 1.5, "show_m": 80, "build_m": 100, "free_m": 140 },
+			{ "step": 18, "sides": 3, "radius_scale": 2.5, "show_m": 320 }
+		],
+		"check_s": 0.3,
+		"cell_m": 25.0,
+		"jobs_per_frame": 6,
+		"lod_jobs_per_check": 24
 	}
 }

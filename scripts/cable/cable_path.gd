@@ -42,12 +42,46 @@ static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radi
 		ctrl.append(center + Vector3(mid_r * cos(am), end_y, mid_r * sin(am)))
 		var a1 := a0 + bend
 		ctrl.append(center + Vector3(rim * 1.02 * cos(a1), end_y, rim * 1.02 * sin(a1)))
+	var surface_min: float = h.get("surface_min_fraction", 0.0)
+	var count := rng.randi_range(int(c["control_points_min"]), int(c["control_points_max"]))
+	var local_r := float(h.get("local_radius_m", 4.5))
+	if radius > float(h.get("local_from_radius_m", 9.0)):
+		# Großer Berg: jedes Kabel windet sich in einem kleineren Bereich, der vom Rand aus unterschiedlich
+		# tief im Berg liegt (statt in langen Bahnen quer über den ganzen Berg). Wirkt dichter und wirrer.
+		var depth := sqrt(rng.randf())
+		var ta := a0 + rng.randf_range(-0.25, 0.25)
+		var tr := rim * (1.0 - depth * 0.92) - local_r * 0.4
+		var target := Vector2(maxf(tr, 0.0) * cos(ta), maxf(tr, 0.0) * sin(ta))
+		# Zwischenpunkte auf dem Weg vom Rand zum Bereich (sonst ein langes gerades Stück)
+		var first := Vector2(ctrl[ctrl.size() - 1].x - center.x, ctrl[ctrl.size() - 1].z - center.z)
+		var steps := int(first.distance_to(target) / (local_r * 1.2))
+		for k in steps:
+			var m := first.lerp(target, float(k + 1) / (steps + 1)) + Vector2.from_angle(rng.randf() * TAU) * local_r * 0.4
+			var mr := m.length()
+			var mrim := radius * _rim_factor(atan2(m.y, m.x), phases)
+			var ms := float(h["base_height_m"]) + peak * pow(maxf(0.0, 1.0 - pow(minf(mr / mrim, 1.0), 2.0)), 0.8)
+			ctrl.append(center + Vector3(m.x, h["min_height_m"] + ms * rng.randf_range(maxf(surface_min, 0.7), 1.0), m.y))
+		for i in count:
+			var off := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * local_r
+			var q := target + off
+			var qr := q.length()
+			var local_rim := radius * _rim_factor(atan2(q.y, q.x), phases)
+			if qr > local_rim * inner_frac:
+				q *= local_rim * inner_frac / qr
+				qr = local_rim * inner_frac
+			var surface := float(h["base_height_m"]) + peak * pow(maxf(0.0, 1.0 - pow(qr / local_rim, 2.0)), 0.8)
+			var y: float = h["min_height_m"] + surface * rng.randf_range(surface_min, 1.0)
+			ctrl.append(center + Vector3(q.x, y, q.y))
+		var dense_big := catmull_rom_centripetal(ctrl, 24)
+		var big := CablePath.new()
+		big.points = resample_even(dense_big, int(c["path_samples"]))
+		big.length = polyline_length(big.points)
+		return big
+
 	var r1 := rim * inner_frac
 	ctrl.append(center + Vector3(r1 * cos(a0 + 0.15), 0.35, r1 * sin(a0 + 0.15)))
 
 	# Weitere Stützpunkte im Haufen, meist knapp unter der Hügeloberfläche
-	var surface_min: float = h.get("surface_min_fraction", 0.0)
-	var count := rng.randi_range(int(c["control_points_min"]), int(c["control_points_max"]))
 	for i in count:
 		var t := rng.randf() * TAU
 		var local_rim := radius * _rim_factor(t, phases)

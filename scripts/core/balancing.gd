@@ -27,6 +27,8 @@ var wagon: Dictionary = {}
 var zipline: Dictionary = {}
 var connector: Dictionary = {}
 var server_room: Dictionary = {}
+## Blöcke ruhender Kabel (CableBatch): Detailstufen und Thread-Aufträge
+var cable_batch: Dictionary = {}
 var tablet_order: Array = []
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
 var services: Array = []
@@ -72,6 +74,7 @@ func reload() -> void:
 	zipline = parsed.get("zipline", {})
 	connector = parsed.get("connector", {})
 	server_room = parsed.get("server_room", {})
+	cable_batch = parsed.get("cable_batch", {})
 	tablet_order = parsed.get("tablet_order", [])
 	var sv := _load_json(SERVICES_PATH)
 	services = sv.get("services", [])
