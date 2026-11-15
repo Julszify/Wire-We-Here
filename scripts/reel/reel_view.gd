@@ -7,23 +7,35 @@ var data: ReelData
 var _spin: Node3D
 
 
+## Trommelgröße relativ zur normalen Rolle (Wagen-Plätze sind kleiner)
+static func scale_of(reel: ReelData) -> float:
+	return float(Balancing.wagon.get("drum_scale", 0.6)) if reel.kind == ReelData.Kind.WAGON else 1.0
+
+
 func setup(reel: ReelData) -> void:
 	data = reel
 	position = reel.position
 	var r: Dictionary = Balancing.reel
-	var drum_r: float = r["drum_radius_m"]
-	var drum_h: float = r["drum_height_m"]
-	var flange_r: float = r["flange_radius_m"]
+	var k := scale_of(reel)
+	var drum_r: float = float(r["drum_radius_m"]) * k
+	var drum_h: float = float(r["drum_height_m"]) * k
+	var flange_r: float = float(r["flange_radius_m"]) * k
 
 	var metal := _material(Color(0.6, 0.65, 0.7), 0.5, 0.4)
-	var flange_color := Color(0.54, 0.35, 0.23) if reel.kind == ReelData.Kind.HAND else Color(0.95, 0.76, 0.19)
+	var flange_color := Color(0.95, 0.76, 0.19)
+	if reel.kind == ReelData.Kind.HAND:
+		flange_color = Color(0.54, 0.35, 0.23)
+	elif reel.kind == ReelData.Kind.WAGON:
+		flange_color = Color(0.2, 0.5, 0.9)
 	var flange_mat := _material(flange_color, 0.7, 0.0)
 
 	_spin = Node3D.new()
 	add_child(_spin)
-	_add_cylinder(_spin, drum_r, drum_h, Vector3(0, 0.15 + drum_h * 0.5, 0), metal)
-	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.12, 0), flange_mat)
-	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.18 + drum_h, 0), flange_mat)
+	_add_cylinder(_spin, drum_r, drum_h, Vector3(0, 0.15 * k + drum_h * 0.5, 0), metal)
+	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.12 * k, 0), flange_mat)
+	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.18 * k + drum_h, 0), flange_mat)
+	if reel.kind == ReelData.Kind.WAGON:
+		return
 
 	if reel.kind == ReelData.Kind.HAND:
 		# Kurbelarm mit Griff oben auf dem Flansch
@@ -45,6 +57,11 @@ func setup(reel: ReelData) -> void:
 		motor.material_override = _material(Color(0.23, 0.26, 0.31), 0.6, 0.0)
 		motor.position = Vector3(flange_r + 0.2, 0.2, 0)
 		add_child(motor)
+
+
+## Getragen: verkleinert neben der Figur; abgestellt: normale Größe am Boden
+func set_carried(carried: bool) -> void:
+	scale = Vector3.ONE * (0.45 if carried else 1.0)
 
 
 ## Drehwinkel aus der Spirale (Bogenmaß, gleiche Konvention wie CableShape).

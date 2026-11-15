@@ -8,10 +8,11 @@ extends RefCounted
 
 
 ## Kabel auf einer Rolle. Ergebnis: { "points", "phase" } – phase = Drehwinkel der Trommel.
-static func build_on_reel(cable: CableData, reel_pos: Vector3) -> Dictionary:
+## `scale` < 1 = kleinere Trommel (Wagen).
+static func build_on_reel(cable: CableData, reel_pos: Vector3, scale: float = 1.0) -> Dictionary:
 	var anchor := cable.path.points[0]
 	var feed_angle := atan2(anchor.z - reel_pos.z, anchor.x - reel_pos.x)
-	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle)
+	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle, scale)
 	var coil_pts: PackedVector3Array = coil["points"]
 	var coil_end := coil_pts[coil_pts.size() - 1]
 	# Verbindungsstück leicht nach oben gebogen
@@ -81,15 +82,15 @@ static func _assemble(cable: CableData, coil_pts: PackedVector3Array, mid_y: flo
 ## Helix um die Trommel. Das äußere Ende liegt immer bei `end_angle` (Richtung Haufen),
 ## dadurch dreht sich die ganze Spirale beim Aufwickeln mit der Trommel.
 ## Ergebnis: { "points": innen -> außen, "phase": Winkel des inneren Anfangs }
-static func coil_points(center: Vector3, length: float, end_angle: float) -> Dictionary:
+static func coil_points(center: Vector3, length: float, end_angle: float, scale: float = 1.0) -> Dictionary:
 	var r: Dictionary = Balancing.reel
 	var step_len: float = r["coil_point_step_m"]
-	var pitch: float = r["coil_pitch_m"]
-	var min_h: float = r["coil_min_height_m"]
-	var max_h: float = r["coil_max_height_m"]
-	var layer_step: float = r["coil_layer_step_m"]
+	var pitch: float = float(r["coil_pitch_m"]) * scale
+	var min_h: float = float(r["coil_min_height_m"]) * scale
+	var max_h: float = float(r["coil_max_height_m"]) * scale
+	var layer_step: float = float(r["coil_layer_step_m"]) * scale
 
-	var radius: float = r["coil_start_radius_m"]
+	var radius: float = float(r["coil_start_radius_m"]) * scale
 	var angle := 0.0
 	var h := min_h
 	var dir := 1.0

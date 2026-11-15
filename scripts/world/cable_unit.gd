@@ -28,11 +28,12 @@ var important: Dictionary = {}
 static func build_all(city: CityWorld) -> Array[CableUnit]:
 	var units: Array[CableUnit] = []
 	var layout := city.layout
+	# Feste Nummer je Einheit ("unit" in world.json), damit Kabel-IDs gleich bleiben, wenn neue Einheiten dazukommen
 	for b: Dictionary in layout.raw().get("barriers", []):
-		units.append(_barrier(city, b, units.size()))
+		units.append(_barrier(city, b, int(b.get("unit", units.size()))))
 	for d in layout.districts:
 		if d.has("cables"):
-			units.append(_district(city, d, units.size()))
+			units.append(_district(city, d, int(d["cables"].get("unit", units.size()))))
 	return units
 
 
@@ -107,11 +108,14 @@ static func _barrier(city: CityWorld, b: Dictionary, index: int) -> CableUnit:
 		float(b["peak_m"]), HeapData.Kind.HEAP)
 	heap.name = u.name
 	u.heaps.append(heap)
-	# Blockade hinter dem Berg (von innen gesehen): eine Rückwand jenseits des Zauns und zwei Seitenwände
-	# zurück zum Zaun. So bleibt der ganze Berg von der Campus-Seite aus erreichbar.
+	# Blockade hinter dem Berg (vom Spieler aus gesehen): eine Rückwand auf der anderen Seite des Bergs und
+	# zwei Seitenwände zurück zum Zaun. Der Berg liegt auf der Seite, von der der Spieler kommt
+	# (offset_m negativ = im Viertel mit dem Zaun, positiv = davor), die Blockade auf der anderen.
 	var wall: Dictionary = from.get("wall", {})
 	var gap := float(wall.get("gap_m", 20.0))
-	var depth := maxf(float(b.get("offset_m", 0.0)) + r + float(b.get("blocker_margin_m", 1.5)), 1.0)
+	var offset := float(b.get("offset_m", 0.0))
+	var side_sign := -1.0 if offset < 0.0 else 1.0
+	var depth := offset - side_sign * (r + float(b.get("blocker_margin_m", 1.5)))
 	var bp := city.to_scene(p)
 	var out3 := Vector3(out.x, 0, out.y)
 	var side3 := Vector3(-out.y, 0, out.x)
@@ -119,7 +123,7 @@ static func _barrier(city: CityWorld, b: Dictionary, index: int) -> CableUnit:
 	u.blocker_boxes.append([bp + out3 * depth + up, _box_size(side3, gap + 2.0, out3, 1.0)])
 	for sgn in [-1.0, 1.0]:
 		u.blocker_boxes.append([bp + out3 * depth * 0.5 + side3 * sgn * (gap * 0.5 + 0.5) + up,
-			_box_size(side3, 1.0, out3, depth + 1.0)])
+			_box_size(side3, 1.0, out3, absf(depth) + 1.0)])
 	if b.has("important_section"):
 		u._assign_important(String(b["important_section"]), int(b.get("seed", 1)))
 	return u
@@ -149,13 +153,28 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 	var xs := WorldLayout.grid_lines(c.x, half.x, block)
 	var zs := WorldLayout.grid_lines(c.y, half.y, block)
 
-	# Haufen auf zufällig gewählten Kreuzungen
+	# Feste große Haufen (z. B. Marktplatz)
+	var hid := 9100 + index * 100
+	var extra: Array = cfg.get("extra_heaps", [])
+	for e: Dictionary in extra:
+		var at := WorldLayout._v2(e["at"])
+		var big := HeapData.new(hid, hash([int(cfg.get("seed", 1)), String(e.get("name", "")), hid]), city.to_scene(at),
+			int(e["count"]), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
+		big.name = "%s, %s" % [u.name, String(e.get("name", "Haufen"))]
+		u.heaps.append(big)
+		hid += 1
+
+	# Haufen auf zufällig gewählten Kreuzungen (nicht direkt neben einem festen Haufen)
 	var crossings: Array[Vector2] = []
 	for x in xs:
 		for z in zs:
-			crossings.append(Vector2(x, z))
+			var p := Vector2(x, z)
+			var near := false
+			for e: Dictionary in extra:
+				near = near or p.distance_to(WorldLayout._v2(e["at"])) < float(e["radius"]) + 6.0
+			if not near:
+				crossings.append(p)
 	var wanted := mini(int(cfg.get("crossing_heaps", 0)), crossings.size())
-	var hid := 9100 + index * 100
 	for k in wanted:
 		var p: Vector2 = crossings.pop_at(rng.randi_range(0, crossings.size() - 1))
 		var heap := HeapData.new(hid, rng.randi(), city.to_scene(p),

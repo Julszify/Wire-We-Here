@@ -18,18 +18,18 @@ Das Spiel ist in Entwicklung. Spielbar ist der **Vertical Slice**, eingebettet i
 
 | Bereich | Stand |
 | --- | --- |
-| Kabel ziehen und aufwickeln | per Hand um den Arm, Handkurbel, Motorrollen, Dauerzug; jedes Kabel ist an beiden Enden greifbar |
-| Knoten, Geld, Upgrades | Knoten lösen mit E, Geld pro Meter, Tablet mit 7 Upgrades |
-| Bewegung | laufen, rennen, springen |
+| Kabel ziehen und aufwickeln | per Hand um den Arm, Handkurbel, Motorrollen, Kabeltrommel-Wagen (folgt dir, zieht drei Kabel), Dauerzug; Rollen lassen sich umstellen; jedes Kabel ist an beiden Enden greifbar |
+| Knoten, Geld, Upgrades | Knoten lösen mit E, Geld pro Meter, Tablet mit 8 Upgrades |
+| Bewegung | laufen, rennen, springen, Seilbahn zur Basis (durch Dienste freigeschaltet); Wegweiser zum Serverraum |
 | Serverraum | begehbare Halle mit zehn Schränken und 2000 Ports; wichtige Kabel werden zu Knäueln, die man in der Tasche sammelt und einsteckt |
 | Dienste | 20 Einzel-Dienste und Reihen à 10 Ports; sie schalten Upgrades frei oder wirken dauerhaft (mehr Geld, schneller laufen, größere Tasche …) |
 | C.O.R.D. | folgt dem Spieler und stellt die Bestellfrage (ohne „Nein“ fallen 100 Kabel vom Himmel); Port 20 gibt einen Abschaltknopf für 5 Minuten Ruhe |
 | Hinterhof | Bäume, Bänke, Laternen, Paletten und ein Lieferwagen rund um den Serverraum |
 | Stadt | ca. 2 × 2 km mit Gelände, Bodentexturen und Straßen; Wohnviertel mit Häusern, sonst graue Gebäudeblöcke (Blockout) |
-| Kabel in der Stadt | Hinterhof, eine Sperre vor dem Wohnviertel und das Wohnviertel, zusammen 150 wichtige Kabel; Laden und Entladen pro Viertel |
+| Kabel in der Stadt | Hinterhof, Wohnviertel und Altstadt mit je einer Sperre davor, zusammen 300 wichtige Kabel; Laden und Entladen pro Viertel |
 | Speichern | Spielstand als JSON, automatisch alle 30 s |
 
-**Geplant:** Kabel für die übrigen acht Viertel, Klettern, Seilbahnen, weitere Gebäude, Ton, Koop für 2–4 Spieler, Steam.
+**Geplant:** Kabel für die übrigen sieben Viertel, Klettern, Seilbahnen, weitere Gebäude, Ton, Koop für 2–4 Spieler, Steam.
 
 ![Im Serverraum: ein Schrank je Viertel, jedes Lämpchen ist ein Port](docs/screenshot_serverraum.jpg)
 
@@ -52,7 +52,7 @@ Beim ersten Start nach einer Änderung an `data/world.json` erzeugt das Spiel H�
 | WASD, Shift | laufen, rennen |
 | Leertaste | springen |
 | Maus | umsehen (Esc gibt die Maus frei) |
-| E | Kabelende greifen, Kabel an anvisierte Rolle hängen, Knoten lösen (3×), Knäuel aufheben, im Serverraum alle Knäuel einstecken |
+| E | Kabelende greifen, Kabel an anvisierte Rolle hängen, Knoten lösen (3×), Knäuel aufheben, im Serverraum alle Knäuel einstecken, leere Rolle aufheben/abstellen, Wagen parken/ankoppeln, Seilbahn fahren |
 | Linksklick | wickeln bzw. kurbeln |
 | Q | Kabel loslassen bzw. ein Knäuel aus der Tasche ablegen |
 | Tab | Tablet mit Upgrades (das Spiel läuft weiter) |

@@ -22,6 +22,16 @@ var _economy: Economy
 var _rack: ServiceRack
 var _room: ServerRoomView
 var _props: YardProps
+# Werkzeug zum Mitnehmen, Seilbahn, Wegweiser
+var _carried_reel: ReelData            # gerade getragene Handkurbel oder Motorrolle
+var _wagon: WagonData
+var _wagon_view: WagonView
+var _wagon_confirm_t := 0.0            # zweites E zum Ankoppeln trotz eingehängter Kabel
+var _ziplines: Dictionary = {}         # Strecken-ID -> Zipline
+var _target_station: Array = []        # [Zipline, 0 = äußeres Ende / 1 = Basis-Seite] in Reichweite
+var _ride: Dictionary = {}             # laufende Seilbahnfahrt: { line, s, dir }
+var _trolley: MeshInstance3D
+var _waypoint: Waypoint
 var _tablet: Tablet
 var _zone: ZoneData
 var _arm_reel: ReelData
@@ -112,6 +122,12 @@ func _ready() -> void:
 
 	_end_marker = _make_sphere(0.1, Color(1.0, 0.85, 0.3), 2.0)
 	add_child(_end_marker)
+	_waypoint = Waypoint.new()
+	_hud.add_child(_waypoint)
+	_waypoint.camera = _player.camera
+	_waypoint.label = "Serverraum"
+	_waypoint.target = ServerRoomView.door_point()
+	_waypoint.visible = false
 	# Spielstand laden, falls vorhanden (außer bei "Neues Spiel" oder --nosave)
 	_saving_enabled = not OS.get_cmdline_user_args().has("--nosave")
 	var save := {}
@@ -142,6 +158,7 @@ func _ready() -> void:
 	_hud.add_child(_cord_prompt)
 	_tablet.new_game_requested.connect(_new_game)
 
+	_build_ziplines()
 	_units = CableUnit.build_all(_city)
 	if not save.is_empty():
 		_apply_save(save)
@@ -207,11 +224,17 @@ func _process(delta: float) -> void:
 		if reel.kind == ReelData.Kind.ARM:
 			view.show_on_arm(arm)
 		else:
-			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position))
+			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel)))
 
 	for i in _bag.size():
 		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
 	_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
+	_update_carried_reel()
+	_update_wagon(delta)
+	_update_ride(delta)
+	_wagon_confirm_t = maxf(_wagon_confirm_t - delta, 0.0)
+	var far := _player.global_position.distance_to(ServerRoomView.door_point()) > 30.0
+	_waypoint.visible = not _bag.is_empty() and far and _ride.is_empty()
 
 	_cord_view.follow(_player.global_position, _player.facing(), delta)
 	if _cord.phase == CordLogic.Phase.ASKING:
@@ -256,7 +279,7 @@ func _notification(what: int) -> void:
 # --- Eingaben -------------------------------------------------------------
 
 func _arm_busy() -> bool:
-	return not _arm_reel.is_free()
+	return not _arm_reel.is_free() or _carried_reel != null
 
 
 func _bag_full() -> bool:
@@ -264,7 +287,13 @@ func _bag_full() -> bool:
 
 
 func _on_interact() -> void:
+	if not _ride.is_empty():
+		return
 	var held := _system.cable_on(_arm_reel)
+	# 0. Getragene Rolle abstellen
+	if _carried_reel:
+		_put_down_reel()
+		return
 	# 1. Knoten am eigenen Kabel lösen geht immer, ohne zu zielen
 	if held and held.is_stuck():
 		_system.untie(held)
@@ -278,7 +307,19 @@ func _on_interact() -> void:
 	elif held and _target_reel and _target_reel.is_free():
 		_system.transfer(_arm_reel, _target_reel)
 		_player.holding = false
-		_show_message("Eingehängt!" + (" Die Rolle zieht jetzt von selbst." if _target_reel.kind == ReelData.Kind.MOTOR else " Jetzt kurbeln."))
+		if _wagon and _wagon.owns(_target_reel):
+			_wagon.parked = true
+			_show_message("Am Wagen eingehängt – er parkt und zieht von selbst (%d/%d Plätze frei)." % [_wagon.free_slots(), _wagon.slots.size()])
+		else:
+			_show_message("Eingehängt!" + (" Die Rolle zieht jetzt von selbst." if _target_reel.kind == ReelData.Kind.MOTOR else " Jetzt kurbeln."))
+	# 4b. Wagen ankoppeln bzw. parken, Rolle aufheben (ohne Kabel in der Hand)
+	elif not held and _target_reel and _wagon and _wagon.owns(_target_reel):
+		_toggle_wagon()
+	elif not held and _target_reel and _target_reel.is_movable() and _target_reel.is_free():
+		_pick_up_reel(_target_reel)
+	# 4c. Seilbahn
+	elif not held and not _target_station.is_empty():
+		_start_ride(_target_station[0], _target_station[1])
 	# 5. Knäuel vom Boden aufheben
 	elif _target_item:
 		_pick_up(_target_item)
@@ -304,7 +345,9 @@ func _on_pull() -> void:
 
 
 func _on_release() -> void:
-	if not _arm_reel.is_free():
+	if _carried_reel:
+		_put_down_reel()
+	elif not _arm_reel.is_free():
 		_system.release(_arm_reel)
 	elif not _bag.is_empty():
 		_drop_from_bag()
@@ -379,7 +422,7 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 			view.show_on_arm(_player.arm_transform())
 			pay_pos = _player.global_position + Vector3(0, 2.1, 0)
 		else:
-			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position))
+			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel)))
 			pay_pos = reel.position + Vector3(0, 1.6, 0)
 		var amount := _economy.pay_for_cable(cable.length_m)
 		FloatText.spawn(self, pay_pos, "+" + Economy.format_money(amount))
@@ -418,7 +461,10 @@ func _on_upgrade_bought(upgrade_id: String, _level: int) -> void:
 			_show_message("Handkurbel aufgestellt. Kabel greifen, zur Kurbel bringen und mit E einhängen.")
 		"extra_reel":
 			_place_reel(ReelData.Kind.MOTOR)
-			_show_message("Motorrolle aufgestellt. Sie zieht eingehängte Kabel von selbst.")
+			_show_message("Motorrolle aufgestellt. Sie zieht eingehängte Kabel von selbst. Leer kannst du sie mit E aufheben und woanders abstellen.")
+		"wagon":
+			_spawn_wagon(null)
+			_show_message("Kabeltrommel-Wagen da! Er folgt dir. Kabel daran einhängen: er parkt und zieht drei Kabel gleichzeitig.")
 		_:
 			_show_message("%s gekauft!" % _economy.upgrade_name(upgrade_id))
 	_apply_upgrades()
@@ -434,6 +480,7 @@ func _on_service_activated(service_id: int, service_name: String, unlocks: Strin
 		_economy.state.total_earned += payout
 		_economy.money_changed.emit(_economy.state.money)
 	_apply_upgrades()
+	_refresh_ziplines()
 	if unlocks != "":
 		_show_message("Dienst „%s“ läuft wieder – neu im Tablet: %s" % [service_name, _economy.upgrade_name(unlocks)])
 	elif def.has("effect"):
@@ -640,15 +687,20 @@ func _update_targets() -> void:
 				_target_rack = true
 				break
 	if _target_knot == null and not _target_rack:
-		_target_reel = CableTargeting.find_reel(_system.reels.values(), origin, dir, pos)
+		_target_reel = CableTargeting.find_reel(_system.reels.values().filter(func(r: ReelData) -> bool: return not r.carried),
+			origin, dir, pos)
 	if _target_knot == null and _target_reel == null and not _target_rack:
 		_target_item = _find_item(origin, dir, pos)
 		if _target_item == null and not _arm_busy():
 			_target_end = CableTargeting.find_end(_grabbable_cables(), origin, dir, pos)
 			_target_tail = _target_end != null and CableTargeting.hit_tail
+	_target_station = []
+	if _target_knot == null and _target_reel == null and _target_item == null and _target_end == null and not _arm_busy():
+		_target_station = _station_near(pos)
 	var holding := not _arm_reel.is_free()
 	_crosshair.targeting = _target_knot != null or _target_end != null or _target_item != null or _target_rack \
-		or (holding and _target_reel != null and _target_reel.is_free())
+		or (holding and _target_reel != null and _target_reel.is_free()) \
+		or (not holding and _target_reel != null and (_target_reel.kind == ReelData.Kind.WAGON or (_target_reel.is_movable() and _target_reel.is_free())))
 	_end_marker.visible = _target_end != null
 	if _target_end:
 		var ends := _target_end.path.points
@@ -685,8 +737,7 @@ func _build_server_room() -> void:
 
 func _place_reel(kind: ReelData.Kind) -> void:
 	var pl: Dictionary = Balancing.placement
-	var pos := _player.global_position + _player.facing() * float(pl["distance_ahead_m"])
-	pos.y = 0.0
+	var pos := _ground_spot(_player.global_position + _player.facing() * float(pl["distance_ahead_m"]))
 	# Nicht in einen Haufen stellen: an den Rand schieben
 	var clearance: float = pl["min_heap_clearance_m"]
 	var heap := _zone.heap_at(pos, clearance)
@@ -903,8 +954,27 @@ func _update_hud() -> void:
 		_hint.text = "E: Knoten lösen (%d/%d)" % [_target_knot.knot_presses, presses]
 	elif not _bag.is_empty() and _target_rack:
 		_hint.text = ("E: %d Knäuel einstecken" % _bag.size()) if _bag.size() > 1 else "E: Knäuel einstecken (%s)" % RackPlan.port_label(_bag[0].port_id)
+	elif not _ride.is_empty():
+		_hint.text = "Seilbahn: %s" % (_ride["line"] as Zipline).line_name
+	elif _carried_reel:
+		_hint.text = "E oder Q: %s hier abstellen" % _reel_name(_carried_reel)
 	elif held and _target_reel and _target_reel.is_free():
-		_hint.text = "E: Kabel an %s einhängen" % ("Motorrolle" if _target_reel.kind == ReelData.Kind.MOTOR else "Handkurbel")
+		_hint.text = "E: Kabel an %s einhängen" % _reel_name(_target_reel)
+	elif not held and _target_reel and _wagon and _wagon.owns(_target_reel):
+		if not _wagon.parked:
+			_hint.text = "E: Wagen hier parken"
+		elif _wagon.any_hooked():
+			_hint.text = "E: Wagen ankoppeln (löst die eingehängten Kabel)" + ("  – nochmal E!" if _wagon_confirm_t > 0.0 else "")
+		else:
+			_hint.text = "E: Wagen ankoppeln (folgt dir)"
+	elif not held and _target_reel and _target_reel.is_movable() and _target_reel.is_free():
+		_hint.text = "E: %s aufheben und umstellen" % _reel_name(_target_reel)
+	elif not _target_station.is_empty():
+		var zl: Zipline = _target_station[0]
+		if RackPlan.has_special(_economy.state, zl.unlock):
+			_hint.text = "E: Seilbahn %s" % ("zur Basis" if _target_station[1] == 0 else "hinaus")
+		else:
+			_hint.text = "Seilbahn außer Betrieb – braucht Dienst „%s“" % _zipline_service(zl)
 	elif held and _player.at_tether_limit:
 		_hint.text = "Das Kabel ist gespannt – erst aufwickeln oder an eine Rolle hängen (Q: loslassen)"
 	elif held:
@@ -925,7 +995,7 @@ func _update_hud() -> void:
 	for reel: ReelData in _system.reels.values():
 		var c := _system.cable_on(reel)
 		if c:
-			var who := "Am Arm" if reel.kind == ReelData.Kind.ARM else ("Handkurbel" if reel.kind == ReelData.Kind.HAND else "Motorrolle %d" % reel.id)
+			var who := "Am Arm" if reel.kind == ReelData.Kind.ARM else _reel_name(reel)
 			line += "\n%s: %.1f von %.1f m%s%s" % [who, c.pulled_m, c.length_m,
 				"  (wichtig)" if c.is_important() else "", "  – KNOTEN!" if c.is_stuck() else ""]
 	if _message_t > 0.0:
@@ -964,6 +1034,211 @@ func _make_sphere(radius: float, color: Color, glow: float) -> MeshInstance3D:
 	return m
 
 
+# --- Werkzeug zum Mitnehmen ---------------------------------------------------
+
+func _reel_name(reel: ReelData) -> String:
+	match reel.kind:
+		ReelData.Kind.HAND:
+			return "Handkurbel"
+		ReelData.Kind.WAGON:
+			return "Wagen, Platz %d" % (_wagon.slots.find(reel) + 1) if _wagon else "Wagen"
+		_:
+			return "Motorrolle %d" % reel.id
+
+
+## Punkt am Boden (Gelände) unter `p`
+func _ground_spot(p: Vector3) -> Vector3:
+	return Vector3(p.x, _city.ground_height(p.x, p.z), p.z)
+
+
+func _pick_up_reel(reel: ReelData) -> void:
+	reel.carried = true
+	_carried_reel = reel
+	_reel_views[reel.id].set_carried(true)
+	_show_message("%s aufgehoben – E oder Q stellt sie wieder ab." % _reel_name(reel))
+
+
+func _put_down_reel() -> void:
+	var reel := _carried_reel
+	var pos := _ground_spot(_player.global_position + _player.facing() * float(Balancing.placement["distance_ahead_m"]))
+	reel.position = pos
+	reel.carried = false
+	_carried_reel = null
+	var view: ReelView = _reel_views[reel.id]
+	view.set_carried(false)
+	view.global_position = pos
+	_show_message("%s abgestellt." % _reel_name(reel))
+
+
+## Getragene Rolle schwebt verkleinert neben der Figur
+func _update_carried_reel() -> void:
+	if _carried_reel == null:
+		return
+	var side := _player.facing().cross(Vector3.UP)
+	var p := _player.global_position + side * 0.55 + _player.facing() * 0.2 + Vector3(0, 0.55, 0)
+	_carried_reel.position = p
+	_reel_views[_carried_reel.id].global_position = p
+
+
+## Wagen anlegen (neu hinter dem Spieler oder aus dem Spielstand)
+func _spawn_wagon(saved: Variant) -> void:
+	_wagon = WagonData.new()
+	var w: Dictionary = Balancing.wagon
+	var ids: Array = (saved as Dictionary).get("slots", []) if saved != null else []
+	for i in int(w.get("slots", 3)):
+		var reel: ReelData = null
+		if i < ids.size():
+			reel = _system.reels.get(int(ids[i]))
+		if reel == null:
+			reel = ReelData.new(_next_reel_id, ReelData.Kind.WAGON)
+			_add_reel(reel)
+		_wagon.slots.append(reel)
+	if saved != null:
+		_wagon.position = SaveGame.vec_from(saved.get("position", [0, 0, 0]))
+		_wagon.yaw = float(saved.get("yaw", 0.0))
+		_wagon.parked = bool(saved.get("parked", false))
+	else:
+		_wagon.position = _ground_spot(_player.global_position - _player.facing() * float(w.get("follow_distance_m", 3.2)))
+		_wagon.yaw = atan2(-_player.facing().x, -_player.facing().z)
+	_wagon_view = WagonView.new()
+	add_child(_wagon_view)
+	_wagon_view.setup(_wagon)
+	_update_wagon(0.0)
+
+
+## Wagen folgt dem Spieler, solange er nicht parkt; Plätze und Trommeln wandern mit
+func _update_wagon(delta: float) -> void:
+	if _wagon == null:
+		return
+	var w: Dictionary = Balancing.wagon
+	var me := _player.global_position
+	var dist := Vector2(me.x - _wagon.position.x, me.z - _wagon.position.z).length()
+	# Geparkt wegen Kabeln und alle fertig: koppelt sich wieder an, sobald der Spieler in der Nähe ist
+	if _wagon.parked and _wagon.get_meta("auto", false) and not _wagon.any_hooked() and dist < float(w.get("recouple_range_m", 8.0)):
+		_wagon.parked = false
+		_wagon.set_meta("auto", false)
+		_show_message("Wagen fertig – er folgt dir wieder.")
+	if _wagon.any_hooked() and _wagon.parked:
+		_wagon.set_meta("auto", true)
+	if not _wagon.parked and _ride.is_empty():
+		var keep := float(w.get("follow_distance_m", 3.2))
+		if dist > keep:
+			var to := Vector3(me.x - _wagon.position.x, 0, me.z - _wagon.position.z).normalized()
+			var step := minf(dist - keep, maxf(dist - keep, 1.0) * float(w.get("follow_speed", 5.0)) * delta)
+			var p := _wagon.position + to * step
+			_wagon.position = _ground_spot(p)
+			_wagon.yaw = lerp_angle(_wagon.yaw, atan2(-to.x, -to.z), 1.0 - exp(-6.0 * delta))
+	_wagon.update_slots()
+	for slot in _wagon.slots:
+		_reel_views[slot.id].global_position = slot.position
+		_reel_views[slot.id].rotation.y = _wagon.yaw
+	_wagon_view.refresh()
+
+
+func _toggle_wagon() -> void:
+	if not _wagon.parked:
+		_wagon.parked = true
+		_wagon.set_meta("auto", false)
+		_show_message("Wagen geparkt. Kabel daran einhängen oder mit E wieder ankoppeln.")
+		return
+	if _wagon.any_hooked() and _wagon_confirm_t <= 0.0:
+		_wagon_confirm_t = 3.0
+		_show_message("Ankoppeln lässt die eingehängten Kabel los (Fortschritt geht verloren). Nochmal E zum Bestätigen.")
+		return
+	for slot in _wagon.slots:
+		if not slot.is_free():
+			_system.release(slot)
+	_wagon_confirm_t = 0.0
+	_wagon.parked = false
+	_wagon.set_meta("auto", false)
+	_show_message("Wagen angekoppelt – er folgt dir.")
+
+
+# --- Seilbahn -------------------------------------------------------------------
+
+func _build_ziplines() -> void:
+	for cfg: Dictionary in _city.layout.raw().get("ziplines", []):
+		var zl := Zipline.new()
+		zl.name = String(cfg["id"])
+		add_child(zl)
+		zl.build(cfg, _city)
+		_ziplines[zl.id] = zl
+	_refresh_ziplines()
+
+
+func _refresh_ziplines() -> void:
+	for zl: Zipline in _ziplines.values():
+		zl.set_unlocked(RackPlan.has_special(_economy.state, zl.unlock), "„%s“" % _zipline_service(zl))
+
+
+func _zipline_service(zl: Zipline) -> String:
+	for service in RackPlan.total_services():
+		if String(RackPlan.service_def(service).get("special", "")) == zl.unlock:
+			return "%s (%s)" % [RackPlan.service_name(service), RackPlan.service_place(service)]
+	return "?"
+
+
+## Station in Reichweite: [Strecke, 0 = äußeres Ende / 1 = Basis-Seite] oder []
+func _station_near(pos: Vector3) -> Array:
+	var reach := float(Balancing.zipline.get("station_reach_m", 3.0))
+	for zl: Zipline in _ziplines.values():
+		for k in 2:
+			var st: Vector3 = zl.stations[k]
+			if Vector2(st.x - pos.x, st.z - pos.z).length() < reach and absf(st.y - pos.y) < 3.0:
+				return [zl, k]
+	return []
+
+
+## Fahrt starten: vom äußeren Ende zur Basis (dir +1) oder von der Basis-Seite hinaus (dir -1)
+func _start_ride(zl: Zipline, station: int) -> void:
+	if not RackPlan.has_special(_economy.state, zl.unlock):
+		_show_message("Diese Seilbahn läuft erst, wenn der Dienst „%s“ wieder online ist." % _zipline_service(zl))
+		return
+	_ride = { "line": zl, "s": 0.0 if station == 0 else zl.length, "dir": 1.0 if station == 0 else -1.0 }
+	_player.riding = true
+	if _trolley == null:
+		_trolley = MeshInstance3D.new()
+		var b := BoxMesh.new()
+		b.size = Vector3(0.5, 0.35, 0.7)
+		_trolley.mesh = b
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.97, 0.8, 0.3)
+		_trolley.material_override = m
+		add_child(_trolley)
+	_trolley.visible = true
+	_show_message("Festhalten!")
+
+
+func _update_ride(delta: float) -> void:
+	if _ride.is_empty():
+		return
+	var zl: Zipline = _ride["line"]
+	var z: Dictionary = Balancing.zipline
+	var s := float(_ride["s"]) + float(_ride["dir"]) * float(z.get("speed_m_per_s", 16.0)) * delta
+	_ride["s"] = s
+	var on_rope := zl.point_at(s)
+	_trolley.global_position = on_rope + Vector3(0, 0.1, 0)
+	_player.global_position = on_rope - Vector3(0, float(z.get("hang_m", 2.3)), 0)
+	_player.velocity = Vector3.ZERO
+	var ahead := zl.point_at(s + float(_ride["dir"]) * 2.0) - on_rope
+	if ahead.length() > 0.1:
+		_player.face_direction(ahead)
+	var done := s >= zl.length if float(_ride["dir"]) > 0.0 else s <= 0.0
+	if not done:
+		return
+	# Weiter auf der Anschluss-Strecke Richtung Basis?
+	var next: Zipline = _ziplines.get(zl.continues) if float(_ride["dir"]) > 0.0 else null
+	if next and RackPlan.has_special(_economy.state, next.unlock):
+		_ride = { "line": next, "s": 0.0, "dir": 1.0 }
+		return
+	var st: Vector3 = zl.stations[1 if float(_ride["dir"]) > 0.0 else 0]
+	_ride = {}
+	_player.riding = false
+	_player.global_position = st + Vector3(0, 0.35, 0)
+	_trolley.visible = false
+	_show_message("Angekommen.")
+
+
 # --- Spielstand -------------------------------------------------------------
 
 func _save_game(announce: bool) -> void:
@@ -984,7 +1259,10 @@ func _collect_save() -> Dictionary:
 	var reels := []
 	for r: ReelData in _system.reels.values():
 		if r.kind != ReelData.Kind.ARM:
-			reels.append(r.to_dict())
+			var rd := r.to_dict()
+			if r.carried:
+				rd["position"] = SaveGame.vec_to(_ground_spot(_player.global_position + _player.facing()))
+			reels.append(rd)
 	var items := []
 	for item: CoilItem in _items.values():
 		items.append(item.to_dict())
@@ -999,6 +1277,7 @@ func _collect_save() -> Dictionary:
 		"arm_cable": _arm_reel.cable_id,
 		"reels": reels,
 		"items": items,
+		"wagon": _wagon.to_dict() if _wagon else {},
 		"economy": _economy.state.to_dict(),
 		"cord": _cord.to_dict(),
 		"player": _player.view_state(),
@@ -1026,6 +1305,8 @@ func _apply_save(d: Dictionary) -> void:
 		var reel := ReelData.from_dict(rd)
 		reel.cable_id = -1
 		_add_reel(reel)
+	if not (d.get("wagon", {}) as Dictionary).is_empty():
+		_spawn_wagon(d["wagon"])
 
 	# Stadt-Einheiten in der Nähe sofort laden, ebenso Einheiten mit eingehängten Kabeln
 	if d.has("player"):
@@ -1114,7 +1395,10 @@ func _summary() -> String:
 	var hit := get_world_3d().direct_space_state.intersect_ray(
 		PhysicsRayQueryParameters3D.create(gp + Vector3(0, 0.5, 0), gp + Vector3(0, -60, 0), 1, [_player.get_rid()]))
 	var under := "%s@%.1f" % [hit["collider"].name, hit["position"].y] if hit else "nichts"
-	return ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "wichtig=%d dienste=%d einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
+	var extra := "wagen=%s rolle_getragen=%s fahrt=%s " % [
+		("geparkt" if _wagon.parked else "folgt") + ":%d/%d" % [_wagon.free_slots(), _wagon.slots.size()] if _wagon else "-",
+		str(_carried_reel != null), ("%s@%.0f" % [(_ride["line"] as Zipline).id, float(_ride["s"])]) if not _ride.is_empty() else "-"]
+	return extra + ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "wichtig=%d dienste=%d einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
 		important, _rack.active_services(), str(loaded), _blockers.size(),
 		_economy.state.money, str(_economy.state.active_ports) if _economy.state.active_ports.size() <= 24 else "%d Ports" % _economy.state.active_ports.size(), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
 		_system.reels.size(), str(hooked), _items.size(), "%d/%d" % [_bag.size(), _economy.bag_capacity()], _done_count, _orders,
@@ -1242,6 +1526,35 @@ func _apply_test_args() -> void:
 		_player.jump()
 	if opts.has("snooze"):
 		_on_snooze_requested()
+	if opts.has("wagon"):
+		# Wagen kaufen und alle Plätze mit Kabeln belegen (--wagon=fill)
+		_economy.state.money += _economy.cost("wagon")
+		_economy.buy("wagon")
+		if opts["wagon"] == "fill":
+			for slot in _wagon.slots:
+				for c: CableData in _system.cables.values():
+					if c.state == CableData.State.HEAP:
+						_system.hook(c, slot)
+						break
+			_wagon.parked = true
+	if opts.has("carryreel"):
+		for r: ReelData in _system.reels.values():
+			if r.is_movable() and r.is_free():
+				_pick_up_reel(r)
+				break
+	if opts.has("zipline"):
+		# --zipline=<Strecken-ID>: freischalten und zur äußeren Station; --zipline=<ID>,ride: gleich losfahren
+		var parts := String(opts["zipline"]).split(",")
+		var zl: Zipline = _ziplines.get(parts[0])
+		if zl:
+			for service in RackPlan.total_services():
+				if String(RackPlan.service_def(service).get("special", "")) == zl.unlock:
+					for port in RackPlan.service_ports(service):
+						_rack.plug(port)
+			_room.refresh(_economy.state)
+			_player.global_position = zl.stations[0] + Vector3(0, 0.3, 1.5)
+			if parts.size() > 1:
+				_start_ride(zl, 0)
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

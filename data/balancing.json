@@ -64,17 +64,19 @@
 			"name": "Festerer Griff",
 			"base_cost": 10.0,
 			"cost_growth": 1.9,
-			"effect_factor": 1.5,
+			"effect_factor": 1.414,
 			"max_count": 6,
-			"description": "Jeder Zug holt 50 % mehr Kabel raus (Arm und Kurbel)."
+			"description": "Jeder Zug holt 41 % mehr Kabel raus (Arm und Kurbel). Voll aufgerüstet etwa 10 m/s per Hand.",
+			"_kommentar": "1,414^6 = 8: Hand (5 Klicks/s × 0,25 m) voll aufgerüstet 10 m/s, ohne Dienst-Boni"
 		},
 		"motor": {
 			"name": "Stärkere Motoren",
 			"base_cost": 40.0,
 			"cost_growth": 2.2,
-			"effect_factor": 1.4,
+			"effect_factor": 1.73,
 			"max_count": 8,
-			"description": "Alle Motorrollen ziehen 40 % schneller."
+			"description": "Alle Motorrollen und der Wagen ziehen 73 % schneller. Voll aufgerüstet etwa 20 m/s.",
+			"_kommentar": "1,73^8 = 80: Motorrolle (0,25 m/s) voll aufgerüstet 20 m/s, ohne Dienst-Boni"
 		},
 		"extra_reel": {
 			"name": "Motorrolle",
@@ -98,6 +100,13 @@
 			"max_count": 6,
 			"description": "2 Knäuel mehr gleichzeitig tragen."
 		},
+		"wagon": {
+			"name": "Kabeltrommel-Wagen",
+			"base_cost": 250.0,
+			"cost_growth": 1.0,
+			"max_count": 1,
+			"description": "Rollt dir hinterher und zieht bis zu drei Kabel gleichzeitig – auch draußen in der Stadt."
+		},
 		"auto_pull": {
 			"name": "Dauerzug",
 			"base_cost": 30.0,
@@ -114,6 +123,25 @@
 	},
 	"motor_reel": {
 		"pull_speed_m_per_s": 0.25
+	},
+	"wagon": {
+		"_kommentar": "Kabeltrommel-Wagen: folgt dem Spieler, parkt beim Einhängen. Plätze ziehen wie Motorrollen (Stärkere Motoren wirkt mit). drum_scale = Trommelgröße relativ zur Rolle",
+		"pull_speed_m_per_s": 0.25,
+		"slots": 3,
+		"slot_spacing_m": 1.2,
+		"bed_height_m": 0.62,
+		"drum_scale": 0.55,
+		"follow_distance_m": 3.2,
+		"follow_speed": 5.0,
+		"recouple_range_m": 8.0
+	},
+	"zipline": {
+		"_kommentar": "Seilbahn zur Basis (Strecken in world.json → ziplines). hang_m = Abstand Seil bis Füße",
+		"speed_m_per_s": 16.0,
+		"hang_m": 2.3,
+		"sag_per_m": 0.025,
+		"min_clearance_m": 3.0,
+		"station_reach_m": 3.0
 	},
 	"reel": {
 		"drum_radius_m": 0.5,
@@ -175,7 +203,8 @@
 		"auto_pull",
 		"motor",
 		"copper",
-		"bag"
+		"bag",
+		"wagon"
 	],
 	"rack": {
 		"reach_m": 3.0

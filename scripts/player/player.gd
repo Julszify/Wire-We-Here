@@ -95,7 +95,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		release_pressed.emit()
 
 
+## Hängt an der Seilbahn: Bewegung kommt von außen
+var riding := false
+
+
 func _physics_process(delta: float) -> void:
+	if riding:
+		at_tether_limit = false
+		_animate_walk(delta, 0.0, 1.0)
+		return
 	var p: Dictionary = Balancing.player
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") if input_enabled else Vector2.ZERO
 	var dir := (_yaw.global_basis * Vector3(input.x, 0.0, input.y))
@@ -181,6 +189,11 @@ func look_toward(point: Vector3) -> void:
 ## Nur für Tests: Kamera um die Figur drehen (Grad)
 func orbit_camera(degrees: float) -> void:
 	_yaw.rotation.y += deg_to_rad(degrees)
+
+
+## Körper in eine Richtung drehen (z. B. Fahrtrichtung der Seilbahn)
+func face_direction(d: Vector3) -> void:
+	_body.rotation.y = atan2(-d.x, -d.z)
 
 
 ## Blickrichtung des Körpers (waagerecht)

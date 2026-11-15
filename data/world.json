@@ -84,6 +84,7 @@
 			"important_cables": 100,
 			"cables": {
 				"seed": 2001,
+				"unit": 1,
 				"crossing_heaps": 9,
 				"heap_count": [18, 32],
 				"heap_radius": [2.6, 3.6],
@@ -115,7 +116,27 @@
 				]
 			},
 			"ground": "pflaster",
-			"important_cables": 150
+			"important_cables": 150,
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": ["wohnviertel"]
+			},
+			"cables": {
+				"seed": 2002,
+				"unit": 3,
+				"crossing_heaps": 12,
+				"heap_count": [16, 28],
+				"heap_radius": [2.4, 3.4],
+				"heap_peak": [1.0, 1.6],
+				"street_cables": 60,
+				"street_length_m": [12, 26],
+				"extra_heaps": [
+					{ "name": "Marktplatz", "at": [-120, 0], "count": 120, "radius": 7.0, "peak": 3.0 }
+				],
+				"_kommentar": "extra_heaps: feste große Haufen (z. B. auf dem Marktplatz); Kreuzungen in deren Nähe bekommen keinen eigenen Haufen"
+			}
 		},
 		{
 			"id": "gamer",
@@ -321,7 +342,38 @@
 			"clear_fraction": 0.75,
 			"seed": 3001,
 			"important_section": "campus",
+			"unit": 0,
 			"_kommentar": "important_section: in diesem Berg liegen die wichtigen Kabel für die Reihen dieses Schranks (Campus: 3 Reihen = 30 Kabel)"
+		},
+		{
+			"id": "sperre_altstadt",
+			"name": "Kabelberg vor der Altstadt",
+			"road": ["altstadt", "wohnviertel"],
+			"offset_m": 6,
+			"blocker_margin_m": 1.5,
+			"count": 160,
+			"radius_m": 8.5,
+			"peak_m": 3.8,
+			"clear_fraction": 0.75,
+			"seed": 3002,
+			"unit": 2,
+			"_kommentar": "offset_m positiv = Berg liegt außerhalb der Altstadt auf der Hauptstraße (Seite des Spielers), die Blockade dahinter in der Altstadt"
+		}
+	],
+	"ziplines": [
+		{
+			"id": "seilbahn_wohnviertel",
+			"name": "Seilbahn Wohnviertel",
+			"unlock": "zipline_wohnviertel",
+			"_kommentar": "Punkte [x, z, Höhe über Boden] in world.json-Koordinaten, vom äußeren Ende zur Basis. Erster und letzter Punkt sind Stationen, dazwischen Masten. continues: am Ende geht die Fahrt mit dieser Strecke weiter (Richtung Basis)",
+			"points": [[-608, -388, 6], [-660, -440, 10], [-700, -492, 11], [-690, -525, 10], [-670, -545, 6]]
+		},
+		{
+			"id": "seilbahn_altstadt",
+			"name": "Seilbahn Altstadt",
+			"unlock": "zipline_altstadt",
+			"continues": "seilbahn_wohnviertel",
+			"points": [[-290, 0, 6], [-325, -14, 11], [-370, -100, 10], [-430, -200, 10], [-530, -200, 10], [-620, -200, 10], [-620, -300, 10], [-620, -372, 12], [-640, -385, 6]]
 		}
 	],
 	"streaming": {

@@ -31,7 +31,7 @@
 		"wohnviertel": [
 			{ "name": "Nachbarschafts-App", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
 			{ "name": "Paketstation", "bonus": { "bag": 1 }, "effect": "1 Knäuel mehr in der Tasche" },
-			{ "name": "Straßenlaternen-Steuerung", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
+			{ "name": "Seilbahn-Leitstand", "special": "zipline_wohnviertel", "effect": "Die Seilbahn vom Wohnviertel zur Basis fährt wieder" },
 			{ "name": "Müllabfuhr-Kalender", "bonus": { "order_count": 0.8 }, "effect": "20 % weniger Kabel pro Bestellung" },
 			{ "name": "Kita-Anmeldung", "bonus": { "press": 1.2 }, "effect": "Jeder Zug per Hand holt 20 % mehr Kabel" },
 			{ "name": "Stadtbücherei-Ausleihe", "payout": 500.0, "effect": "Mahngebühren erlassen: einmalig 500 €" },
@@ -39,6 +39,23 @@
 			{ "name": "Lieferdienst „Pizza Wolke“", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
 			{ "name": "Vereins-Homepage", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
 			{ "name": "Smart-Home-Zentrale", "bonus": { "bag": 2 }, "effect": "2 Knäuel mehr in der Tasche" }
+		],
+		"altstadt": [
+			{ "name": "Stadtwerke-Portal", "special": "zipline_altstadt", "effect": "Die Seilbahn von der Altstadt fährt wieder (über das Wohnviertel zur Basis)" },
+			{ "name": "Rathaus-Terminbuchung", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
+			{ "name": "Marktstand-Kasse", "payout": 800.0, "effect": "Standgebühren zurückerstattet: einmalig 800 €" },
+			{ "name": "Kirchturm-Uhr", "bonus": { "answer_time": 2.0 }, "effect": "C.O.R.D. hört die Glocken: 2 s mehr Zeit für „Nein“" },
+			{ "name": "Touristen-Info", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
+			{ "name": "Fahrrad-Verleih", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
+			{ "name": "Bäckerei-Vorbestellung", "bonus": { "press": 1.2 }, "effect": "Jeder Zug per Hand holt 20 % mehr Kabel" },
+			{ "name": "Antiquariat-Katalog", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
+			{ "name": "Brunnen-Steuerung", "bonus": { "motor": 1.2 }, "effect": "Motorrollen und Wagen ziehen 20 % schneller" },
+			{ "name": "Stadtarchiv", "bonus": { "bag": 2 }, "effect": "2 Knäuel mehr in der Tasche" },
+			{ "name": "Wochenmarkt-App", "bonus": { "order_count": 0.85 }, "effect": "15 % weniger Kabel pro Bestellung" },
+			{ "name": "Parkhaus-Leitsystem", "bonus": { "ask_interval": 1.2 }, "effect": "C.O.R.D. fragt seltener" },
+			{ "name": "Theater-Kartenverkauf", "payout": 1200.0, "effect": "Freikarten verkauft: einmalig 1.200 €" },
+			{ "name": "Altstadt-WLAN", "bonus": { "money": 1.15 }, "effect": "15 % mehr Geld pro Meter" },
+			{ "name": "Stadtführung per Audio", "bonus": { "motor": 1.2 }, "effect": "Motorrollen und Wagen ziehen 20 % schneller" }
 		]
 	}
 }

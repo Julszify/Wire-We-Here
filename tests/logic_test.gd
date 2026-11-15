@@ -18,6 +18,9 @@ func _ready() -> void:
 	_test_save_roundtrip()
 	_test_rack_plan()
 	_test_both_ends()
+	_test_wagon()
+	_test_altstadt_plan()
+	_test_zipline_path()
 	_test_bonuses_and_bag()
 	_test_unit_important()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
@@ -132,7 +135,14 @@ func _test_rack_and_unlocks() -> void:
 	_check(not rack.plug(port), "Port nicht doppelt belegbar")
 	_check(events.size() == 1 and events[0][1] == "grip", "Signal mit Freischaltung")
 	_check(not eco.is_locked("grip") and eco.buy("grip"), "Festerer Griff nach Dienst kaufbar")
-	_check(is_equal_approx(eco.factor("grip"), 1.5), "Griff-Faktor 1,5")
+	_check(is_equal_approx(eco.factor("grip"), float(Balancing.upgrades["grip"]["effect_factor"])), "Griff-Faktor aus balancing.json")
+	# Voll aufgerüstet: Hand etwa 10 m/s, Motorrolle etwa 20 m/s (ohne Dienst-Boni)
+	var g: Dictionary = Balancing.upgrades["grip"]
+	var m: Dictionary = Balancing.upgrades["motor"]
+	var hand := 5.0 * float(Balancing.hand_wrap["pull_per_press_m"]) * pow(float(g["effect_factor"]), int(g["max_count"]))
+	var motor := float(Balancing.motor_reel["pull_speed_m_per_s"]) * pow(float(m["effect_factor"]), int(m["max_count"]))
+	_check(absf(hand - 10.0) < 0.5, "Hand voll aufgerüstet ca. 10 m/s (%.1f)" % hand)
+	_check(absf(motor - 20.0) < 1.0, "Motorrolle voll aufgerüstet ca. 20 m/s (%.1f)" % motor)
 	rack.free()
 	eco.queue_free()
 
@@ -363,3 +373,75 @@ func _test_both_ends() -> void:
 	var c2 := CableData.from_seed(1, 5, Vector3.ZERO)
 	c2.load_state(JSON.parse_string(JSON.stringify(c.state_dict())))
 	_check(c2.reversed and c2.path.points[0] == last, "Umgedrehtes Kabel über JSON")
+
+
+func _test_wagon() -> void:
+	var sys := CableSystem.new()
+	var arm := ReelData.new(0, ReelData.Kind.ARM)
+	sys.add_reel(arm)
+	var wagon := WagonData.new()
+	for i in 3:
+		var slot := ReelData.new(10 + i, ReelData.Kind.WAGON)
+		wagon.slots.append(slot)
+		sys.add_reel(slot)
+	wagon.position = Vector3(5, 0, 5)
+	wagon.yaw = 0.5
+	wagon.update_slots()
+	_check(wagon.slots[0].position.distance_to(wagon.slots[2].position) > 2.0, "Wagen-Plätze liegen hintereinander")
+	var cables: Array[CableData] = []
+	for i in 3:
+		var c := CableData.from_seed(100 + i, 300 + i, Vector3.ZERO)
+		c.knots_m = PackedFloat32Array()
+		sys.add_cable(c)
+		sys.hook(c, wagon.slots[i])
+		cables.append(c)
+	_check(wagon.free_slots() == 0 and wagon.any_hooked(), "Drei Kabel am Wagen")
+	sys._process(2.0)
+	var expected := 2.0 * float(Balancing.wagon["pull_speed_m_per_s"])
+	_check(cables.all(func(c: CableData) -> bool: return is_equal_approx(c.pulled_m, expected)), "Alle drei Plätze ziehen gleichzeitig")
+	var before := cables[0].pulled_m
+	sys.press(wagon.slots[0])
+	_check(wagon.slots[0].pending_m == 0.0 and cables[0].pulled_m == before, "Wagen-Platz reagiert nicht auf Tastendruck")
+	_check(not wagon.slots[0].is_movable() and ReelData.new(1, ReelData.Kind.MOTOR).is_movable(), "Nur Kurbel und Motorrolle sind tragbar")
+	var d: Dictionary = JSON.parse_string(JSON.stringify(wagon.to_dict()))
+	_check(d["slots"] == [10.0, 11.0, 12.0] and is_equal_approx(float(d["yaw"]), 0.5), "Wagen über JSON")
+	sys.free()
+
+
+func _test_altstadt_plan() -> void:
+	var alt := RackPlan.section("altstadt")
+	_check(int(alt["first_port"]) == 150 and int(alt["count"]) == 150 and int(alt["rows"]) == 15, "Altstadt: Ports 150–299, 15 Reihen")
+	var named := 0
+	for r in 15:
+		var service := RackPlan.service_of(150 + r * 10)
+		if RackPlan.service_def(service).has("name"):
+			named += 1
+	_check(named == 15, "Alle 15 Altstadt-Dienste haben Namen (%d)" % named)
+	var specials := []
+	for service in RackPlan.total_services():
+		var sp := String(RackPlan.service_def(service).get("special", ""))
+		if sp.begins_with("zipline_"):
+			specials.append(sp)
+	specials.sort()
+	_check(specials == ["zipline_altstadt", "zipline_wohnviertel"], "Zwei Dienste schalten Seilbahnen frei")
+	# Feste Einheiten-Nummern: Wohnviertel behält seinen ID-Bereich, auch wenn Altstadt und zweite Sperre dazukommen
+	var units: Dictionary = {}
+	for b: Dictionary in Balancing.world["barriers"]:
+		units[b["id"]] = int(b["unit"])
+	for dd: Dictionary in Balancing.world["districts"]:
+		if dd.has("cables"):
+			units[dd["id"]] = int(dd["cables"]["unit"])
+	_check(units["sperre_wohnviertel"] == 0 and units["wohnviertel"] == 1, "Alte Einheiten behalten ihre Nummer")
+	_check(units.values().size() == 4 and units["altstadt"] == 3 and units["sperre_altstadt"] == 2, "Neue Einheiten 2 und 3")
+
+
+func _test_zipline_path() -> void:
+	var tops: Array[Vector3] = [Vector3(0, 6, 0), Vector3(40, 10, 0), Vector3(100, 6, 30)]
+	var ground := func(_x: float, _z: float) -> float: return 0.0
+	var path := Zipline.sample_path(tops, ground)
+	var clear := float(Balancing.zipline["min_clearance_m"]) + float(Balancing.zipline["hang_m"])
+	var lowest := INF
+	for p in path:
+		lowest = minf(lowest, p.y)
+	_check(path.size() > 30 and path[0] == tops[0] and path[path.size() - 1] == tops[2], "Seil verbindet erste und letzte Station")
+	_check(lowest >= clear - 0.001, "Seil hängt nie tiefer als die Mindesthöhe (%.1f m)" % lowest)

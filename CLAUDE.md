@@ -30,7 +30,7 @@ Noch nicht enthalten und bewusst offen: Koop, Steam-Anbindung, weitere Zonen, Pr
 
 1. **Echten Spieltest auswerten:** Fühlt sich das Wickeln per Hand gut mühsam oder frustrierend an? Ist C.O.R.D.s Takt lustig oder nervig? Die Verlaufs-Rechnung (`tests/balance_sim.tscn`) zeigt nur Zeiten, kein Spielgefühl. Danach Balancing in `data/balancing.json` anpassen.
 2. **Vierte Werkzeug-Stufe** festlegen (Vorschlag: Kabeltrommel-Wagen, den man mitzieht und der mehrere Kabel gleichzeitig aufnimmt). Wichtig für die Stadt: Kurbel und Motorrollen stehen fest, wo sie gekauft wurden; im Wohnviertel wickelt man bisher nur per Hand.
-3. **Geld-Senken für später:** Nach etwa einer Stunde ist laut Verlaufs-Rechnung alles gekauft.
+3. **Balancing:** Werkzeuge sind angeglichen (Hand voll aufgerüstet ca. 10 m/s, Motorrolle ca. 20 m/s, jeweils plus Dienst-Boni). Laut Verlaufs-Rechnung bestimmen jetzt Greifen und Laufwege die Spielzeit, nicht mehr das Wickeln. Geld-Senken fehlen: nach gut 1,5 Stunden ist alles gekauft.
 4. **Optik:** Knäuel am Arm kompakter (wirkt eher wie ein Trichter; die fertigen Knäuel sind schon ordentliche Kabelringe); echte Gebäudemodelle für weitere Viertel; Anzeige (HUD) im Spielzeug-Look.
 5. **Koop vorbereiten:** CableSystem, Economy, ServiceRack und CordLogic laufen später beim Host; Clients bekommen Zustand und senden Absichten.
 
@@ -81,7 +81,10 @@ Konzept im GDD, Abschnitt „Welt und offene Map“: offene Kleinstadt, ca. 2 ×
 - **Hauptszene:** `world.gd` baut die Stadt als `CityWorld` und verschiebt sie so, dass der Wolkig-Hinterhof (`backyard` in `world.json`, 130 × 130 m frei) bei (0, 0, 0) liegt. Die bisherige Zone (Haufen, Schrank, Lieferungen in `floor_size_m`) behält dadurch ihre Koordinaten; Spielstände bleiben gültig. Absturz-Schutz wie in der Vorschau.
 - **Kabel in der Stadt:** `CableUnit` (Viertel mit `cables` und Sperren aus `barriers` in `world.json`) hat feste Kabel-ID-Bereiche ab 1.000.000 (je 100.000), der Hinterhof bleibt die immer geladene Zone (IDs ab 0). `world.gd` lädt Einheiten näher als `streaming.load_m` über eine Warteschlange (`cables_per_frame`) und entlädt sie ab `unload_m`, außer ein Kabel hängt an Rolle oder Arm; veränderte Zustände entladener Kabel liegen in `_stored_states` und im Spielstand. Wohnviertel: Haufen auf Kreuzungen, Straßenkabel (`HeapData.Kind.STREET`). Campus hat einen Zaun (`wall`) mit Lücke zum Wohnviertel; dort liegt die Sperre, deren Blockade fällt, wenn `clear_fraction` abgetragen ist. Testoptionen: `--clearbarrier`, `--streamtest`; `--dumpafter` beendet Godot nicht, dafür `--quit-after <frames>` vor dem `--` angeben.
 - **Plan der 2000 wichtigen Kabel:** `important_plan` und `important_cables` je Viertel in `world.json`. `RackPlan` (`scripts/rack/rack_plan.gd`) leitet daraus alles ab: Ports 0–1999 über zehn Schränke, die ersten 20 (Campus) sind Einzel-Dienste, der Rest Reihen à 10 Ports (eine volle Reihe = ein Dienst; zusammen 218 Dienste). Wichtige Kabel liegen bisher im Hinterhof (20 Einzel-Dienste), in der Sperre (`important_section: campus`, 30 Kabel = 3 Reihen) und im Wohnviertel (100 Kabel = 10 Reihen); `CableUnit` verteilt die Ports per Seed auf die Kabel. Die übrigen Viertel haben Schränke, aber noch keine Kabel.
-- **Nächste Schritte laut Bauplan:** Kabel für die übrigen Viertel, Leitern/Aufzüge, Klettern, Seilbahn.
+- **Altstadt:** Zaun mit Lücke zum Wohnviertel, davor auf der Hauptstraße der zweite Kabelberg (`sperre_altstadt`, `offset_m` positiv = Berg außerhalb, Blockade dahinter in der Altstadt). Kabel auf Kreuzungen und Straßen, dazu ein großer Haufen auf dem Marktplatz (`extra_heaps`); 150 wichtige Kabel für 15 Reihen. Einheiten haben feste Nummern (`unit` in `world.json`), damit Kabel-IDs alter Spielstände gleich bleiben.
+- **Seilbahn zur Basis** (`ziplines` in `world.json`, `scripts/world/zipline.gd`): Strecken aus Punkten [x, z, Höhe über Boden] vom äußeren Ende zur Basis, erster und letzter Punkt sind Stationen. Freigeschaltet durch Dienste mit `special` `zipline_wohnviertel` (Wohnviertel-Reihe „Seilbahn-Leitstand“) bzw. `zipline_altstadt` (Altstadt-Reihe „Stadtwerke-Portal“). E an einer Station fährt; von der Altstadt geht es über `continues` ohne Halt weiter bis zur Basis. Werte in `balancing.json` → `zipline`.
+- **Wegweiser:** Sind Knäuel in der Tasche und der Serverraum mehr als 30 m entfernt, zeigt oben ein Pfeil Richtung und Entfernung (`scripts/ui/waypoint.gd`).
+- **Nächste Schritte laut Bauplan:** Kabel für die übrigen Viertel, Leitern/Aufzüge, Klettern.
 
 ### Werkzeug-Kette und Eingabe
 
@@ -90,7 +93,9 @@ Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
 1. **Per Hand (Start):** Die Figur wickelt das Kabel zwischen Hand und Ellbogen um den Arm. Eine Taste muss **wiederholt gedrückt** werden; das ist absichtlich mühsam. Solange ein Kabel am Arm hängt, hält eine Leine (6 m) die Figur beim Haufen.
 2. **Handkurbel (erstes Upgrade):** aufstellbare Rolle mit Kurbel, deutlich mehr Meter pro Tastendruck.
 3. **Motorrolle:** zieht automatisch; mehrere kaufbar.
-4. **Mehr:** noch offen (siehe „Nächste Schritte“).
+4. **Kabeltrommel-Wagen** (250 €, einmalig): rollt dem Spieler hinterher, parkt beim Einhängen und zieht drei Kabel gleichzeitig wie Motorrollen (Stärkere Motoren wirkt mit). Sind alle Plätze fertig, koppelt er sich wieder an, sobald der Spieler in der Nähe ist; E am Wagen parkt bzw. koppelt (mit eingehängten Kabeln nach Bestätigung, die Kabel gehen dann los). `WagonData`/`WagonView`, Plätze sind `ReelData` mit `Kind.WAGON`, Werte in `balancing.json` → `wagon`.
+
+**Umstellen:** Leere Handkurbeln und Motorrollen hebt man mit E auf und stellt sie mit E oder Q woanders ab (auch in der Stadt). Getragen blockiert die Rolle den Arm.
 
 Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
 
@@ -117,10 +122,11 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 | --- | --- | --- |
 | Kabellänge (Spiel-Länge) | 15–30 m | – |
 | Geld pro Meter | 0,50 € (wichtige Kabel: halber Preis) | Kupferhändler ×1,35, Kosten 60 € × 2,3^Stufe |
-| Handzug per Hand (Arm) | 0,25 m pro Tastendruck | Festerer Griff ×1,5, Kosten 10 € × 1,9^Stufe, max. 6 |
+| Handzug per Hand (Arm) | 0,25 m pro Tastendruck | Festerer Griff ×1,414, Kosten 10 € × 1,9^Stufe, max. 6 (voll: ca. 10 m/s) |
 | Handkurbel | 0,75 m pro Tastendruck | Kauf 8 €, einmalig |
 | Dauerzug | – | Halten = 4 Züge/s, 30 €, einmalig |
-| Motorrolle | 0,25 m/s | Stärkere Motoren ×1,4, Kosten 40 € × 2,2^Stufe, max. 8 |
+| Motorrolle | 0,25 m/s | Stärkere Motoren ×1,73, Kosten 40 € × 2,2^Stufe, max. 8 (voll: ca. 20 m/s) |
+| Kabeltrommel-Wagen | 3 Plätze à 0,25 m/s | 250 €, einmalig; Stärkere Motoren wirkt mit |
 | Weitere Motorrolle | – | Kosten 15 € × 1,8^Anzahl, max. 8 |
 | Knoten pro Kabel | 0–2, bei 20–85 % der Länge | – |
 | Tasche für Knäuel | 3 Plätze | Größere Tasche +2, Kosten 40 € × 2^Stufe, max. 6 |
@@ -154,7 +160,7 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 
 - **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 - **Verlaufs-Rechnung:** `godot --headless res://tests/balance_sim.tscn` spielt Hinterhof, Sperre und Wohnviertel mit einem Modell-Spieler durch (Annahmen oben im Skript) und gibt aus, wann welcher Kauf und welcher Dienst kommt. Ersetzt keinen echten Spieltest.
-- **Testoptionen** für die Hauptszene (nach `--`): `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` / `--dumpafter=<frames>` (Zustand ausgeben), `--grab`, `--pull=<m>`, `--buy=<ids>`, `--hang`, `--order`, `--ask`, `--room` / `--room=in` (vor bzw. in den Serverraum), `--plugports=<von>-<bis>`, `--fillbag=<n>`, `--deliver`, `--jump`, `--snooze` usw.; vollständige Liste in `world.gd` → `_apply_test_args`. Für Testläufe immer `--nosave` verwenden, sonst wird der echte Spielstand geladen.
+- **Testoptionen** für die Hauptszene (nach `--`): `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` / `--dumpafter=<frames>` (Zustand ausgeben), `--grab`, `--pull=<m>`, `--buy=<ids>`, `--hang`, `--order`, `--ask`, `--room` / `--room=in` (vor bzw. in den Serverraum), `--plugports=<von>-<bis>`, `--fillbag=<n>`, `--deliver`, `--jump`, `--snooze`, `--wagon` / `--wagon=fill`, `--carryreel`, `--zipline=<Strecken-ID>` / `--zipline=<ID>,ride` usw.; vollständige Liste in `world.gd` → `_apply_test_args`. Für Testläufe immer `--nosave` verwenden, sonst wird der echte Spielstand geladen.
 - **Bilder rendern:** `godot --write-movie <pfad>.png --quit-after 3 -- --nosave ...`
 
 ### Technische Hinweise
@@ -187,4 +193,6 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 ## Verlauf danach
 
 - ✅ Modelle aus Blender (C.O.R.D., Figur, Stecker), Stadt mit Gelände, Boden, Blockout, Kabel in Sperre und Wohnviertel
+- ✅ Optik: Himmel, Licht, Fassaden, Straßenlinien, Meer, Kabelringe
+- ✅ Rollen umstellen, Kabeltrommel-Wagen, Wegweiser, Altstadt mit Sperre und 15 Diensten, Seilbahn zur Basis
 - ✅ Springen; Serverraum mit 2000 Ports statt Schrank; Tasche für Knäuel; wichtige Kabel in Sperre und Wohnviertel; Wirkung für alle 20 Einzel-Dienste und 13 Reihen; Wohnhäuser und Serverraum aus Blender; Verlaufs-Rechnung

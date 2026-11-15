@@ -73,7 +73,7 @@ func transfer(from_reel: ReelData, to_reel: ReelData) -> bool:
 ## Ein Tastendruck (Arm oder Handkurbel). Die Meter werden über einige Frames
 ## abgearbeitet, damit das Ziehen flüssig aussieht.
 func press(reel: ReelData) -> void:
-	if reel.kind == ReelData.Kind.MOTOR or reel.is_free():
+	if reel.is_motorized() or reel.is_free():
 		return
 	var cable := cable_on(reel)
 	if cable.is_stuck():
@@ -136,8 +136,8 @@ func _process(delta: float) -> void:
 	for reel: ReelData in reels.values():
 		if reel.is_free():
 			continue
-		if reel.kind == ReelData.Kind.MOTOR:
-			pull(reel, float(Balancing.motor_reel["pull_speed_m_per_s"]) * motor_multiplier * delta)
+		if reel.is_motorized():
+			pull(reel, float(reel.tuning()["pull_speed_m_per_s"]) * motor_multiplier * delta)
 		elif reel.pending_m > 0.0:
 			var feed: float = float(reel.tuning()["feed_speed_m_per_s"]) * press_multiplier
 			var step := minf(reel.pending_m, feed * delta)

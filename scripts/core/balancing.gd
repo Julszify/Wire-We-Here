@@ -23,6 +23,8 @@ var rack: Dictionary = {}
 var cord: Dictionary = {}
 var save: Dictionary = {}
 var bag: Dictionary = {}
+var wagon: Dictionary = {}
+var zipline: Dictionary = {}
 var server_room: Dictionary = {}
 var tablet_order: Array = []
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
@@ -65,6 +67,8 @@ func reload() -> void:
 	cord = parsed.get("cord", {})
 	save = parsed.get("save", {})
 	bag = parsed.get("bag", {})
+	wagon = parsed.get("wagon", {})
+	zipline = parsed.get("zipline", {})
 	server_room = parsed.get("server_room", {})
 	tablet_order = parsed.get("tablet_order", [])
 	var sv := _load_json(SERVICES_PATH)

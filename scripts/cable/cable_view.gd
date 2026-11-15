@@ -46,8 +46,8 @@ func show_in_heap() -> void:
 
 ## Form an einer Rolle. Nur für aktive Kabel pro Frame aufrufen.
 ## Gibt den Drehwinkel der Rolle zurück.
-func show_on_reel(reel_pos: Vector3) -> float:
-	var shape := CableShape.build_on_reel(data, reel_pos)
+func show_on_reel(reel_pos: Vector3, scale: float = 1.0) -> float:
+	var shape := CableShape.build_on_reel(data, reel_pos, scale)
 	_build(shape["points"])
 	return shape["phase"]
 
