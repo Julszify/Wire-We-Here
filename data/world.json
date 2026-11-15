@@ -38,6 +38,7 @@
 			"height_m": 33,
 			"edge_m": 120,
 			"blockout": {
+				"palette": ["#e9eef4", "#cfe0f2", "#dfe6ee", "#b9d3ee", "#f1f3f5"],
 				"style": "grid",
 				"block_m": 90,
 				"street_m": 14,
@@ -100,6 +101,7 @@
 			"height_m": 9,
 			"edge_m": 70,
 			"blockout": {
+				"palette": ["#e8c9a0", "#d9a57c", "#f0dcb8", "#c98b6b", "#e6d3c0", "#b97a5e"],
 				"style": "grid",
 				"block_m": 45,
 				"street_m": 8,
@@ -123,6 +125,7 @@
 			"height_m": 11,
 			"edge_m": 70,
 			"blockout": {
+				"palette": ["#8f7fd6", "#4fb3b0", "#e06aa6", "#5b6bd0", "#3c4466", "#f2c14e"],
 				"style": "grid",
 				"block_m": 55,
 				"street_m": 10,
@@ -143,6 +146,7 @@
 			"height_m": 14,
 			"edge_m": 80,
 			"blockout": {
+				"palette": ["#b8c6d6", "#9fb3c8", "#d5dde6", "#8aa2bd", "#c7d4e2"],
 				"style": "towers",
 				"block_m": 85,
 				"street_m": 16,
@@ -163,6 +167,7 @@
 			"height_m": 6,
 			"edge_m": 70,
 			"blockout": {
+				"palette": ["#d8cdb4", "#b9c2a8", "#e3d9c4", "#c4b89c"],
 				"style": "warehouse",
 				"block_m": 110,
 				"street_m": 18,
@@ -196,6 +201,7 @@
 			"height_m": 3,
 			"edge_m": 60,
 			"blockout": {
+				"palette": ["#c0503f", "#3f7fb5", "#d9a441", "#4f8f6a", "#b8bcc2"],
 				"style": "harbor",
 				"h_min": 10,
 				"h_max": 14
@@ -211,6 +217,7 @@
 			"height_m": -1,
 			"edge_m": 0,
 			"blockout": {
+				"palette": ["#9aa7b0", "#b5bec6", "#7f8c96"],
 				"style": "crater",
 				"h_min": 8,
 				"h_max": 12

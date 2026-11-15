@@ -116,10 +116,22 @@ static func build_sea(parent: Node, layout: WorldLayout, offset: Vector3 = Vecto
 	var north_edge := layout.sea_north_edge_m()
 	pm.size = Vector2(layout.size_m, 3000.0)
 	pm.center_offset = Vector3(0, 0, north_edge + 1500.0)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.15, 0.4, 0.65, 0.85)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.1
+	pm.subdivide_width = 8
+	pm.subdivide_depth = 8
+	# Wellen als Normalen aus einem Rauschmuster (siehe sea.gdshader)
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://assets/shaders/sea.gdshader")
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.02
+	var tex := NoiseTexture2D.new()
+	tex.width = 256
+	tex.height = 256
+	tex.seamless = true
+	tex.as_normal_map = true
+	tex.bump_strength = 6.0
+	tex.noise = noise
+	mat.set_shader_parameter("waves", tex)
 	pm.material = mat
 	sea.mesh = pm
 	parent.add_child(sea)

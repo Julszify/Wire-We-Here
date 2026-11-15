@@ -16,7 +16,10 @@ var layout: WorldLayout
 var building_count := 0
 var _roads: Array[PackedVector2Array] = []  # Hauptstraßen als 2D-Linien (für Abstandstests)
 var _road_w := 12.0
-var _material: StandardMaterial3D
+var _material: ShaderMaterial
+const BLOCKOUT_SHADER := "res://assets/shaders/blockout.gdshader"
+## Farben der Gebäude, wenn ein Viertel keine eigene `palette` hat
+const DEFAULT_PALETTE := ["#d9dde3", "#c9d3df", "#e6e1d6", "#cfd8d2"]
 ## Hausmodelle aus Blender (tools/blender/building_designs.py): Einheitsmodelle 1 x 1 x 1 m, Vorderseite +Z
 const HOUSES_PATH := "res://assets/models/buildings/houses.glb"
 var _house_meshes: Array[Mesh] = []
@@ -25,10 +28,9 @@ var _house_material: StandardMaterial3D
 
 func build(world_layout: WorldLayout) -> void:
 	layout = world_layout
-	_material = StandardMaterial3D.new()
-	_material.vertex_color_use_as_albedo = true
-	_material.vertex_color_is_srgb = true  # Farben oben sind sRGB-Werte, sonst wirken sie fast weiß
-	_material.roughness = 0.8
+	# Ein Shader für alles: Fenster auf Gebäuden, Linien auf Straßen (siehe blockout.gdshader)
+	_material = ShaderMaterial.new()
+	_material.shader = load(BLOCKOUT_SHADER)
 	_build_main_roads()
 	for d in layout.districts:
 		_build_district(d)
@@ -64,7 +66,7 @@ func _add_ribbon(st: SurfaceTool, a: Vector2, b: Vector2, width: float, color: C
 	var length := a.distance_to(b)
 	var steps := maxi(1, ceili(length / 2.0))
 	var side := (b - a).normalized().orthogonal() * width * 0.5
-	st.set_color(color)
+	st.set_color(Color(color, 0.1))
 	st.set_normal(Vector3.UP)
 	for i in steps:
 		var q0 := a.lerp(b, float(i) / steps)
@@ -73,8 +75,12 @@ func _add_ribbon(st: SurfaceTool, a: Vector2, b: Vector2, width: float, color: C
 		var r0 := _ground(q0 - side)
 		var l1 := _ground(q1 + side)
 		var r1 := _ground(q1 - side)
-		st.add_vertex(l0); st.add_vertex(r1); st.add_vertex(r0)
-		st.add_vertex(l0); st.add_vertex(l1); st.add_vertex(r1)
+		var m0 := length * float(i) / steps
+		var m1 := length * float(i + 1) / steps
+		# UV: Lage quer (-1 … 1) und längs in Metern, für Mittel- und Randlinien
+		for v: Array in [[l0, 1.0, m0], [r1, -1.0, m1], [r0, -1.0, m0], [l0, 1.0, m0], [l1, 1.0, m1], [r1, -1.0, m1]]:
+			st.set_uv(Vector2(v[1], v[2]))
+			st.add_vertex(v[0])
 
 
 ## Punkt knapp über dem Gelände; an Hängen etwas höher, damit das Band nicht im Boden verschwindet
@@ -183,10 +189,14 @@ func _style_grid(ctx: Dictionary) -> void:
 	# Straßen (Linien in x und z durch die Mitte, dann im Raster nach außen)
 	var xs := WorldLayout.grid_lines(c.x, half.x, block)
 	var zs := WorldLayout.grid_lines(c.y, half.y, block)
+	# Alpha 0.2 / 0.3 = Straße entlang z / x; UV = Mittelachse und Breite (für die Mittellinie),
+	# UV2 = Lage der Kreuzungen längs (Ursprung, Abstand): dort setzen Linie und Gehweg aus
 	for x in xs:
-		_box(ctx, Vector3(x, y + STREET_TOP - 0.1, c.y), Vector3(street, 0.2, half.y * 2.0), STREET_COLOR, false)
+		_box(ctx, Vector3(x, y + STREET_TOP - 0.1, c.y), Vector3(street, 0.2, half.y * 2.0), Color(STREET_COLOR, 0.2),
+			false, Vector2(x, street), Vector2(c.y, block))
 	for z in zs:
-		_box(ctx, Vector3(c.x, y + STREET_TOP - 0.1, z), Vector3(half.x * 2.0, 0.2, street), STREET_COLOR, false)
+		_box(ctx, Vector3(c.x, y + STREET_TOP - 0.09, z), Vector3(half.x * 2.0, 0.2, street), Color(STREET_COLOR, 0.3),
+			false, Vector2(z, street), Vector2(c.x, block))
 
 	# Grundstücke zwischen den Straßen
 	var bounds_x := [c.x - half.x] + xs + [c.x + half.x]
@@ -259,12 +269,15 @@ func _lot(ctx: Dictionary, r: Rect2, height: float, edge: int = 1) -> void:
 		return
 	var y: float = ctx["y"]
 	var shade := ctx["rng"].randf_range(0.66, 0.82) as float
-	var color := Color(shade, shade, shade + 0.02)
+	# Farbe aus der Palette des Viertels (per Lage gewählt), leicht abgedunkelt; Alpha 0.5 = Gebäude
+	var palette: Array = ctx["bo"].get("palette", DEFAULT_PALETTE) if ctx.has("bo") else DEFAULT_PALETTE
+	var pick := Color.html(String(palette[posmod(hash([roundi(center.x), roundi(center.y), "farbe"]), palette.size())]))
+	var color := Color(pick.darkened((0.82 - shade) * 0.9), 0.5)
 	var box_center := Vector3(center.x, y + (height - BASE_DEPTH) * 0.5, center.y)
 	var box_size := Vector3(r.size.x, height + BASE_DEPTH, r.size.y)
 	building_count += 1
 	if not ctx.has("houses"):
-		_box(ctx, box_center, box_size, color, true)
+		_box(ctx, box_center, box_size, color, true, Vector2(y, height))
 		return
 	# Hausmodell: Kollision als Kiste, Darstellung als Instanz im MultiMesh
 	_collider(ctx, box_center, box_size)
@@ -402,7 +415,7 @@ func _build_landmarks() -> void:
 		var size := Vector3(float(s[0]), float(s[1]), float(s[2]))
 		var y := layout.height(pos.x, pos.y)
 		_box(ctx, Vector3(pos.x, y + (size.y - BASE_DEPTH) * 0.5, pos.y), size + Vector3(0, BASE_DEPTH, 0),
-			Color(0.35, 0.6, 0.9), true)
+			Color(0.35, 0.6, 0.9, 0.5), true, Vector2(y, size.y))
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = _material
@@ -418,9 +431,12 @@ func _solid(ctx: Dictionary, center: Vector3, size: Vector3, color: Color) -> vo
 
 
 ## Kiste ins Mesh des Viertels; mit Kollision als BoxShape am StaticBody des Viertels
-func _box(ctx: Dictionary, center: Vector3, size: Vector3, color: Color, collide: bool) -> void:
+func _box(ctx: Dictionary, center: Vector3, size: Vector3, color: Color, collide: bool, uv := Vector2.ZERO,
+		uv2 := Vector2.ZERO) -> void:
 	var st: SurfaceTool = ctx["st"]
 	st.set_color(color)
+	st.set_uv(uv)
+	st.set_uv2(uv2)
 	var h := size * 0.5
 	var faces := [
 		[Vector3.UP, Vector3(-h.x, h.y, -h.z), Vector3(h.x, h.y, -h.z), Vector3(h.x, h.y, h.z), Vector3(-h.x, h.y, h.z)],

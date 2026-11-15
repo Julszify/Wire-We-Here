@@ -212,7 +212,9 @@ func arm_transform() -> Transform3D:
 func back_transform(index: int) -> Transform3D:
 	var col := index % 3
 	var layer := floori(index / 3.0)
-	var local := Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3((col - 1) * 0.2, 1.38, 0.24 + layer * 0.09))
+	# Der Ring liegt flach in der xz-Ebene; am Rücken hängt er aufrecht, leicht schräg wie umgehängt
+	var tilt := Basis(Vector3.RIGHT, PI * 0.5) * Basis(Vector3.UP, (col - 1) * 0.35)
+	var local := Transform3D(tilt, Vector3((col - 1) * 0.17, 1.12, 0.3 + layer * 0.1))
 	return _body.global_transform * local
 
 

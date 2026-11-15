@@ -31,6 +31,23 @@ static func build_on_arm(cable: CableData, arm: Transform3D) -> PackedVector3Arr
 	return _assemble(cable, coil_pts, mid_y)
 
 
+## Fertiges Knäuel als ordentlicher Kabelring: Windungen im Kreis um die Y-Achse, leicht versetzt,
+## damit sie nebeneinander liegen. `length` bestimmt die Zahl der Windungen.
+static func ring_coil_points(length: float) -> PackedVector3Array:
+	var r := 0.17
+	var turns := clampf(length / (TAU * r) * 0.45, 4.0, 9.0)
+	var steps := int(turns * 20.0)
+	var pts := PackedVector3Array()
+	for i in steps + 1:
+		var t := float(i) / steps
+		var a := t * turns * TAU
+		# Windungen wandern in einem kleinen Kreis um den Ringquerschnitt
+		var k := t * turns * 2.4
+		var rr := r + cos(k) * 0.035
+		pts.append(Vector3(cos(a) * rr, sin(k) * 0.035, sin(a) * rr))
+	return pts
+
+
 ## Sichtbare Länge der Wicklung bei voll aufgerolltem Kabel (begrenzt, damit
 ## lange Bahnen im großen Berg keine riesigen Knäuel ergeben).
 static func coil_length(cable: CableData) -> float:

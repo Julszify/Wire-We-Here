@@ -11,7 +11,7 @@ func setup(item: CoilItem) -> void:
 	data = item
 	var mi := MeshInstance3D.new()
 	var c: Dictionary = Balancing.cable
-	var pts := CableShape.arm_coil_points(Transform3D.IDENTITY, item.visual_length)
+	var pts := CableShape.ring_coil_points(item.visual_length)
 	mi.mesh = TubeMesh.build(pts, c["radius_m"], int(c["tube_sides"]))
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = item.color()
@@ -46,12 +46,11 @@ func set_carried(carried: bool) -> void:
 
 
 func carry_at(xf: Transform3D) -> void:
-	global_transform = xf.scaled_local(Vector3.ONE * 0.55)
+	global_transform = xf
 
 
 ## Am Boden: flach hinlegen (Schlaufen waagerecht).
 func lie_at(pos: Vector3) -> void:
-	var flat := Basis(Vector3.FORWARD, PI * 0.5)
-	global_transform = Transform3D(flat, pos + Vector3(0, 0.12, 0.18))
+	global_transform = Transform3D(Basis.IDENTITY, pos + Vector3(0, 0.1, 0))
 	_label.global_position = pos + Vector3(0, 0.6, 0)
 	_label.visibility_range_end = 25.0

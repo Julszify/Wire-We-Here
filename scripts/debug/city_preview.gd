@@ -139,19 +139,8 @@ func _build_district_signs() -> void:
 
 func _build_environment() -> void:
 	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_SKY
-	var sky := Sky.new()
-	sky.sky_material = ProceduralSkyMaterial.new()
-	e.sky = sky
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	e.fog_enabled = true
-	e.fog_density = 0.0003
-	env.environment = e
+	env.environment = CityLook.environment()
 	add_child(env)
 	var sun := DirectionalLight3D.new()
-	sun.rotation = Vector3(deg_to_rad(-50), deg_to_rad(35), 0)
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 300.0
+	CityLook.setup_sun(sun)
 	add_child(sun)

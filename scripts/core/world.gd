@@ -75,6 +75,8 @@ var _stream_t := 0.0
 
 
 func _ready() -> void:
+	($WorldEnvironment as WorldEnvironment).environment = CityLook.environment()
+	CityLook.setup_sun($Sun)
 	_build_city()
 	_system = CableSystem.new()
 	add_child(_system)
