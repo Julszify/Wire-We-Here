@@ -15,6 +15,8 @@ const PLAYER_ID := 0
 @onready var _money: Label = $HUD/Money
 @onready var _shop: Label = $HUD/Shop
 
+## Die Stadt (Gelände, Straßen, Gebäude); so verschoben, dass der Wolkig-Hinterhof bei (0, 0, 0) liegt
+var _city: CityWorld
 var _system: CableSystem
 var _economy: Economy
 var _rack: ServiceRack
@@ -64,6 +66,7 @@ var _dump_after := -1  # nur für Tests: Zustand nach so vielen Bildern ausgeben
 
 
 func _ready() -> void:
+	_build_city()
 	_system = CableSystem.new()
 	add_child(_system)
 	_system.cable_completed.connect(_on_cable_completed)
@@ -147,6 +150,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("tablet") and not _tablet.visible:
 		get_viewport().set_input_as_handled()
 		_open_tablet()
+
+
+## Stadt um die bisherige Zone herum aufbauen: der Hinterhof des Wolkig-Campus liegt auf dem Ursprung.
+func _build_city() -> void:
+	var layout := WorldLayout.load_default()
+	_city = CityWorld.new()
+	_city.name = "City"
+	add_child(_city)
+	_city.build(CityWorld.backyard_offset(layout), _player, layout)
+
+
+func _physics_process(_delta: float) -> void:
+	# Absturz-Schutz: unter das Gelände gerutscht (z. B. in einem Gebäude abgesetzt) -> wieder hochsetzen
+	var p := _player.global_position
+	var ground := _city.ground_height(p.x, p.z)
+	if p.y < ground - 4.0:
+		_player.global_position = Vector3(p.x, ground + 2.0, p.z)
+		_player.velocity = Vector3.ZERO
 
 
 func _process(delta: float) -> void:
@@ -474,7 +495,10 @@ func _find_free_spot(radius: float) -> Vector3:
 			if Vector2(pos.x - _rack_pos.x, pos.z - _rack_pos.z).length() < radius + 2.0:
 				continue
 			return pos
+	# Kein Platz gefunden (z. B. Spieler unterwegs in der Stadt): Lieferung landet trotzdem im Hinterhof
 	var fallback := _player.global_position + _player.facing() * dist
+	fallback.x = clampf(fallback.x, -half, half)
+	fallback.z = clampf(fallback.z, -half, half)
 	fallback.y = 0.0
 	return fallback
 

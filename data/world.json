@@ -47,9 +47,10 @@
 				"h_max": 30,
 				"fill": 0.7,
 				"keep_free": [
-					[-640, -585, 150, 110]
+					[-640, -585, 130, 130]
 				]
-			}
+			},
+			"ground": "platten"
 		},
 		{
 			"id": "wohnviertel",
@@ -67,7 +68,8 @@
 				"h_min": 7,
 				"h_max": 11,
 				"fill": 0.75
-			}
+			},
+			"ground": "gras"
 		},
 		{
 			"id": "altstadt",
@@ -88,7 +90,8 @@
 				"keep_free": [
 					[-120, 0, 70, 70]
 				]
-			}
+			},
+			"ground": "pflaster"
 		},
 		{
 			"id": "gamer",
@@ -106,7 +109,8 @@
 				"h_min": 10,
 				"h_max": 22,
 				"fill": 0.85
-			}
+			},
+			"ground": "platten"
 		},
 		{
 			"id": "buero",
@@ -124,7 +128,8 @@
 				"h_min": 40,
 				"h_max": 120,
 				"fill": 0.9
-			}
+			},
+			"ground": "platten"
 		},
 		{
 			"id": "lieferzentrum",
@@ -140,7 +145,8 @@
 				"h_min": 10,
 				"h_max": 14,
 				"fill": 0.9
-			}
+			},
+			"ground": "beton"
 		},
 		{
 			"id": "stadion",
@@ -153,7 +159,8 @@
 				"style": "stadium",
 				"h_min": 24,
 				"h_max": 24
-			}
+			},
+			"ground": "beton"
 		},
 		{
 			"id": "hafen",
@@ -166,7 +173,8 @@
 				"style": "harbor",
 				"h_min": 10,
 				"h_max": 14
-			}
+			},
+			"ground": "beton"
 		},
 		{
 			"id": "krater",
@@ -179,7 +187,8 @@
 				"style": "crater",
 				"h_min": 8,
 				"h_max": 12
-			}
+			},
+			"ground": "kies"
 		}
 	],
 	"crater": {
@@ -201,16 +210,9 @@
 			"district": "campus",
 			"pos": [-700, -700],
 			"size": [36, 200, 36]
-		},
-		{
-			"id": "basis",
-			"name": "Basis (Hinterhof)",
-			"district": "campus",
-			"pos": [-640, -600],
-			"size": [24, 6, 16]
 		}
 	],
-	"spawn": [-640, -570],
+	"spawn": [-637, -572],
 	"roads": {
 		"width_m": 12,
 		"_kommentar": "Hauptstraßen zwischen Vierteln (von Rand zu Rand, folgen dem Gelände)",
@@ -229,5 +231,25 @@
 			["hafen", "krater"],
 			["lieferzentrum", "hafen"]
 		]
+	},
+	"backyard": {
+		"_kommentar": "Wolkig-Hinterhof: hier liegt die bisherige Zone (Kabelberg, Haufen, Server-Schrank). Die Hauptszene verschiebt die Stadt so, dass dieser Punkt bei (0, 0, 0) liegt.",
+		"center": [-640, -585]
+	},
+	"ground": {
+		"_kommentar": "Bodentexturen (erzeugt von scripts/debug/make_terrain_textures.gd). Reihenfolge = Textur-ID. uv_scale: Wiederholungen pro Meter (0.1 = alle 10 m). Viertel ohne 'ground' bekommen den Automatik-Boden (Gras, an Hängen Fels).",
+		"textures": [
+			{ "name": "gras", "uv_scale": 0.08, "detiling": true },
+			{ "name": "pflaster", "uv_scale": 0.2, "detiling": false },
+			{ "name": "platten", "uv_scale": 0.125, "detiling": false },
+			{ "name": "beton", "uv_scale": 0.1, "detiling": false },
+			{ "name": "sand", "uv_scale": 0.07, "detiling": true },
+			{ "name": "kies", "uv_scale": 0.4, "detiling": true },
+			{ "name": "fels", "uv_scale": 0.06, "detiling": true }
+		],
+		"auto_base": "gras",
+		"auto_slope_overlay": "fels",
+		"coast": "sand",
+		"crater": "kies"
 	}
 }

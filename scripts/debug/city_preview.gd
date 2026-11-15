@@ -18,24 +18,17 @@ var _fps_log: Array[float] = []
 
 func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
-	layout = WorldLayout.load_default()
 	_build_environment()
-	terrain = CityTerrain.build(self, layout)
-	CityTerrain.build_sea(self, layout)
-	print("STADT-GELAENDE erzeugt in %d ms" % (Time.get_ticks_msec() - t0))
-	var t1 := Time.get_ticks_msec()
-	var blockout := CityBlockout.new()
-	blockout.name = "Blockout"
-	add_child(blockout)
-	blockout.build(layout)
-	print("BLOCKOUT %d Gebäude in %d ms" % [blockout.building_count, Time.get_ticks_msec() - t1])
-	_build_district_signs()
-	_build_landmarks()
-
 	_player = (load("res://scenes/player.tscn") as PackedScene).instantiate()
 	add_child(_player)
-	terrain.collision_target = _player
-	terrain.clipmap_target = _player
+	var city := CityWorld.new()
+	city.name = "City"
+	add_child(city)
+	city.build(Vector3.ZERO, _player)
+	layout = city.layout
+	terrain = city.terrain
+	print("STADT erzeugt in %d ms (%d Gebäude)" % [Time.get_ticks_msec() - t0, city.blockout.building_count])
+	_build_district_signs()
 	_place(layout.spawn)
 
 	_label = Label.new()
@@ -142,29 +135,6 @@ func _build_district_signs() -> void:
 		sign.modulate = Color(1.0, 0.85, 0.3)
 		add_child(sign)
 		sign.global_position = Vector3(c.x, maxf(layout.height(c.x, c.y), 0.0) + 45.0, c.y)
-
-
-func _build_landmarks() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.35, 0.6, 0.9)
-	for l in layout.landmarks:
-		var pos := WorldLayout._v2(l["pos"])
-		var s: Array = l["size"]
-		var size := Vector3(float(s[0]), float(s[1]), float(s[2]))
-		var body := StaticBody3D.new()
-		var mi := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = size
-		bm.material = mat
-		mi.mesh = bm
-		var col := CollisionShape3D.new()
-		var shape := BoxShape3D.new()
-		shape.size = size
-		col.shape = shape
-		body.add_child(mi)
-		body.add_child(col)
-		add_child(body)
-		body.global_position = Vector3(pos.x, layout.height(pos.x, pos.y) + size.y * 0.5 - 0.5, pos.y)
 
 
 func _build_environment() -> void:

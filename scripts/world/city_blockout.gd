@@ -6,7 +6,8 @@ extends Node3D
 ##   - Gebäude als Kisten auf den Grundstücken zwischen den Straßen, Stil je Viertel
 ## Deterministisch (Seed je Viertel). Pro Viertel ein Mesh und ein StaticBody mit Kisten-Kollision.
 
-const ROAD_LIFT := 0.12        # Straßen knapp über dem Boden
+const ROAD_LIFT := 0.12        # Hauptstraßen knapp über dem Boden
+const STREET_TOP := 0.03       # Straßen in den Vierteln (flach, damit Kabel darauf sichtbar bleiben)
 const BASE_DEPTH := 3.0        # Gebäude reichen so tief in den Boden (keine Lücken an Rampen)
 const STREET_COLOR := Color(0.32, 0.33, 0.36)
 const ROAD_COLOR := Color(0.27, 0.28, 0.31)
@@ -27,6 +28,7 @@ func build(world_layout: WorldLayout) -> void:
 	_build_main_roads()
 	for d in layout.districts:
 		_build_district(d)
+	_build_landmarks()
 
 
 # ---------------------------------------------------------------- Hauptstraßen
@@ -140,9 +142,9 @@ func _style_grid(ctx: Dictionary) -> void:
 	var xs := _grid_lines(c.x, half.x, block)
 	var zs := _grid_lines(c.y, half.y, block)
 	for x in xs:
-		_box(ctx, Vector3(x, y + ROAD_LIFT - 0.1, c.y), Vector3(street, 0.2, half.y * 2.0), STREET_COLOR, false)
+		_box(ctx, Vector3(x, y + STREET_TOP - 0.1, c.y), Vector3(street, 0.2, half.y * 2.0), STREET_COLOR, false)
 	for z in zs:
-		_box(ctx, Vector3(c.x, y + ROAD_LIFT - 0.1, z), Vector3(half.x * 2.0, 0.2, street), STREET_COLOR, false)
+		_box(ctx, Vector3(c.x, y + STREET_TOP - 0.1, z), Vector3(half.x * 2.0, 0.2, street), STREET_COLOR, false)
 
 	# Grundstücke zwischen den Straßen
 	var bounds_x := [c.x - half.x] + xs + [c.x + half.x]
@@ -300,6 +302,29 @@ func _style_crater(ctx: Dictionary) -> void:
 		for j in 2:
 			var p := c + Vector2((i - 1) * 42.0, (j - 0.5) * 40.0)
 			_lot(ctx, Rect2(p - Vector2(15, 12), Vector2(30, 24)), rng.randf_range(float(ctx["bo"]["h_min"]), float(ctx["bo"]["h_max"])))
+
+
+# ---------------------------------------------------------------- Landmarken
+
+## Landmarken aus world.json als Kisten (vorerst nur der Wolkig-Turm)
+func _build_landmarks() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var body := StaticBody3D.new()
+	body.name = "Landmarks"
+	var ctx := { "st": st, "body": body }
+	for l in layout.landmarks:
+		var pos := WorldLayout._v2(l["pos"])
+		var s: Array = l["size"]
+		var size := Vector3(float(s[0]), float(s[1]), float(s[2]))
+		var y := layout.height(pos.x, pos.y)
+		_box(ctx, Vector3(pos.x, y + (size.y - BASE_DEPTH) * 0.5, pos.y), size + Vector3(0, BASE_DEPTH, 0),
+			Color(0.35, 0.6, 0.9), true)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _material
+	body.add_child(mi)
+	add_child(body)
 
 
 # ---------------------------------------------------------------- Kisten

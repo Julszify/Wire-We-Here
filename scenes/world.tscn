@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/world.gd" id="1_world"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -20,24 +20,6 @@ ambient_light_source = 3
 tonemap_mode = 2
 ssao_enabled = true
 
-[sub_resource type="StandardMaterial3D" id="floor_mat"]
-albedo_color = Color(0.55, 0.52, 0.47, 1)
-roughness = 0.9
-
-[sub_resource type="PlaneMesh" id="floor_mesh"]
-material = SubResource("floor_mat")
-size = Vector2(90, 90)
-
-[sub_resource type="BoxShape3D" id="floor_shape"]
-size = Vector3(90, 1, 90)
-
-[sub_resource type="StandardMaterial3D" id="ref_mat"]
-albedo_color = Color(0.9, 0.35, 0.2, 1)
-roughness = 0.4
-
-[sub_resource type="BoxMesh" id="ref_mesh"]
-material = SubResource("ref_mat")
-
 [node name="World" type="Node3D"]
 script = ExtResource("1_world")
 
@@ -48,19 +30,6 @@ environment = SubResource("env")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
 rotation = Vector3(-0.873, -0.524, 0)
 shadow_enabled = true
-
-[node name="Floor" type="StaticBody3D" parent="."]
-
-[node name="Mesh" type="MeshInstance3D" parent="Floor"]
-mesh = SubResource("floor_mesh")
-
-[node name="Collision" type="CollisionShape3D" parent="Floor"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-shape = SubResource("floor_shape")
-
-[node name="ReferenceCube" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.5, -6)
-mesh = SubResource("ref_mesh")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 6)

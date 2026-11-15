@@ -101,6 +101,52 @@ func height(x: float, z: float) -> float:
 	return h
 
 
+## Textur-ID eines Bodens aus ground.textures (-1, wenn es ihn nicht gibt)
+func texture_id(ground_name: String) -> int:
+	var list: Array = _d.get("ground", {}).get("textures", [])
+	for i in list.size():
+		if list[i]["name"] == ground_name:
+			return i
+	return -1
+
+
+## Boden an (x, z) bei Geländehöhe h und Steigung slope (Höhenunterschied pro Meter).
+## Ergebnis: [Grund-ID, Überlagerungs-ID, Mischung 0..1]
+## Reihenfolge: Viertel (mit weichem Übergang auf der Rampe) vor Krater vor Küste vor Gras; an steilen
+## Hängen außerhalb der Viertel wird Fels eingeblendet.
+func ground_at(x: float, z: float, h: float, slope: float) -> Array:
+	var g: Dictionary = _d.get("ground", {})
+	var grass := texture_id(String(g.get("auto_base", "gras")))
+	var rock := texture_id(String(g.get("auto_slope_overlay", "fels")))
+	var rock_w := smoothstep(0.35, 0.7, slope)
+	var best_w := 0.0
+	var best_tex := -1
+	for d in districts:
+		var edge := float(d["edge_m"])
+		if edge <= 0.0 or not d.has("ground"):
+			continue
+		var dist := _rect_distance(Vector2(x, z), _v2(d["center"]), _v2(d["size"]) * 0.5, 30.0)
+		var w := 1.0 - smoothstep(0.0, edge * 0.6, dist)
+		if w > best_w:
+			best_w = w
+			best_tex = texture_id(String(d["ground"]))
+	if best_tex >= 0 and best_w >= 0.98:
+		return [best_tex, best_tex, 0.0]
+	if best_tex >= 0 and best_w > 0.02:
+		return [best_tex, grass, 1.0 - best_w]
+
+	var cr: Dictionary = _d["crater"]
+	var dc := Vector2(x, z).distance_to(_v2(cr["center"]))
+	if dc < float(cr["rim_radius_m"]) - 25.0:
+		var gravel := texture_id(String(g.get("crater", "kies")))
+		return [gravel, rock, rock_w * 0.7]
+
+	if z > sea_north_edge_m() - 60.0 and h < 4.0:
+		var sand := texture_id(String(g.get("coast", "sand")))
+		return [sand, grass, clampf((h - 2.0) / 2.0, 0.0, 1.0)]
+	return [grass, rock, rock_w]
+
+
 ## Nördlichste Stelle, an der Meer sein kann (Küstenlinie minus Welle, etwas Puffer)
 func sea_north_edge_m() -> float:
 	var coast: Dictionary = _d["coast"]
