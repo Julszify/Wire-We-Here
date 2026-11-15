@@ -1,7 +1,8 @@
 class_name CordView
 extends Node3D
-## Platzhalter für C.O.R.D.: schwebender Zylinder mit Leuchtring, folgt dem Spieler.
-## Der Ring leuchtet cyan; während der Bestellfrage blinkt er rot.
+## C.O.R.D.: schwebende Figur mit Leuchtteilen, folgt dem Spieler.
+## Verwendet das Modell unter MODEL_PATH (Blender-Entwurf „Server-Box“), sonst einen Platzhalter.
+## Alle Teile mit dem Material „CordRing“ leuchten cyan; während der Bestellfrage blinken sie rot.
 
 var _ring_mat: StandardMaterial3D
 var _body: Node3D
@@ -11,12 +12,88 @@ var _t := 0.0
 
 const CALM := Color(0.3, 0.9, 1.0)
 const ALARM := Color(1.0, 0.2, 0.15)
+const MODEL_PATH := "res://assets/models/cord/cord_server.glb"
+const RING_MATERIAL := "CordRing"
 
 
 func _ready() -> void:
 	_body = Node3D.new()
 	add_child(_body)
 
+	_ring_mat = StandardMaterial3D.new()
+	_ring_mat.albedo_color = CALM
+	_ring_mat.emission_enabled = true
+	_ring_mat.emission = CALM
+	_ring_mat.emission_energy_multiplier = 3.0
+
+	if not _build_model():
+		_build_placeholder()
+
+	_speech = Label3D.new()
+	_speech.font_size = 32
+	_speech.outline_size = 10
+	_speech.pixel_size = 0.0011
+	_speech.fixed_size = true
+	_speech.modulate = Color(1.0, 0.75, 0.7)
+	_speech.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_speech.no_depth_test = true
+	_speech.position = Vector3(0, 0.75, 0)
+	_speech.visible = false
+	add_child(_speech)
+
+
+## Lädt das Modell (Maße in Metern) und zentriert es um den Ursprung.
+## glTF-Modelle schauen nach +Z, C.O.R.D. schaut nach -Z, daher um 180° gedreht.
+## Leuchtmaterialien werden durch _ring_mat ersetzt, damit sie die Farbe wechseln können.
+func _build_model() -> bool:
+	if not ResourceLoader.exists(MODEL_PATH):
+		return false
+	var scene := load(MODEL_PATH) as PackedScene
+	if scene == null:
+		return false
+	var model: Node3D = scene.instantiate()
+	var holder := Node3D.new()
+	holder.rotation = Vector3(0, PI, 0)
+	holder.add_child(model)
+	_body.add_child(holder)
+	model.position = -_mesh_aabb(model, Transform3D.IDENTITY).get_center()
+	_swap_ring_materials(model)
+	return true
+
+
+func _swap_ring_materials(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(i)
+			if m and m.resource_name == RING_MATERIAL:
+				mi.set_surface_override_material(i, _ring_mat)
+	for child in node.get_children():
+		_swap_ring_materials(child)
+
+
+## Begrenzungsbox aller Meshes unter node, im Koordinatensystem von node.
+func _mesh_aabb(node: Node, xform: Transform3D) -> AABB:
+	var result := AABB()
+	var has := false
+	for child in node.get_children():
+		var t := xform
+		if child is Node3D:
+			t = xform * (child as Node3D).transform
+		var boxes: Array[AABB] = []
+		if child is MeshInstance3D and (child as MeshInstance3D).mesh:
+			boxes.append(t * (child as MeshInstance3D).mesh.get_aabb())
+		var sub := _mesh_aabb(child, t)
+		if sub.size != Vector3.ZERO:
+			boxes.append(sub)
+		for b in boxes:
+			result = b if not has else result.merge(b)
+			has = true
+	return result
+
+
+## Platzhalter aus Grundformen, falls das Modell fehlt.
+func _build_placeholder() -> void:
 	var shell := StandardMaterial3D.new()
 	shell.albedo_color = Color(0.88, 0.9, 0.93)
 	shell.roughness = 0.25
@@ -40,11 +117,6 @@ func _ready() -> void:
 	cap_mesh.position = Vector3(0, 0.3, 0)
 	_body.add_child(cap_mesh)
 
-	_ring_mat = StandardMaterial3D.new()
-	_ring_mat.albedo_color = CALM
-	_ring_mat.emission_enabled = true
-	_ring_mat.emission = CALM
-	_ring_mat.emission_energy_multiplier = 3.0
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.27
 	torus.outer_radius = 0.34
@@ -62,18 +134,6 @@ func _ready() -> void:
 	eye.mesh = eye_box
 	eye.position = Vector3(0, 0.2, -0.25)
 	_body.add_child(eye)
-
-	_speech = Label3D.new()
-	_speech.font_size = 32
-	_speech.outline_size = 10
-	_speech.pixel_size = 0.0011
-	_speech.fixed_size = true
-	_speech.modulate = Color(1.0, 0.75, 0.7)
-	_speech.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_speech.no_depth_test = true
-	_speech.position = Vector3(0, 0.75, 0)
-	_speech.visible = false
-	add_child(_speech)
 
 
 ## Weich links neben den Spieler schweben (Kamera sitzt rechts hinten) und zu ihm schauen.
