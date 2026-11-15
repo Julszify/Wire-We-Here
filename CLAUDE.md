@@ -66,6 +66,15 @@ Blender 5.3 liegt unter `/Applications/Blender.app/Contents/MacOS/Blender`. Mode
 
 Kabel und Haufen bleiben prozedural (siehe oben); Blender liefert nur feste Teile. Nach neuen `class_name`-Skripten einmal `godot --headless --import` ausführen, sonst kennt die Kommandozeile die Klasse nicht.
 
+### Begehbare Welt (im Aufbau)
+
+Konzept im GDD, Abschnitt „Welt und offene Map“: offene Kleinstadt, ca. 2 × 2 km, Basis im Wolkig-Hinterhof, zehn Viertel, viel Höhe.
+
+- **Gelände:** Addon Terrain3D 1.1.0 (`addons/terrain_3d`, MIT, läuft mit Godot 4.7). `CityTerrain` erzeugt es aus `WorldLayout.height()`; die Höhenkarte wird in `user://city_height_<hash>.res` zwischengespeichert (erstes Mal ca. 7 s, danach unter 0,1 s). Ändert sich `height()`, `HEIGHT_VERSION` in `city_terrain.gd` erhöhen.
+- **Layout als Daten:** `data/world.json` (Viertel als Rechtecke mit Bodenhöhe und Rampenbreite, Hügel, Küste, Krater, Hafenbecken, Landmarken, Startpunkt); `scripts/world/world_layout.gd` liest es.
+- **Vorschau:** `scenes/city_preview.tscn` (F6), Optionen `--viertel=<id>`, `--at=<x>,<z>`, `--orbit=<grad>`, `--overview` (Luftbild), `--tour` (FPS je Viertel). Enthält einen Absturz-Schutz (unter das Gelände gerutscht → wieder hochsetzen).
+- Die Hauptszene `world.tscn` nutzt die Stadt noch nicht; Bauplan: Blockout der Viertel per Blender, Landmarken, Startbereich in den Hinterhof, Sperren, dann Springen/Klettern, zuletzt Laden pro Viertel.
+
 ### Werkzeug-Kette und Eingabe
 
 Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
