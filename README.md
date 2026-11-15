@@ -44,7 +44,7 @@ Das Spiel ist in Entwicklung. Spielbar ist der **Vertical Slice**, eingebettet i
 
 ![Büroviertel mit Glas-Hochhäusern](docs/screenshot_buero.jpg)
 
-![Wohnviertel mit Häusern und Kabelhaufen auf den Kreuzungen](docs/screenshot_wohnviertel.jpg)
+![Wohnviertel mit Häusern, C.O.R.D. und einem Kabelhaufen auf der Kreuzung](docs/screenshot_wohnviertel.jpg)
 
 ## Starten
 
