@@ -5,7 +5,10 @@ extends MeshInstance3D
 var data: CableData
 var _mesh := ArrayMesh.new()
 var _mat: StandardMaterial3D
+var _plug_mat: StandardMaterial3D
 var _label: Label3D
+## Drehung der Stecker um die Kabelachse (aus dem Seed, damit nicht alle gleich liegen)
+var _plug_roll := 0.0
 
 
 func setup(cable: CableData) -> void:
@@ -31,7 +34,8 @@ func setup(cable: CableData) -> void:
 	else:
 		# Gewöhnliche Kabel teilen sich ein Material pro Farbe (viel schneller bei hunderten Kabeln)
 		_mat = _shared_material(cable.color_index, cable.color())
-	material_override = _mat
+	_plug_mat = PlugMeshes.material()
+	_plug_roll = float(posmod(cable.rng_seed, 628)) / 100.0
 	show_in_heap()
 
 
@@ -60,9 +64,12 @@ func set_fade(alpha: float) -> void:
 	if _SHARED.values().has(_mat):
 		# Geteiltes Material nicht für alle Kabel ausblenden: vorher kopieren
 		_mat = _mat.duplicate()
-		material_override = _mat
-	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if alpha < 1.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
-	_mat.albedo_color.a = alpha
+	if _plug_mat == PlugMeshes.material():
+		_plug_mat = _plug_mat.duplicate()
+	for m in [_mat, _plug_mat]:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if alpha < 1.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
+		m.albedo_color.a = alpha
+	_apply_materials()
 
 
 static var _SHARED: Dictionary = {}  # Farbindex -> StandardMaterial3D
@@ -85,5 +92,14 @@ static func _new_material(color: Color) -> StandardMaterial3D:
 
 
 func _build(pts: PackedVector3Array) -> void:
-	var c: Dictionary = Balancing.cable
-	TubeMesh.build(pts, c["radius_m"], int(c["tube_sides"]), _mesh)
+	TubeMesh.build(pts, data.radius(), int(Balancing.cable["tube_sides"]), _mesh)
+	PlugMeshes.add_to_mesh(_mesh, data.plug_id(), pts, _plug_roll)
+	_apply_materials()
+
+
+## Fläche 0 = Kabel, Fläche 1 = Stecker (wird bei jedem Neubau gesetzt, weil das Mesh neu entsteht)
+func _apply_materials() -> void:
+	if _mesh.get_surface_count() > 0:
+		_mesh.surface_set_material(0, _mat)
+	if _mesh.get_surface_count() > 1:
+		_mesh.surface_set_material(1, _plug_mat)

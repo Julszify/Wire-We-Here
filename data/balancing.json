@@ -4,7 +4,8 @@
 		"length_min_m": 15.0,
 		"length_max_m": 30.0,
 		"radius_m": 0.055,
-		"tube_sides": 8,
+		"_kommentar_radius": "radius_m = dickstes Kabel; jedes Kabel bekommt den Radius seines Steckertyps (plugs)",
+		"tube_sides": 10,
 		"path_samples": 180,
 		"control_points_min": 7,
 		"control_points_max": 10,
@@ -22,7 +23,15 @@
 			"#e07b2a",
 			"#3b4350"
 		],
-		"coil_visual_max_m": 18.0
+		"coil_visual_max_m": 18.0,
+		"_kommentar_plugs": "Steckertypen an beiden Kabelenden (Modelle: assets/models/cable/plugs.glb, aus tools/blender/plug_designs.py). weight = relative Häufigkeit",
+		"plugs": [
+			{ "id": "power", "radius_m": 0.055, "weight": 2 },
+			{ "id": "hdmi", "radius_m": 0.047, "weight": 2 },
+			{ "id": "network", "radius_m": 0.044, "weight": 3 },
+			{ "id": "usb", "radius_m": 0.041, "weight": 3 },
+			{ "id": "jack", "radius_m": 0.038, "weight": 1 }
+		]
 	},
 	"heap": {
 		"radius_m": 2.5,
@@ -30,7 +39,12 @@
 		"min_height_m": 0.1,
 		"base_height_m": 0.25,
 		"peak_extra_height_m": 1.7,
-		"end_height_m": 0.12
+		"end_height_m": 0.12,
+		"rim_wobble": 0.22,
+		"tail_chance": 0.16,
+		"tail_reach": 1.6,
+		"surface_min_fraction": 0.5,
+		"_kommentar": "rim_wobble: Stärke der Wellen am Haufenrand; tail_chance/tail_reach: Anteil und Reichweite der Ausläufer über den Boden; surface_min_fraction: Kabel liegen zwischen diesem Anteil der Hügelhöhe und der Oberfläche"
 	},
 	"economy": {
 		"money_per_meter": 0.5,

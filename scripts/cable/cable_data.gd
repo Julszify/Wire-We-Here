@@ -16,6 +16,8 @@ var length_m: float = 0.0
 ## Positionen der Knoten in gezogenen Metern, aufsteigend
 var knots_m: PackedFloat32Array = PackedFloat32Array()
 var color_index: int = 0
+## Index in Balancing.cable.plugs (-1 = ohne Stecker)
+var plug_index: int = -1
 ## Wichtiges Kabel: gehört an diesen Port im Server-Schrank (-1 = gewöhnliches Kabel)
 var port_id: int = -1
 ## Sichtbare Bahn im Haufen (abgeleitet, wird nicht gespeichert)
@@ -60,7 +62,38 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3, heap: Hea
 	d.knots_m = PackedFloat32Array(knots)
 
 	d.color_index = rng.randi_range(0, (c["palette"] as Array).size() - 1)
+	d.plug_index = _pick_plug(cable_seed)
 	return d
+
+
+## Steckertyp aus einem eigenen Zufallsstrom, damit die übrigen Zufallswerte unverändert bleiben.
+static func _pick_plug(cable_seed: int) -> int:
+	var plugs: Array = Balancing.cable.get("plugs", [])
+	if plugs.is_empty():
+		return -1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([cable_seed, "plug"])
+	var total := 0.0
+	for p: Dictionary in plugs:
+		total += float(p.get("weight", 1.0))
+	var x := rng.randf() * total
+	for i in plugs.size():
+		x -= float(plugs[i].get("weight", 1.0))
+		if x <= 0.0:
+			return i
+	return plugs.size() - 1
+
+
+## Steckertyp an beiden Enden (z. B. "usb"), leer wenn keine Stecker definiert sind
+func plug_id() -> String:
+	return String(Balancing.cable["plugs"][plug_index]["id"]) if plug_index >= 0 else ""
+
+
+## Dicke dieses Kabels (hängt vom Steckertyp ab)
+func radius() -> float:
+	if plug_index >= 0:
+		return float(Balancing.cable["plugs"][plug_index]["radius_m"])
+	return float(Balancing.cable["radius_m"])
 
 
 func is_important() -> bool:

@@ -36,6 +36,21 @@ var input_enabled := true
 var auto_pull_rate := 0.0
 var _auto_pull_t := 0.0
 
+## Modell der Figur aus Blender (tools/blender/player_designs.py). Es besteht aus Einzelteilen,
+## deren Ursprung im Gelenk liegt; jedes Teil wird an den passenden Gelenk-Node gehängt.
+## Fehlt die Datei, bleiben die Grundformen aus player.tscn sichtbar.
+const MODEL_PATH := "res://assets/models/player/player_hoodie.glb"
+## Teil im Modell -> [Gelenk-Node, Grundformen, die es ersetzt]
+const MODEL_PARTS := {
+	"Body": ["Body", ["Body/Torso", "Body/Head"]],
+	"LegL": ["Body/LegL", ["Body/LegL/Mesh"]],
+	"LegR": ["Body/LegR", ["Body/LegR/Mesh"]],
+	"UpperArmL": ["Body/UpperArmL", ["Body/UpperArmL/Mesh"]],
+	"UpperArmR": ["Body/ArmR", ["Body/ArmR/Mesh"]],
+	"ForearmL": ["Body/UpperArmL/WrapArm", ["Body/UpperArmL/WrapArm/Forearm", "Body/UpperArmL/WrapArm/Hand"]],
+	"ForearmR": ["Body/ArmR/ForearmR", ["Body/ArmR/ForearmR/Mesh", "Body/ArmR/ForearmR/Hand"]],
+}
+
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
 var _walk_phase := 0.0
@@ -43,6 +58,7 @@ var _walk_phase := 0.0
 
 func _ready() -> void:
 	_spring.add_excluded_object(get_rid())
+	_apply_model()
 	_update_arm_pose()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -177,6 +193,32 @@ func _animate_walk(delta: float, speed: float, walk_speed: float) -> void:
 	# Linker Arm schwingt nur ohne Kabel; mit Kabel bleibt er ruhig
 	var left := 0.0 if holding else swing * 0.8
 	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, left, k)
+
+
+func _apply_model() -> void:
+	if not ResourceLoader.exists(MODEL_PATH):
+		return
+	var scene := load(MODEL_PATH) as PackedScene
+	if scene == null:
+		return
+	var model := scene.instantiate()
+	for part_name: String in MODEL_PARTS:
+		var part := model.find_child(part_name, true, false) as Node3D
+		var entry: Array = MODEL_PARTS[part_name]
+		var joint := get_node_or_null(String(entry[0])) as Node3D
+		if part == null or joint == null:
+			push_warning("Figur-Modell: Teil %s fehlt" % part_name)
+			continue
+		part.owner = null
+		part.get_parent().remove_child(part)
+		joint.add_child(part)
+		# Im Modell liegt der Ursprung im Gelenk; Drehung der Vorschau-Pose verwerfen
+		part.transform = Transform3D.IDENTITY
+		for old_path: String in entry[1]:
+			var old := get_node_or_null(old_path) as Node3D
+			if old:
+				old.visible = false
+	model.free()
 
 
 func _update_arm_pose() -> void:

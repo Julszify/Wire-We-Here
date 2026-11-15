@@ -56,6 +56,16 @@ Die Spiel-Länge eines Kabels (15–30 m, bestimmt Geld und Knoten) ist von der 
 
 Der ursprüngliche Browser-Prototyp liegt unter `reference/kabelsalat-3d.html` (three.js).
 
+### Modelle aus Blender
+
+Blender 5.3 liegt unter `/Applications/Blender.app/Contents/MacOS/Blender`. Modelle entstehen per Python-Skript in `tools/blender/` (reproduzierbar, Aufruf steht jeweils oben im Skript); `tools/` ist per `.gdignore` vom Godot-Import ausgenommen.
+
+- `cord_designs.py` → `assets/models/cord/` (C.O.R.D. = Server-Box; Leuchtteile heißen `CordRing` und blinken per Code)
+- `player_designs.py` → `assets/models/player/` (Hoodie-Admin; sieben Teile mit Ursprung im Gelenk, `player.gd` hängt sie an die Gelenk-Nodes, siehe `MODEL_PARTS`)
+- `plug_designs.py` → `assets/models/cable/plugs.glb` (fünf Steckertypen mit Vertex-Farben; `PlugMeshes` schreibt sie als zweite Fläche ins Kabel-Mesh, Typ und Kabeldicke über `cable.plugs` in `balancing.json`)
+
+Kabel und Haufen bleiben prozedural (siehe oben); Blender liefert nur feste Teile. Nach neuen `class_name`-Skripten einmal `godot --headless --import` ausführen, sonst kennt die Kommandozeile die Klasse nicht.
+
 ### Werkzeug-Kette und Eingabe
 
 Der Fortschritt soll sich spürbar beschleunigen, das ist der Reiz:
