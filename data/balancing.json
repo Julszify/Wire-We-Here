@@ -138,7 +138,7 @@
 	"zipline": {
 		"_kommentar": "Seilbahn zur Basis (Strecken in world.json → ziplines). hang_m = Abstand Seil bis Füße",
 		"speed_m_per_s": 16.0,
-		"hang_m": 2.3,
+		"hang_m": 2.05,
 		"sag_per_m": 0.025,
 		"min_clearance_m": 3.0,
 		"station_reach_m": 3.0
@@ -153,7 +153,6 @@
 		"coil_max_height_m": 1.0,
 		"coil_pitch_m": 0.12,
 		"coil_point_step_m": 0.12,
-		"connector_lift_m": 0.45,
 		"connector_samples": 10,
 		"done_fade_s": 0.6
 	},
@@ -179,14 +178,24 @@
 		"reel_reach_m": 3.2
 	},
 	"arm": {
-		"_kommentar": "Kabel zwischen Hand und Ellbogen um den Arm gewickelt",
+		"_kommentar": "Kabel um den Unterarm gewickelt (wie auf einer Spule)",
 		"forearm_length_m": 0.36,
-		"loop_half_length_m": 0.2,
-		"loop_half_height_m": 0.07,
-		"loop_growth_m": 0.006,
-		"loop_lateral_step_m": 0.022,
 		"point_step_m": 0.05,
-		"connector_sag_m": 0.35
+		"wrap_radius_m": 0.075,
+		"wrap_from_m": 0.05,
+		"wrap_to_m": 0.31,
+		"visual_max_m": 6.5,
+		"_kommentar_wrap": "Wicklung um den Unterarm: Abstand der Windungen vom Ellbogen (wrap_from) bis kurz vor der Hand (wrap_to), Armdicke wrap_radius; visual_max_m = sichtbare Länge bei vollem Kabel"
+	},
+	"connector": {
+		"_kommentar": "Kabelstück vom Haufen zum Aufwickler: liegt locker am Boden und hebt sich auf den letzten rise-Metern; beim Ziehen strafft es sich (tension_up_s schnell, tension_down_s langsam wieder locker), am Knoten zittert es",
+		"rise_arm_m": 0.9,
+		"rise_reel_m": 0.7,
+		"meander": 0.08,
+		"tension_up_s": 0.08,
+		"tension_down_s": 0.45,
+		"motor_tension": 0.7,
+		"knot_jitter_m": 0.03
 	},
 	"knot": {
 		"untie_presses": 3,

@@ -7,29 +7,39 @@ extends RefCounted
 ## Reine Funktionen von (Kabel-Daten, Aufwickler-Lage) – kein eigener Zustand.
 
 
+## Aussehen des Verbindungsstücks, von der Darstellung pro Bild gesetzt:
+##   tension 0 = locker (liegt am Boden), 1 = straff (gerade Linie); jitter > 0 = zittert (am Knoten);
+##   time = Sekunden für das Zittern; ground_y = Bodenhöhe am Aufwickler.
+static func look(tension: float = 0.0, jitter: float = 0.0, time: float = 0.0, ground_y: float = NAN) -> Dictionary:
+	return { "tension": tension, "jitter": jitter, "time": time, "ground_y": ground_y }
+
+
 ## Kabel auf einer Rolle. Ergebnis: { "points", "phase" } – phase = Drehwinkel der Trommel.
-## `scale` < 1 = kleinere Trommel (Wagen).
-static func build_on_reel(cable: CableData, reel_pos: Vector3, scale: float = 1.0) -> Dictionary:
+## `scale` < 1 = kleinere Trommel (Wagen). Das Kabel läuft tangential auf die Trommel.
+static func build_on_reel(cable: CableData, reel_pos: Vector3, scale: float = 1.0, lk: Dictionary = {}) -> Dictionary:
 	var anchor := cable.path.points[0]
 	var feed_angle := atan2(anchor.z - reel_pos.z, anchor.x - reel_pos.x)
-	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle, scale)
+	# Tangential: an dieser Stelle zeigt die Wicklung in Richtung Haufen
+	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle - PI * 0.5, scale, cable.radius())
 	var coil_pts: PackedVector3Array = coil["points"]
-	var coil_end := coil_pts[coil_pts.size() - 1]
-	# Verbindungsstück leicht nach oben gebogen
-	var mid_y := maxf(anchor.y, coil_end.y) + float(Balancing.reel["connector_lift_m"])
-	return { "points": _assemble(cable, coil_pts, mid_y), "phase": coil["phase"] }
+	var c: Dictionary = Balancing.connector
+	var rise := float(c.get("rise_reel_m", 0.7)) * scale + 0.3
+	var ground := float(lk.get("ground_y", NAN))
+	if is_nan(ground):
+		ground = reel_pos.y
+	return { "points": _assemble(cable, coil_pts, lk, ground, rise), "phase": coil["phase"] }
 
 
 ## Kabel um den Arm gewickelt. `arm` ist die globale Lage des Unterarms
 ## (Ursprung am Ellbogen, Hand Richtung -Z, außen Richtung -X).
-static func build_on_arm(cable: CableData, arm: Transform3D) -> PackedVector3Array:
-	var coil_pts := arm_coil_points(arm, cable.progress() * coil_length(cable))
-	var anchor := cable.path.points[0]
-	var coil_end := coil_pts[coil_pts.size() - 1]
-	# Verbindungsstück hängt durch, aber nicht durch den Boden
-	var mid_y := maxf((anchor.y + coil_end.y) * 0.5 - float(Balancing.arm["connector_sag_m"]),
-		float(Balancing.cable["radius_m"]))
-	return _assemble(cable, coil_pts, mid_y)
+static func build_on_arm(cable: CableData, arm: Transform3D, lk: Dictionary = {}) -> PackedVector3Array:
+	var visual := minf(coil_length(cable), float(Balancing.arm.get("visual_max_m", 6.5)))
+	var coil_pts := arm_coil_points(arm, cable.progress() * visual, cable.radius())
+	var c: Dictionary = Balancing.connector
+	var ground := float(lk.get("ground_y", NAN))
+	if is_nan(ground):
+		ground = arm.origin.y - 1.0
+	return _assemble(cable, coil_pts, lk, ground, float(c.get("rise_arm_m", 0.9)))
 
 
 ## Fertiges Knäuel als ordentlicher Kabelring: Windungen im Kreis um die Y-Achse, leicht versetzt,
@@ -55,8 +65,10 @@ static func coil_length(cable: CableData) -> float:
 	return minf(cable.path.length, float(Balancing.cable.get("coil_visual_max_m", 18.0)))
 
 
-## Haufenrest + Verbindungsstück (quadratische Bézierkurve) + Wicklung von außen nach innen.
-static func _assemble(cable: CableData, coil_pts: PackedVector3Array, mid_y: float) -> PackedVector3Array:
+## Haufenrest + Verbindungsstück + Wicklung von außen nach innen.
+## Das Verbindungsstück liegt locker am Boden (leicht geschlängelt) und hebt sich erst auf den letzten
+## `rise` Metern zum Aufwickler; je straffer (tension), desto mehr wird es zur geraden Linie.
+static func _assemble(cable: CableData, coil_pts: PackedVector3Array, lk: Dictionary, ground_y: float, rise: float) -> PackedVector3Array:
 	var heap_pts := cable.path.points
 	var n := heap_pts.size() - 1
 	var k := maxi(1, roundi((1.0 - cable.progress()) * n))
@@ -65,14 +77,40 @@ static func _assemble(cable: CableData, coil_pts: PackedVector3Array, mid_y: flo
 	for i in range(k, -1, -1):
 		pts.append(heap_pts[i])
 
+	var c: Dictionary = Balancing.connector
+	var tension := clampf(float(lk.get("tension", 0.0)), 0.0, 1.0)
+	var jitter := float(lk.get("jitter", 0.0))
+	var time := float(lk.get("time", 0.0))
 	var anchor := heap_pts[0]
 	var coil_end := coil_pts[coil_pts.size() - 1]
-	var mid := (anchor + coil_end) * 0.5
-	mid.y = mid_y
-	var samples := int(Balancing.reel["connector_samples"])
+	var flat := Vector2(coil_end.x - anchor.x, coil_end.z - anchor.z)
+	var dist := flat.length()
+	var side := Vector3(-flat.y, 0.0, flat.x).normalized() if dist > 0.01 else Vector3.RIGHT
+	var lie := ground_y + cable.radius()
+	rise = minf(rise, dist * 0.6)
+	# Schlängeln: Stärke wächst mit der Länge, Richtung aus dem Seed (jedes Kabel liegt anders)
+	var meander := minf(float(c.get("meander", 0.08)) * dist, 0.6) * (1.0 - tension)
+	var wave := 1.0 if posmod(cable.rng_seed, 2) == 0 else -1.0
+	var samples := clampi(int(dist / 0.2), 8, 60)
 	for i in range(1, samples):
 		var t := float(i) / samples
-		pts.append(anchor.lerp(mid, t).lerp(mid.lerp(coil_end, t), t))
+		# Locker: am Boden entlang, kurz vor dem Ziel in einem weichen Bogen hoch
+		var slack := anchor.lerp(coil_end, t)
+		slack += side * wave * meander * sin(t * PI) * (1.0 - t)
+		var left := (1.0 - t) * dist
+		var ground_line := lerpf(anchor.y, lie, minf(t * 4.0, 1.0))
+		if left < rise:
+			var u := 1.0 - left / maxf(rise, 0.001)
+			slack.y = lerpf(ground_line, coil_end.y, u * u * (3.0 - 2.0 * u))
+		else:
+			slack.y = ground_line
+		var taut := anchor.lerp(coil_end, t)
+		var p := slack.lerp(taut, tension * tension * (3.0 - 2.0 * tension))
+		if jitter > 0.0:
+			var amp := float(c.get("knot_jitter_m", 0.025)) * jitter * sin(t * PI)
+			p += side * amp * sin(time * 47.0 + t * 11.0) + Vector3.UP * amp * 0.6 * sin(time * 39.0 + t * 7.0)
+		p.y = maxf(p.y, lie)
+		pts.append(p)
 
 	for i in range(coil_pts.size() - 1, -1, -1):
 		pts.append(coil_pts[i])
@@ -82,13 +120,17 @@ static func _assemble(cable: CableData, coil_pts: PackedVector3Array, mid_y: flo
 ## Helix um die Trommel. Das äußere Ende liegt immer bei `end_angle` (Richtung Haufen),
 ## dadurch dreht sich die ganze Spirale beim Aufwickeln mit der Trommel.
 ## Ergebnis: { "points": innen -> außen, "phase": Winkel des inneren Anfangs }
-static func coil_points(center: Vector3, length: float, end_angle: float, scale: float = 1.0) -> Dictionary:
+## `cable_radius` > 0: Windungen und Lagen liegen genau Kabel an Kabel.
+static func coil_points(center: Vector3, length: float, end_angle: float, scale: float = 1.0, cable_radius: float = 0.0) -> Dictionary:
 	var r: Dictionary = Balancing.reel
 	var step_len: float = r["coil_point_step_m"]
 	var pitch: float = float(r["coil_pitch_m"]) * scale
 	var min_h: float = float(r["coil_min_height_m"]) * scale
 	var max_h: float = float(r["coil_max_height_m"]) * scale
 	var layer_step: float = float(r["coil_layer_step_m"]) * scale
+	if cable_radius > 0.0:
+		pitch = cable_radius * 2.05
+		layer_step = cable_radius * 1.8
 
 	var radius: float = float(r["coil_start_radius_m"]) * scale
 	var angle := 0.0
@@ -122,34 +164,40 @@ static func coil_points(center: Vector3, length: float, end_angle: float, scale:
 	return { "points": out, "phase": offset }
 
 
-## Ovale Schlaufen zwischen Hand und Ellbogen. Jede Schlaufe wird etwas größer und
-## liegt etwas weiter außen, so entsteht ein dicker werdendes Knäuel.
-## Ergebnis: innen -> außen, in globalen Koordinaten.
-static func arm_coil_points(arm: Transform3D, length: float) -> PackedVector3Array:
+## Wicklung um den Unterarm wie auf einer Spule: Windungen laufen um den Arm herum von der Hand zum
+## Ellbogen und zurück, jede Lage etwas weiter außen. Ergebnis: innen -> außen, in globalen Koordinaten.
+static func arm_coil_points(arm: Transform3D, length: float, cable_radius: float = 0.045) -> PackedVector3Array:
 	var a: Dictionary = Balancing.arm
-	var center_z := -float(a["forearm_length_m"]) * 0.5
-	var half_len: float = a["loop_half_length_m"]
-	var half_h: float = a["loop_half_height_m"]
-	var growth: float = a["loop_growth_m"]
-	var lateral: float = a["loop_lateral_step_m"]
+	var near := -float(a.get("wrap_from_m", 0.05))
+	var far := -float(a.get("wrap_to_m", 0.31))
 	var step_len: float = a["point_step_m"]
+	var pitch := cable_radius * 2.05
+	var layer := cable_radius * 1.85
+	var radius := float(a.get("wrap_radius_m", 0.075)) + cable_radius
 
 	var out := PackedVector3Array()
-	var theta := 0.0
+	var angle := 0.0
+	var z := far
+	var dir := 1.0
 	var s := 0.0
-	out.append(arm * Vector3(0.0, 0.0, center_z + half_len))
+	var layer_index := 0
+	out.append(arm * Vector3(radius, 0.0, z))
 	while s < length:
-		var loops := theta / TAU
-		var hl := half_len + growth * loops
-		var hh := half_h + growth * loops
-		# Winkelschritt so wählen, dass die Bogenlänge ungefähr step_len ist
-		var speed := sqrt(pow(hl * sin(theta), 2.0) + pow(hh * cos(theta), 2.0))
 		var step := minf(step_len, length - s)
-		theta += step / maxf(speed, 0.02)
 		s += step
-		loops = theta / TAU
-		hl = half_len + growth * loops
-		hh = half_h + growth * loops
-		var local := Vector3(-lateral * loops, hh * sin(theta), center_z + hl * cos(theta))
-		out.append(arm * local)
+		angle += step / radius
+		z += dir * pitch * step / (TAU * radius)
+		if z > near:
+			z = near
+			dir = -1.0
+			radius += layer
+			layer_index += 1
+		elif z < far:
+			z = far
+			dir = 1.0
+			radius += layer
+			layer_index += 1
+		# leicht unregelmäßig, damit es nach Hand gewickelt aussieht
+		var r := radius * (1.0 + 0.05 * sin(angle * 3.0 + layer_index * 1.7))
+		out.append(arm * Vector3(cos(angle) * r, sin(angle) * r, z))
 	return out

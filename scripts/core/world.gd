@@ -88,6 +88,7 @@ func _ready() -> void:
 	($WorldEnvironment as WorldEnvironment).environment = CityLook.environment()
 	CityLook.setup_sun($Sun)
 	_build_city()
+	ToonLook.install(self, _player.camera)
 	_system = CableSystem.new()
 	add_child(_system)
 	_system.cable_completed.connect(_on_cable_completed)
@@ -221,10 +222,18 @@ func _process(delta: float) -> void:
 		if cable == null:
 			continue
 		var view: CableView = _views[cable.id]
+		# Straff, solange gezogen wird (Tastendruck wird abgearbeitet, Motor läuft); locker sonst
+		var pulling := 0.0
+		if reel.pending_m > 0.0:
+			pulling = 1.0
+		elif reel.is_motorized():
+			pulling = float(Balancing.connector.get("motor_tension", 0.7))
+		view.update_tension(pulling, cable.is_stuck(), delta)
 		if reel.kind == ReelData.Kind.ARM:
-			view.show_on_arm(arm)
+			view.show_on_arm(arm, _player.global_position.y)
 		else:
-			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel)))
+			var ground := _wagon.position.y if (_wagon and _wagon.owns(reel)) else reel.position.y
+			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel), ground))
 
 	for i in _bag.size():
 		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
@@ -1555,6 +1564,18 @@ func _apply_test_args() -> void:
 			_player.global_position = zl.stations[0] + Vector3(0, 0.3, 1.5)
 			if parts.size() > 1:
 				_start_ride(zl, 0)
+	if opts.has("closeup"):
+		# Kamera nah an die Figur (für Bilder der Figur)
+		_player._spring.spring_length = 2.2
+		_player._pitch.rotation.x = -0.12
+	if opts.has("rigdump") and _player._skel:
+		var sk: Skeleton3D = _player._skel
+		for key: String in _player._bone:
+			var b: int = _player._bone[key]
+			var gp := sk.global_transform * sk.get_bone_global_pose(b)
+			print("RIG %-7s pose_y=%s  welt_pos=%s  relativ=%s" % [key, str(sk.get_bone_global_pose(b).basis.y.normalized().snapped(Vector3.ONE * 0.01)),
+				str(gp.origin.snapped(Vector3.ONE * 0.01)), str((_player.global_transform.affine_inverse() * gp.origin).snapped(Vector3.ONE * 0.01))])
+		print("RIG to_skel=", _player._to_skel)
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

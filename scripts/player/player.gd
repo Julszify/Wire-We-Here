@@ -51,6 +51,22 @@ const MODEL_PARTS := {
 	"ForearmR": ["Body/ArmR/ForearmR", ["Body/ArmR/ForearmR/Mesh", "Body/ArmR/ForearmR/Hand"]],
 }
 
+## Geriggtes Modell (Tripo3D, Mixamo-Skelett). Ist es vorhanden, ersetzt es die Einzelteile: die Knochen
+## werden per Code gestellt (Laufen, Arme, Wickel-Haltung), der linke Unterarm-Knochen trägt die Kabel-Wicklung.
+const RIG_PATH := "res://assets/models/player/tripo/admin_tripo.glb"
+## Modell ist ca. 1 m hoch und schaut nach +Z; Spielfigur ist ca. 1,75 m und schaut nach -Z
+const RIG_SCALE := 1.75
+## Beim Tripo-Rig hängt der Oberarm fast ganz am Schulter-Knochen (der Arm-Knochen ist sehr kurz),
+## deshalb werden Schulter und Arm gemeinsam ausgerichtet.
+const RIG_BONES := { "leg_l": "mixamorig_LeftUpLeg", "leg_r": "mixamorig_RightUpLeg",
+	"sh_l": "mixamorig_LeftShoulder", "sh_r": "mixamorig_RightShoulder", "arm_l": "mixamorig_LeftArm",
+	"arm_r": "mixamorig_RightArm", "fore_l": "mixamorig_LeftForeArm", "fore_r": "mixamorig_RightForeArm" }
+var _rig: Node3D
+var _skel: Skeleton3D
+var _bone: Dictionary = {}     # Kurzname -> Knochen-Index
+var _wiggle := 0.0             # kleine Wickelbewegung des Unterarms (wird per Tween gesetzt)
+var _to_skel := Basis()        # Richtungen vom Modell-Raum (+Z vorn, +X links) in den Skelett-Raum
+
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
 var _walk_phase := 0.0
@@ -63,7 +79,8 @@ var speed_factor := 1.0
 
 func _ready() -> void:
 	_spring.add_excluded_object(get_rid())
-	_apply_model()
+	if not _apply_rig():
+		_apply_model()
 	_update_arm_pose()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -217,8 +234,16 @@ func set_view_state(d: Dictionary) -> void:
 
 
 ## Globale Lage des Unterarms, um den das Kabel gewickelt wird
+## (Ursprung am Ellbogen, Hand Richtung -Z, außen Richtung -X)
 func arm_transform() -> Transform3D:
-	return _arm.global_transform
+	if _skel == null:
+		return _arm.global_transform
+	var elbow := _skel.global_transform * _skel.get_bone_global_pose(_bone["fore_l"])
+	var hand_dir := elbow.basis.y.normalized()
+	var z := -hand_dir
+	var x := Vector3.UP.cross(z).normalized()
+	var y := z.cross(x).normalized()
+	return Transform3D(Basis(x, y, z), elbow.origin)
 
 
 ## Platz Nr. `index` für ein Knäuel am Rücken (Tasche): drei nebeneinander, weitere dahinter
@@ -243,6 +268,88 @@ func _animate_walk(delta: float, speed: float, walk_speed: float) -> void:
 	# Linker Arm schwingt nur ohne Kabel; mit Kabel bleibt er ruhig
 	var left := 0.0 if holding else swing * 0.8
 	_arm_l.rotation.x = lerpf(_arm_l.rotation.x, left, k)
+	if _skel:
+		_pose_rig()
+
+
+## Geriggtes Modell laden und unter den Körper hängen; Grundformen ausblenden. false, wenn es fehlt.
+func _apply_rig() -> bool:
+	if not ResourceLoader.exists(RIG_PATH):
+		return false
+	var scene := load(RIG_PATH) as PackedScene
+	if scene == null:
+		return false
+	_rig = scene.instantiate() as Node3D
+	var skels := _rig.find_children("*", "Skeleton3D", true, false)
+	if skels.is_empty():
+		_rig.free()
+		return false
+	_skel = skels[0]
+	for key: String in RIG_BONES:
+		_bone[key] = _skel.find_bone(String(RIG_BONES[key]))
+		if int(_bone[key]) < 0:
+			push_warning("Figur-Skelett: Knochen %s fehlt" % RIG_BONES[key])
+			_rig.free()
+			_skel = null
+			return false
+	# Das Skelett kann im Modell gedreht sein: Basis vom Skelett bis zur Modell-Wurzel aufmultiplizieren
+	var chain := Basis()
+	var n: Node = _skel
+	while n != _rig and n != null:
+		if n is Node3D:
+			chain = (n as Node3D).transform.basis * chain
+		n = n.get_parent()
+	_to_skel = chain.orthonormalized().inverse()
+	_rig.name = "Rig"
+	_rig.rotation.y = PI
+	_rig.scale = Vector3.ONE * RIG_SCALE
+	for mi in _body.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).visible = false
+	_body.add_child(_rig)
+	_pose_rig()
+	return true
+
+
+## Knochen so drehen, dass ihre Längsachse (Y) in `dir` zeigt (Richtung im Modell-Raum: +Z vorn, +X links)
+func _aim_bone(bone: int, dir: Vector3) -> void:
+	var rest := _skel.get_bone_global_rest(bone)
+	var q := Quaternion(rest.basis.y.normalized(), (_to_skel * dir).normalized())
+	var want := Basis(q) * rest.basis
+	var parent := _skel.get_bone_parent(bone)
+	var parent_basis := _skel.get_bone_global_pose(parent).basis if parent >= 0 else Basis.IDENTITY
+	_skel.set_bone_pose_rotation(bone, Quaternion((parent_basis.inverse() * want).orthonormalized()))
+
+
+## Pose aus Laufen und Haltung: Beine und Arme schwingen, Arme hängen am Körper, mit Kabel zeigt der
+## linke Unterarm waagerecht nach vorn (leicht nach außen), damit das Kabel darum gewickelt werden kann.
+func _pose_rig() -> void:
+	var swing := _leg_l.rotation.x  # Schwung aus _animate_walk (Bogenmaß)
+	var arm_swing := _arm_r.rotation.x
+	_aim_bone(_bone["leg_l"], Vector3(0.05, -cos(swing), -sin(swing)))
+	_aim_bone(_bone["leg_r"], Vector3(-0.05, -cos(swing), sin(swing)))
+	# Arme nur mäßig absenken: bei steilerem Winkel verschwindet der Oberarm im runden Bauch
+	var up_r := Vector3(-0.6, -0.8 * cos(arm_swing), -0.8 * sin(arm_swing))
+	_aim_bone(_bone["sh_r"], up_r)
+	_aim_bone(_bone["arm_r"], up_r)
+	_aim_bone(_bone["fore_r"], Vector3(-0.35, -0.85, 0.3 - sin(arm_swing) * 0.5))
+	if riding:
+		# An der Seilbahn: beide Arme nach oben zum Laufwagen
+		for side in [["sh_l", "arm_l", "fore_l", 1.0], ["sh_r", "arm_r", "fore_r", -1.0]]:
+			var up := Vector3(0.25 * float(side[3]), 1.0, 0.05)
+			_aim_bone(_bone[side[0]], up)
+			_aim_bone(_bone[side[1]], up)
+			_aim_bone(_bone[side[2]], Vector3(-0.1 * float(side[3]), 1.0, 0.0))
+	elif holding:
+		_aim_bone(_bone["sh_l"], Vector3(0.62, -0.75, 0.2))
+		_aim_bone(_bone["arm_l"], Vector3(0.62, -0.75, 0.2))
+		var fwd := Vector3(sin(deg_to_rad(30)), 0.08 + _wiggle, cos(deg_to_rad(30)))
+		_aim_bone(_bone["fore_l"], fwd)
+	else:
+		var left_swing := _arm_l.rotation.x
+		var up_l := Vector3(0.6, -0.8 * cos(left_swing), 0.8 * sin(left_swing))
+		_aim_bone(_bone["sh_l"], up_l)
+		_aim_bone(_bone["arm_l"], up_l)
+		_aim_bone(_bone["fore_l"], Vector3(0.35, -0.85, 0.3 + sin(left_swing) * 0.5))
 
 
 func _apply_model() -> void:
@@ -281,6 +388,13 @@ func _update_arm_pose() -> void:
 
 func _wiggle_arm() -> void:
 	if not holding:
+		return
+	if _skel:
+		if _arm_tween:
+			_arm_tween.kill()
+		_arm_tween = create_tween()
+		_arm_tween.tween_property(self, "_wiggle", 0.35, 0.06)
+		_arm_tween.tween_property(self, "_wiggle", 0.0, 0.12)
 		return
 	# Kleine Wickelbewegung pro Tastendruck
 	if _arm_tween:

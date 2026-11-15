@@ -34,6 +34,27 @@ func setup(reel: ReelData) -> void:
 	_add_cylinder(_spin, drum_r, drum_h, Vector3(0, 0.15 * k + drum_h * 0.5, 0), metal)
 	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.12 * k, 0), flange_mat)
 	_add_cylinder(_spin, flange_r, 0.06, Vector3(0, 0.18 * k + drum_h, 0), flange_mat)
+	# Speichen auf beiden Flanschen und ein heller Streifen auf der Trommel: man sieht das Drehen
+	var spoke_mat := _material(flange_color.darkened(0.45), 0.6, 0.0)
+	var stripe_mat := _material(Color(0.95, 0.95, 0.92), 0.4, 0.0)
+	for y in [0.12 * k + 0.035, 0.18 * k + drum_h + 0.035]:
+		for i in 3:
+			var spoke := MeshInstance3D.new()
+			var sm := BoxMesh.new()
+			sm.size = Vector3(flange_r * 1.9, 0.02, 0.07 * maxf(k, 0.6))
+			spoke.mesh = sm
+			spoke.material_override = spoke_mat
+			spoke.position = Vector3(0, y, 0)
+			spoke.rotation.y = i * PI / 3.0
+			_spin.add_child(spoke)
+		_add_cylinder(_spin, 0.09 * maxf(k, 0.6), 0.04, Vector3(0, y + 0.005, 0), stripe_mat)
+	var stripe := MeshInstance3D.new()
+	var st := BoxMesh.new()
+	st.size = Vector3(0.05, drum_h * 0.96, 0.12 * maxf(k, 0.6))
+	stripe.mesh = st
+	stripe.material_override = stripe_mat
+	stripe.position = Vector3(drum_r + 0.005, 0.15 * k + drum_h * 0.5, 0)
+	_spin.add_child(stripe)
 	if reel.kind == ReelData.Kind.WAGON:
 		return
 

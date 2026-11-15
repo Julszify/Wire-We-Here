@@ -145,7 +145,7 @@
 			"count": 70,
 			"inner_m": 46.0,
 			"outer_m": 63.0,
-			"models": ["TreeRound", "TreeRound", "TreePine", "Bush", "Bush", "Planter"]
+			"models": ["TreeRound", "TreeRound", "TreeRound", "TreePine", "TreeAutumn", "Bush", "Bush", "Planter", "Rock"]
 		}
 	},
 	"important_count": 20,

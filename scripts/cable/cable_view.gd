@@ -9,6 +9,10 @@ var _plug_mat: StandardMaterial3D
 var _label: Label3D
 ## Drehung der Stecker um die Kabelachse (aus dem Seed, damit nicht alle gleich liegen)
 var _plug_roll := 0.0
+## Spannung des Verbindungsstücks (0 locker … 1 straff) und Zittern am Knoten; nur Darstellung
+var tension := 0.0
+var jitter := 0.0
+var _time := 0.0
 
 
 func setup(cable: CableData) -> void:
@@ -46,15 +50,26 @@ func show_in_heap() -> void:
 
 ## Form an einer Rolle. Nur für aktive Kabel pro Frame aufrufen.
 ## Gibt den Drehwinkel der Rolle zurück.
-func show_on_reel(reel_pos: Vector3, scale: float = 1.0) -> float:
-	var shape := CableShape.build_on_reel(data, reel_pos, scale)
+func show_on_reel(reel_pos: Vector3, scale: float = 1.0, ground_y: float = NAN) -> float:
+	var shape := CableShape.build_on_reel(data, reel_pos, scale, CableShape.look(tension, jitter, _time, ground_y))
 	_build(shape["points"])
 	return shape["phase"]
 
 
 ## Form um den Arm der Spielfigur gewickelt.
-func show_on_arm(arm: Transform3D) -> void:
-	_build(CableShape.build_on_arm(data, arm))
+func show_on_arm(arm: Transform3D, ground_y: float = NAN) -> void:
+	_build(CableShape.build_on_arm(data, arm, CableShape.look(tension, jitter, _time, ground_y)))
+
+
+## Spannung nachführen: `target` 1 = wird gerade gezogen, 0 = locker; `stuck` = hängt am Knoten
+func update_tension(target: float, stuck: bool, delta: float) -> void:
+	var c: Dictionary = Balancing.connector
+	_time += delta
+	if stuck:
+		target = 1.0
+	var rate := 1.0 / maxf(float(c.get("tension_up_s" if target > tension else "tension_down_s", 0.3)), 0.01)
+	tension = move_toward(tension, target, rate * delta)
+	jitter = move_toward(jitter, 1.0 if stuck else 0.0, 4.0 * delta)
 
 
 ## Ausblenden nach dem Fertigstellen (0 = unsichtbar, 1 = voll sichtbar).

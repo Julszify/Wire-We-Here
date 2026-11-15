@@ -1,4 +1,5 @@
 {
+	"_kommentar_kit": "blockout.kit = Gebäude-Bausatz (assets/models/buildings/kit.glb): facade = Fassadenstil (grid, office, altstadt, shop, warehouse, datacenter, tower), roofs = [Dach, Gewicht], props = Dachaufbauten auf Flachdächern [Teil, Gewicht], *_palette = Farben, *_chance = Anteil der Gebäude mit Markise, Ladenschild, Leuchtschild, Schornstein, Hubschrauberlandeplatz.",
 	"_kommentar": "Grobe Anordnung der Stadt (2048 x 2048 m). x nach Osten, z nach Süden, Meer im Süden, Meeresspiegel y = 0. Viertel sind abgerundete Rechtecke, deren Boden auf 'height' eingeebnet wird; 'edge' = Breite des Übergangs (Rampe) in Metern. Reihenfolge = Spielreihenfolge.",
 	"size_m": 2048,
 	"vertex_spacing_m": 2.0,
@@ -38,6 +39,7 @@
 			"height_m": 33,
 			"edge_m": 120,
 			"blockout": {
+				"kit": {"facade": "office", "roofs": [["RoofParapet", 1]], "roof_palette": ["#aeb8c3", "#9eaab7"], "props": [["AcUnit", 3], ["SolarPanels", 2], ["VentStack", 1], ["Dish", 1]], "prop_density": 1.0},
 				"palette": ["#e9eef4", "#cfe0f2", "#dfe6ee", "#b9d3ee", "#f1f3f5"],
 				"style": "grid",
 				"block_m": 90,
@@ -102,6 +104,7 @@
 			"height_m": 9,
 			"edge_m": 70,
 			"blockout": {
+				"kit": {"facade": "altstadt", "roofs": [["RoofGable", 4], ["RoofHip", 1], ["RoofMansard", 2]], "roof_palette": ["#b8533c", "#a5452f", "#8b5a44", "#5c6470", "#c0653f"], "chimney_chance": 0.6, "awning_chance": 0.45, "awning_palette": ["#c94b3c", "#3c7a5a", "#2f5f9e", "#d9a441", "#7a4a8c"]},
 				"palette": ["#e8c9a0", "#d9a57c", "#f0dcb8", "#c98b6b", "#e6d3c0", "#b97a5e"],
 				"style": "grid",
 				"block_m": 45,
@@ -146,6 +149,7 @@
 			"height_m": 11,
 			"edge_m": 70,
 			"blockout": {
+				"kit": {"facade": "shop", "roofs": [["RoofParapet", 1]], "roof_palette": ["#3c4466", "#4a4f6e", "#2f3550"], "props": [["Billboard", 2], ["AcUnit", 2], ["Dish", 1], ["Antenna", 0.5]], "neon_chance": 0.7, "shop_sign_chance": 0.8, "neon_palette": ["#ff4fd8", "#4ff0ff", "#ffd84f", "#7cff6b", "#b26bff", "#ff7a3c"]},
 				"palette": ["#8f7fd6", "#4fb3b0", "#e06aa6", "#5b6bd0", "#3c4466", "#f2c14e"],
 				"style": "grid",
 				"block_m": 55,
@@ -167,6 +171,7 @@
 			"height_m": 14,
 			"edge_m": 80,
 			"blockout": {
+				"kit": {"facade": "tower", "roofs": [["RoofParapet", 1]], "roof_palette": ["#8f9db0", "#7f8ea3"], "props": [["AcUnit", 3], ["Antenna", 1], ["VentStack", 1], ["Dish", 0.5]], "prop_density": 0.6, "helipad_min_h": 60, "helipad_chance": 0.45},
 				"palette": ["#b8c6d6", "#9fb3c8", "#d5dde6", "#8aa2bd", "#c7d4e2"],
 				"style": "towers",
 				"block_m": 85,
@@ -188,6 +193,7 @@
 			"height_m": 6,
 			"edge_m": 70,
 			"blockout": {
+				"kit": {"facade": "warehouse", "roofs": [["RoofSawtooth", 2], ["RoofParapet", 1]], "roof_palette": ["#7d8790", "#8c949d", "#9a8a6c"], "props": [["VentStack", 2], ["Skylight", 2], ["AcUnit", 1]], "prop_density": 0.5},
 				"palette": ["#d8cdb4", "#b9c2a8", "#e3d9c4", "#c4b89c"],
 				"style": "warehouse",
 				"block_m": 110,
@@ -222,6 +228,7 @@
 			"height_m": 3,
 			"edge_m": 60,
 			"blockout": {
+				"kit": {"facade": "warehouse", "roofs": [["RoofSawtooth", 2], ["RoofGable", 1]], "roof_palette": ["#c0503f", "#3f7fb5", "#9aa2aa", "#d9a441"], "props": [["VentStack", 1]]},
 				"palette": ["#c0503f", "#3f7fb5", "#d9a441", "#4f8f6a", "#b8bcc2"],
 				"style": "harbor",
 				"h_min": 10,
@@ -238,6 +245,7 @@
 			"height_m": -1,
 			"edge_m": 0,
 			"blockout": {
+				"kit": {"facade": "datacenter", "roofs": [["RoofParapet", 1]], "roof_palette": ["#76838d", "#8a96a0"], "props": [["AcUnit", 4], ["VentStack", 2], ["Dish", 1]], "prop_density": 1.4},
 				"palette": ["#9aa7b0", "#b5bec6", "#7f8c96"],
 				"style": "crater",
 				"h_min": 8,

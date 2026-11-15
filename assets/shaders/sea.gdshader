@@ -1,6 +1,6 @@
 shader_type spatial;
 // Meer im Spielzeug-Look: zwei wandernde Wellenmuster als Normalen, heller am Ufer (flaches Wasser).
-render_mode blend_mix, depth_draw_opaque, cull_back;
+render_mode blend_mix, depth_draw_opaque, cull_back, specular_toon;
 
 uniform vec3 deep_color : source_color = vec3(0.06, 0.3, 0.55);
 uniform vec3 shallow_color : source_color = vec3(0.2, 0.62, 0.72);

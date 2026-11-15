@@ -24,6 +24,14 @@ const DEFAULT_PALETTE := ["#d9dde3", "#c9d3df", "#e6e1d6", "#cfd8d2"]
 const HOUSES_PATH := "res://assets/models/buildings/houses.glb"
 var _house_meshes: Array[Mesh] = []
 var _house_material: StandardMaterial3D
+## Gebäude-Bausatz aus Blender (tools/blender/building_kit.py): Dächer, Aufbauten, Markisen, Schilder
+const KIT_PATH := "res://assets/models/buildings/kit.glb"
+const KIT_SHADER := "res://assets/shaders/kit.gdshader"
+## Fassadenstil (blockout.gdshader, UV2.x) je Name aus world.json → blockout.kit.facade
+const FACADES := { "grid": 0, "office": 1, "altstadt": 2, "shop": 3, "warehouse": 4, "datacenter": 5, "tower": 6 }
+var _kit_meshes: Dictionary = {}  # Teilname -> Mesh
+var _kit_material: ShaderMaterial
+var kit_count := 0
 
 
 func build(world_layout: WorldLayout) -> void:
@@ -113,6 +121,8 @@ func _build_district(d: Dictionary) -> void:
 	# Viertel mit "models": "houses" bekommen Hausmodelle statt grauer Kisten (Kollision bleibt die Kiste)
 	if String(bo.get("models", "")) == "houses" and _load_houses():
 		ctx["houses"] = []
+	elif bo.has("kit") and _load_kit():
+		ctx["kit"] = {}
 	if d.has("wall"):
 		_build_wall(ctx)
 	match String(bo.get("style", "grid")):
@@ -131,6 +141,8 @@ func _build_district(d: Dictionary) -> void:
 	add_child(body)
 	if ctx.has("houses"):
 		_build_houses(body, ctx["houses"])
+	if ctx.has("kit"):
+		_build_kit(body, ctx["kit"])
 
 
 ## Hausmodelle laden (einmal); false, wenn die Datei fehlt
@@ -277,7 +289,11 @@ func _lot(ctx: Dictionary, r: Rect2, height: float, edge: int = 1) -> void:
 	var box_size := Vector3(r.size.x, height + BASE_DEPTH, r.size.y)
 	building_count += 1
 	if not ctx.has("houses"):
-		_box(ctx, box_center, box_size, color, true, Vector2(y, height))
+		var kit: Dictionary = ctx["bo"].get("kit", {}) if ctx.has("bo") else {}
+		var facade := float(FACADES.get(String(kit.get("facade", "grid")), 0))
+		_box(ctx, box_center, box_size, color, true, Vector2(y, height), Vector2(facade, 0.0))
+		if ctx.has("kit"):
+			_decorate(ctx, r, y, height, edge)
 		return
 	# Hausmodell: Kollision als Kiste, Darstellung als Instanz im MultiMesh
 	_collider(ctx, box_center, box_size)
@@ -288,6 +304,138 @@ func _lot(ctx: Dictionary, r: Rect2, height: float, edge: int = 1) -> void:
 	var variant := posmod(hash([roundi(center.x), roundi(center.y)]), _house_meshes.size())
 	var tint := 0.82 + (shade - 0.66) / 0.16 * 0.18
 	(ctx["houses"] as Array).append([variant, Transform3D(basis, Vector3(center.x, y, center.y)), Color(tint, tint, tint)])
+
+
+# ---------------------------------------------------------------- Bausatz
+
+func _load_kit() -> bool:
+	if not _kit_meshes.is_empty():
+		return true
+	if not ResourceLoader.exists(KIT_PATH):
+		return false
+	var scene := load(KIT_PATH) as PackedScene
+	if scene == null:
+		return false
+	var root := scene.instantiate()
+	for child in root.find_children("*", "MeshInstance3D", true, false):
+		_kit_meshes[String(child.name)] = (child as MeshInstance3D).mesh
+	root.free()
+	_kit_material = ShaderMaterial.new()
+	_kit_material.shader = load(KIT_SHADER)
+	return not _kit_meshes.is_empty()
+
+
+func _kit_add(ctx: Dictionary, part: String, xf: Transform3D, color := Color.WHITE) -> void:
+	if not _kit_meshes.has(part):
+		return
+	var kit: Dictionary = ctx["kit"]
+	if not kit.has(part):
+		kit[part] = []
+	(kit[part] as Array).append([xf, color])
+	kit_count += 1
+
+
+## Gewichtete Auswahl aus [[Name, Gewicht], …] mit einer Zufallszahl 0..1
+static func _pick(list: Array, x: float) -> String:
+	var total := 0.0
+	for e: Array in list:
+		total += float(e[1])
+	x *= total
+	for e: Array in list:
+		x -= float(e[1])
+		if x <= 0.0:
+			return String(e[0])
+	return String(list[-1][0])
+
+
+static func _pick_color(list: Array, x: float, fallback: Color) -> Color:
+	if list.is_empty():
+		return fallback
+	return Color.html(String(list[clampi(int(x * list.size()), 0, list.size() - 1)]))
+
+
+## Dach, Dachaufbauten und Fassadenschmuck für ein Gebäude (Regeln aus blockout.kit in world.json).
+## `edge` = Blockseite, an der das Gebäude steht; die Vorderseite zeigt zur Straße.
+func _decorate(ctx: Dictionary, r: Rect2, y: float, height: float, edge: int) -> void:
+	var kit: Dictionary = ctx["bo"]["kit"]
+	var rng := RandomNumberGenerator.new()
+	var c2 := r.get_center()
+	rng.seed = hash([roundi(c2.x * 10.0), roundi(c2.y * 10.0), "kit"])
+	var angle: float = [PI, 0.0, -PI * 0.5, PI * 0.5][edge]
+	var rot := Basis(Vector3.UP, angle)
+	var along := r.size.x if edge < 2 else r.size.y
+	var deep := r.size.y if edge < 2 else r.size.x
+	var top := y + height
+	var center := Vector3(c2.x, top, c2.y)
+	var front := rot * Vector3(0, 0, 1)
+	var side := rot * Vector3(1, 0, 0)
+
+	# Dach
+	var roof := _pick(kit.get("roofs", [["RoofParapet", 1]]), rng.randf())
+	var roof_col := _pick_color(kit.get("roof_palette", []), rng.randf(), Color(0.85, 0.86, 0.88))
+	var roof_h := 1.0
+	match roof:
+		"RoofGable", "RoofHip", "RoofMansard":
+			roof_h = clampf(minf(along, deep) * 0.38, 2.5, 7.0)
+		"RoofSawtooth":
+			roof_h = 2.4
+	_kit_add(ctx, roof, Transform3D(rot * Basis.from_scale(Vector3(along, roof_h, deep)), center), roof_col)
+	var flat := roof == "RoofParapet"
+
+	# Aufbauten auf Flachdächern (Anzahl nach Fläche), Schornsteine auf geneigten Dächern
+	var props: Array = kit.get("props", [])
+	if flat and not props.is_empty() and along > 6.0 and deep > 6.0:
+		var n := clampi(int(along * deep / 140.0 * float(kit.get("prop_density", 1.0))), 1, 7)
+		for i in n:
+			var part := _pick(props, rng.randf())
+			var p := center + side * rng.randf_range(-along * 0.5 + 2.5, along * 0.5 - 2.5) \
+				+ front * rng.randf_range(-deep * 0.5 + 2.5, deep * 0.5 - 2.5) + Vector3(0, 0.08, 0)
+			var turn := Basis(Vector3.UP, angle + PI * 0.5 * rng.randi_range(0, 3))
+			if part == "Billboard":
+				# Werbetafel an der Straßenseite, Bild zur Straße
+				p = center + front * (deep * 0.5 - 1.5) + side * rng.randf_range(-along * 0.25, along * 0.25)
+				turn = Basis(Vector3.UP, angle + PI)
+			_kit_add(ctx, part, Transform3D(turn, p), _pick_color(kit.get("neon_palette", []), rng.randf(), Color.WHITE))
+	elif not flat and rng.randf() < float(kit.get("chimney_chance", 0.0)):
+		var cp := center + side * rng.randf_range(-along * 0.3, along * 0.3) + front * deep * 0.12
+		cp.y += roof_h * 0.55
+		_kit_add(ctx, "Chimney", Transform3D(rot, cp))
+	if flat and height > float(kit.get("helipad_min_h", 9999.0)) and rng.randf() < float(kit.get("helipad_chance", 0.0)) \
+			and minf(along, deep) > 14.0:
+		_kit_add(ctx, "Helipad", Transform3D(rot, center + Vector3(0, 0.1, 0)))
+
+	# Erdgeschoss zur Straße: Markise und Ladenschild, Leuchtschild an der Ecke
+	var facade := center - Vector3(0, height, 0) + front * deep * 0.5
+	if rng.randf() < float(kit.get("awning_chance", 0.0)):
+		var w := along * rng.randf_range(0.5, 0.8)
+		_kit_add(ctx, "Awning", Transform3D(rot * Basis.from_scale(Vector3(w, 0.9, 1.4)), facade + Vector3(0, 2.7, 0)),
+			_pick_color(kit.get("awning_palette", []), rng.randf(), Color(0.8, 0.3, 0.25)))
+	if rng.randf() < float(kit.get("shop_sign_chance", 0.0)):
+		_kit_add(ctx, "ShopSign", Transform3D(rot * Basis.from_scale(Vector3(along * 0.6, 0.9, 1.0)),
+			facade + Vector3(0, 3.5, 0)), _pick_color(kit.get("neon_palette", []), rng.randf(), Color.WHITE))
+	if height > 8.0 and rng.randf() < float(kit.get("neon_chance", 0.0)):
+		var corner := facade + side * along * 0.5 * (1.0 if rng.randf() < 0.5 else -1.0) * 0.85
+		_kit_add(ctx, "NeonSign", Transform3D(rot, corner + Vector3(0, rng.randf_range(4.5, minf(height - 4.0, 9.0)), 0)),
+			_pick_color(kit.get("neon_palette", []), rng.randf(), Color.WHITE))
+
+
+## Ein MultiMesh je Bausatz-Teil
+func _build_kit(parent: Node3D, kit: Dictionary) -> void:
+	for part: String in kit:
+		var list: Array = kit[part]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_custom_data = true
+		mm.mesh = _kit_meshes[part]
+		mm.instance_count = list.size()
+		for i in list.size():
+			mm.set_instance_transform(i, list[i][0])
+			mm.set_instance_custom_data(i, list[i][1])  # Farbe je Gebäude (kit.gdshader)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Kit_%s" % part
+		mmi.multimesh = mm
+		mmi.material_override = _kit_material
+		parent.add_child(mmi)
 
 
 func _is_kept_free(bo: Dictionary, cell: Rect2) -> bool:
@@ -346,8 +494,15 @@ func _style_stadium(ctx: Dictionary) -> void:
 	var y: float = ctx["y"]
 	var h := float(ctx["bo"]["h_max"])
 	var field := Vector2(110, 75)
+	if _load_kit():
+		ctx["kit"] = {}
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				var corner := Vector3(c.x + sx * (field.x * 0.5 + 34.0), y, c.y + sz * (field.y * 0.5 + 34.0))
+				_kit_add(ctx, "Floodlight", Transform3D(Basis(Vector3.UP, atan2(sx, sz) + PI), corner))
 	var stand := 28.0
-	var grey := Color(0.7, 0.7, 0.73)
+	var grey := Color(0.88, 0.88, 0.9)
+	var seats := Color(0.85, 0.27, 0.22)
 	# Spielfeld (grün, ohne Kollision)
 	_box(ctx, Vector3(c.x, y + 0.05, c.y), Vector3(field.x, 0.2, field.y), Color(0.3, 0.55, 0.3), false)
 	# Tribünen als gestufte Kisten (zwei Stufen je Seite, außen höher)
@@ -355,10 +510,11 @@ func _style_stadium(ctx: Dictionary) -> void:
 		var off := stand * (0.25 + 0.5 * step)
 		var sh := h * (0.55 + 0.45 * step)
 		for side in [-1.0, 1.0]:
+			var col := seats if step == 0 else grey
 			_solid(ctx, Vector3(c.x, y + sh * 0.5, c.y + side * (field.y * 0.5 + off)),
-				Vector3(field.x + stand * 2.0, sh, stand * 0.5), grey)
+				Vector3(field.x + stand * 2.0, sh, stand * 0.5), col)
 			_solid(ctx, Vector3(c.x + side * (field.x * 0.5 + off), y + sh * 0.5, c.y),
-				Vector3(stand * 0.5, sh, field.y), grey)
+				Vector3(stand * 0.5, sh, field.y), col)
 
 
 ## Hafen: Lagerhallen in einer Reihe, Kräne an der Kaimauer
@@ -415,12 +571,22 @@ func _build_landmarks() -> void:
 		var size := Vector3(float(s[0]), float(s[1]), float(s[2]))
 		var y := layout.height(pos.x, pos.y)
 		_box(ctx, Vector3(pos.x, y + (size.y - BASE_DEPTH) * 0.5, pos.y), size + Vector3(0, BASE_DEPTH, 0),
-			Color(0.35, 0.6, 0.9, 0.5), true, Vector2(y, size.y))
+			Color(0.35, 0.6, 0.9, 0.5), true, Vector2(y, size.y), Vector2(FACADES["tower"], 0.0))
+		if _load_kit():
+			if not ctx.has("kit"):
+				ctx["kit"] = {}
+			var roof_y := y + size.y
+			_kit_add(ctx, "RoofParapet", Transform3D(Basis.from_scale(Vector3(size.x, 1.2, size.z)), Vector3(pos.x, roof_y, pos.y)),
+				Color(0.85, 0.9, 0.95))
+			_kit_add(ctx, "Antenna", Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 2.5), Vector3(pos.x + 6.0, roof_y, pos.y - 6.0)))
+			_kit_add(ctx, "Helipad", Transform3D(Basis.IDENTITY, Vector3(pos.x - 4.0, roof_y + 0.1, pos.y + 4.0)))
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = _material
 	body.add_child(mi)
 	add_child(body)
+	if ctx.has("kit"):
+		_build_kit(body, ctx["kit"])
 
 
 # ---------------------------------------------------------------- Kisten

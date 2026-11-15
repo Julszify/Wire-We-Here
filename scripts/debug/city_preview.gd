@@ -25,6 +25,7 @@ func _ready() -> void:
 	city.name = "City"
 	add_child(city)
 	city.build(Vector3.ZERO, _player)
+	ToonLook.install(self, _player.camera)
 	layout = city.layout
 	terrain = city.terrain
 	print("STADT erzeugt in %d ms (%d Gebäude)" % [Time.get_ticks_msec() - t0, city.blockout.building_count])
@@ -96,6 +97,23 @@ func _apply_args() -> void:
 				cam.global_position = Vector3(0, 1100, 1700)
 				cam.look_at(Vector3(0, 0, -150))
 				cam.current = true
+				_label.visible = false
+			"cam":
+				# Freie Kamera: --cam=<x>,<z>,<Höhe über Boden>,<Ziel-x>,<Ziel-z> (Koordinaten wie world.json)
+				var v := String(kv[1]).split(",")
+				var cam := Camera3D.new()
+				add_child(cam)
+				cam.far = 3000.0
+				cam.fov = 60.0
+				var layout := WorldLayout.load_default()
+				var gx := float(v[0])
+				var gz := float(v[1])
+				cam.global_position = Vector3(gx, layout.height(gx, gz) + float(v[2]), gz)
+				var tx := float(v[3])
+				var tz := float(v[4])
+				cam.look_at(Vector3(tx, layout.height(tx, tz), tz))
+				cam.current = true
+				ToonLook.add_outline(cam)
 				_label.visible = false
 
 

@@ -1,7 +1,7 @@
 class_name CordView
 extends Node3D
 ## C.O.R.D.: schwebende Figur mit Leuchtteilen, folgt dem Spieler.
-## Verwendet das Modell unter MODEL_PATH (Blender-Entwurf „Server-Box“), sonst einen Platzhalter.
+## Verwendet das Tripo-Modell (TRIPO_PATH), sonst den Blender-Entwurf „Server-Box“ (MODEL_PATH), sonst einen Platzhalter.
 ## Alle Teile mit dem Material „CordRing“ leuchten cyan; während der Bestellfrage blinken sie rot.
 
 var _ring_mat: StandardMaterial3D
@@ -13,6 +13,13 @@ var _t := 0.0
 const CALM := Color(0.3, 0.9, 1.0)
 const ALARM := Color(1.0, 0.2, 0.15)
 const MODEL_PATH := "res://assets/models/cord/cord_server.glb"
+## In Tripo3D erzeugtes Modell (eine Textur, ca. 1 m hoch). Hat Vorrang; der Leuchtring liegt dort in der
+## Textur, deshalb kommt ein eigenes Leuchtband darüber, das blinken kann.
+const TRIPO_PATH := "res://assets/models/cord/tripo/cord_tripo.glb"
+const TRIPO_HEIGHT := 0.8
+## Lage des Bands im Modell (Anteil der Höhe von unten) und seine Höhe (Anteil der Höhe)
+const TRIPO_BAND_Y := 0.43
+const TRIPO_BAND_H := 0.11
 const RING_MATERIAL := "CordRing"
 
 
@@ -26,7 +33,7 @@ func _ready() -> void:
 	_ring_mat.emission = CALM
 	_ring_mat.emission_energy_multiplier = 3.0
 
-	if not _build_model():
+	if not _build_tripo() and not _build_model():
 		_build_placeholder()
 
 	_speech = Label3D.new()
@@ -58,6 +65,44 @@ func _build_model() -> bool:
 	_body.add_child(holder)
 	model.position = -_mesh_aabb(model, Transform3D.IDENTITY).get_center()
 	_swap_ring_materials(model)
+	return true
+
+
+## Tripo-Modell laden, auf TRIPO_HEIGHT verkleinern, zentrieren, Leuchtband darüberlegen
+func _build_tripo() -> bool:
+	if not ResourceLoader.exists(TRIPO_PATH):
+		return false
+	var scene := load(TRIPO_PATH) as PackedScene
+	if scene == null:
+		return false
+	var model: Node3D = scene.instantiate()
+	var box := _mesh_aabb(model, Transform3D.IDENTITY)
+	if box.size.y <= 0.0:
+		model.free()
+		return false
+	var k := TRIPO_HEIGHT / box.size.y
+	var holder := Node3D.new()
+	holder.rotation = Vector3(0, PI, 0)
+	holder.scale = Vector3.ONE * k
+	holder.add_child(model)
+	_body.add_child(holder)
+	model.position = -box.get_center()
+	# Leuchtband: vier flache Leisten knapp außerhalb des Gehäuses (im Modell-Raum, vor dem Verkleinern)
+	var y := box.position.y + box.size.y * TRIPO_BAND_Y - box.get_center().y
+	var h := box.size.y * TRIPO_BAND_H
+	var hx := box.size.x * 0.5 * 0.955
+	var hz := box.size.z * 0.5 * 0.955
+	var t := 0.012
+	for spec in [[Vector3(0, y, hz), Vector3(hx * 2.0, h, t)], [Vector3(0, y, -hz), Vector3(hx * 2.0, h, t)],
+			[Vector3(hx, y, 0), Vector3(t, h, hz * 2.0)], [Vector3(-hx, y, 0), Vector3(t, h, hz * 2.0)]]:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = spec[1]
+		bm.material = _ring_mat
+		mi.mesh = bm
+		mi.position = spec[0]
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(mi)
 	return true
 
 
