@@ -41,6 +41,8 @@ static func _setup_textures(t: Terrain3D, layout: WorldLayout) -> bool:
 		ta.albedo_texture = alb
 		ta.normal_texture = nrm
 		ta.uv_scale = float(e.get("uv_scale", 0.1))
+		if e.has("tint"):
+			ta.albedo_color = Color(e["tint"])  # dunkelt helle Bodenbilder ab
 		if e.get("detiling", false):
 			ta.detiling_rotation = 0.3
 			ta.detiling_shift = 0.3

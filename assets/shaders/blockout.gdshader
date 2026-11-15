@@ -14,11 +14,32 @@ uniform vec3 glass_dark : source_color = vec3(0.13, 0.22, 0.36);
 uniform vec3 glass_light : source_color = vec3(0.5, 0.72, 0.92);
 uniform vec3 line_color : source_color = vec3(0.92, 0.9, 0.82);
 
+// Fassadentexturen je Stil (gesetzt von CityBlockout, siehe FACADE_TEXTURES). size_* = Kachelgröße in Metern.
+// Helle, kaum bunte Stellen (Putz, Blech) werden mit der Gebäudefarbe eingefärbt, der Rest (Glas, Holz) bleibt.
+uniform float wall_ref = 0.62;
+#define FACADE(n) uniform bool has_##n = false; uniform vec2 size_##n = vec2(3.0); uniform sampler2D tex_##n : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+FACADE(office)
+FACADE(altstadt)
+FACADE(altstadt_ground)
+FACADE(shop)
+FACADE(shop_ground)
+FACADE(warehouse)
+FACADE(rolltor)
+FACADE(datacenter)
+FACADE(tower)
+
 varying vec3 lpos;
 varying vec3 lnormal;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
+}
+
+vec3 facade_color(vec3 t, vec3 base) {
+	float mx = max(t.r, max(t.g, t.b));
+	float sat = (mx - min(t.r, min(t.g, t.b))) / max(mx, 0.001);
+	float wall = (1.0 - smoothstep(0.22, 0.4, sat)) * smoothstep(0.3, 0.5, mx);
+	return mix(t, base * t / wall_ref, wall);
 }
 
 void vertex() {
@@ -104,10 +125,53 @@ void fragment() {
 				// Hochhaus: Brüstungsbänder zwischen den Glasreihen
 				col = mix(col, base * 0.85, (1.0 - win) * step(ground_h, h));
 			}
+			// Fassadentextur statt gezeichneter Fenster (nur ganze Kachelreihen, darüber glatte Wand)
+			bool has_up = (style == 1 && has_office) || (style == 2 && has_altstadt) || (style == 3 && has_shop)
+				|| (style == 4 && has_warehouse) || (style == 5 && has_datacenter) || (style == 6 && has_tower);
+			bool has_gf = (style == 2 && has_altstadt_ground) || (style == 3 && has_shop_ground);
+			bool textured = false;
+			if (has_up) {
+				vec2 sz = style == 1 ? size_office : style == 2 ? size_altstadt : style == 3 ? size_shop
+					: style == 4 ? size_warehouse : style == 5 ? size_datacenter : size_tower;
+				bool cladding = style == 4 || style == 5;  // Blech und Paneele laufen bis zum Boden durch
+				float h0 = cladding ? 0.0 : ground_h;
+				float cv = (h - h0) / sz.y;
+				vec2 tuv = vec2(u / sz.x, 1.0 - fract(cv));
+				bool full_row = cladding || h0 + (floor(cv) + 1.0) * sz.y <= top - 0.5;
+				if (h >= h0) {
+					textured = true;
+					vec3 t = style == 1 ? texture(tex_office, tuv).rgb : style == 2 ? texture(tex_altstadt, tuv).rgb
+						: style == 3 ? texture(tex_shop, tuv).rgb : style == 4 ? texture(tex_warehouse, tuv).rgb
+						: style == 5 ? texture(tex_datacenter, tuv).rgb : texture(tex_tower, tuv).rgb;
+					col = full_row ? facade_color(t, base) : base;
+					rough = 0.8;
+				}
+				if (style == 4 && has_rolltor) {
+					float du = mod(u, 14.0);
+					if (du > 4.0 && du < 10.0 && h < 5.0) {
+						col = facade_color(texture(tex_rolltor, vec2((du - 4.0) / 6.0, 1.0 - h / 5.0)).rgb, base);
+					}
+				}
+				if (style == 5) {
+					col = mix(col, vec3(0.3, 0.75, 0.95), step(top - 1.6, h) * step(h, top - 1.2));
+				}
+			}
+			if (has_gf && h < ground_h) {
+				vec2 gsz = style == 2 ? size_altstadt_ground : size_shop_ground;
+				vec2 guv = vec2(u / gsz.x, 1.0 - clamp(h / ground_h, 0.0, 0.999));
+				vec3 t = style == 2 ? texture(tex_altstadt_ground, guv).rgb : texture(tex_shop_ground, guv).rgb;
+				col = facade_color(t, base);
+				rough = 0.8;
+				textured = true;
+			}
 			// Sockel dunkler, Dachkante heller, Geschossbänder ganz leicht
-			col = mix(col, base * 0.55, step(h, 0.6));
+			if (!has_gf) {
+				col = mix(col, base * 0.55, step(h, 0.6));
+			}
 			col = mix(col, min(base * 1.25, vec3(1.0)), step(top - 0.7, h));
-			col *= mix(1.0, 0.93, step(f.y, 0.06) * (1.0 - win) * step(0.6, h));
+			if (!textured) {
+				col *= mix(1.0, 0.93, step(f.y, 0.06) * (1.0 - win) * step(0.6, h));
+			}
 		}
 	} else if (kind > 0.15 && kind < 0.35 && n.y > 0.5) {
 		float across = (kind > 0.25 ? lpos.z : lpos.x) - UV.x;

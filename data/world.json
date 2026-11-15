@@ -303,13 +303,13 @@
 	"ground": {
 		"_kommentar": "Bodentexturen (erzeugt von scripts/debug/make_terrain_textures.gd). Reihenfolge = Textur-ID. uv_scale: Wiederholungen pro Meter (0.1 = alle 10 m). Viertel ohne 'ground' bekommen den Automatik-Boden (Gras, an Hängen Fels).",
 		"textures": [
-			{ "name": "gras", "uv_scale": 0.08, "detiling": true },
-			{ "name": "pflaster", "uv_scale": 0.2, "detiling": false },
-			{ "name": "platten", "uv_scale": 0.125, "detiling": false },
-			{ "name": "beton", "uv_scale": 0.1, "detiling": false },
-			{ "name": "sand", "uv_scale": 0.07, "detiling": true },
-			{ "name": "kies", "uv_scale": 0.4, "detiling": true },
-			{ "name": "fels", "uv_scale": 0.06, "detiling": true }
+			{ "name": "gras", "uv_scale": 0.3, "detiling": true },
+			{ "name": "pflaster", "uv_scale": 0.6, "detiling": false },
+			{ "name": "platten", "uv_scale": 0.5, "detiling": false, "tint": "#d6d3ce" },
+			{ "name": "beton", "uv_scale": 0.25, "detiling": true, "tint": "#b4b2ae" },
+			{ "name": "sand", "uv_scale": 0.2, "detiling": true },
+			{ "name": "kies", "uv_scale": 1.0, "detiling": true },
+			{ "name": "fels", "uv_scale": 0.15, "detiling": true }
 		],
 		"auto_base": "gras",
 		"auto_slope_overlay": "fels",

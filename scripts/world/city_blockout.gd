@@ -27,10 +27,35 @@ var _house_material: StandardMaterial3D
 ## Gebäude-Bausatz aus Blender (tools/blender/building_kit.py): Dächer, Aufbauten, Markisen, Schilder
 const KIT_PATH := "res://assets/models/buildings/kit.glb"
 const KIT_SHADER := "res://assets/shaders/kit.gdshader"
+## Fassadentexturen (blockout.gdshader, Uniform tex_<name>): [Bild, Breite, Höhe in Metern].
+## Obergeschosse: eine Kachel = eine Fensterachse × ein Geschoss (Hochhaus: zwei × zwei); *_ground = Erdgeschoss
+## (4,2 m hoch); rolltor = Tor der Hallen (6 × 5 m). Fehlt ein Bild, zeichnet der Shader die Fenster selbst.
+const FACADE_DIR := "res://assets/textures/buildings/facade_%s.png"
+const FACADE_TEXTURES := {
+	"office": [2.4, 3.6],
+	"altstadt": [2.6, 3.2],
+	"altstadt_ground": [5.8, 4.2],
+	"shop": [2.8, 3.4],
+	"shop_ground": [9.2, 4.2],
+	"warehouse": [6.0, 6.0],
+	"rolltor": [6.0, 5.0],
+	"datacenter": [6.0, 6.0],
+	"tower": [3.2, 7.6],
+}
+## Dachtexturen je Bausatz-Dach: [Bild, Kachelgröße in Metern]. Fehlt ein Bild, bleibt das Dach einfarbig.
+const ROOF_TEXTURES := {
+	"RoofGable": ["res://assets/textures/buildings/roof_tiles.png", 2.5],
+	"RoofHip": ["res://assets/textures/buildings/roof_tiles.png", 2.5],
+	"RoofMansard": ["res://assets/textures/buildings/roof_slate.png", 2.5],
+	"RoofParapet": ["res://assets/textures/buildings/roof_flat.png", 6.0],
+	"RoofSawtooth": ["res://assets/textures/buildings/roof_metal.png", 4.0],
+}
 ## Fassadenstil (blockout.gdshader, UV2.x) je Name aus world.json → blockout.kit.facade
 const FACADES := { "grid": 0, "office": 1, "altstadt": 2, "shop": 3, "warehouse": 4, "datacenter": 5, "tower": 6 }
 var _kit_meshes: Dictionary = {}  # Teilname -> Mesh
 var _kit_material: ShaderMaterial
+## Dach-Teil -> eigenes Material mit Textur (siehe ROOF_TEXTURES)
+var _roof_materials: Dictionary = {}
 var kit_count := 0
 
 
@@ -39,6 +64,13 @@ func build(world_layout: WorldLayout) -> void:
 	# Ein Shader für alles: Fenster auf Gebäuden, Linien auf Straßen (siehe blockout.gdshader)
 	_material = ShaderMaterial.new()
 	_material.shader = load(BLOCKOUT_SHADER)
+	for n: String in FACADE_TEXTURES:
+		var tex := load_texture(FACADE_DIR % n)
+		if tex:
+			var sz: Array = FACADE_TEXTURES[n]
+			_material.set_shader_parameter("has_" + n, true)
+			_material.set_shader_parameter("tex_" + n, tex)
+			_material.set_shader_parameter("size_" + n, Vector2(sz[0], sz[1]))
 	_build_main_roads()
 	for d in layout.districts:
 		_build_district(d)
@@ -322,7 +354,28 @@ func _load_kit() -> bool:
 	root.free()
 	_kit_material = ShaderMaterial.new()
 	_kit_material.shader = load(KIT_SHADER)
+	for part: String in ROOF_TEXTURES:
+		var spec: Array = ROOF_TEXTURES[part]
+		if not ResourceLoader.exists(spec[0]):
+			continue
+		var m := _kit_material.duplicate() as ShaderMaterial
+		m.set_shader_parameter("use_roof_tex", true)
+		m.set_shader_parameter("roof_tex", load_texture(spec[0]))
+		m.set_shader_parameter("roof_tile_m", float(spec[1]))
+		_roof_materials[part] = m
 	return not _kit_meshes.is_empty()
+
+
+## Bild als Textur mit Mipmaps laden (unabhängig von den Import-Einstellungen), null wenn es fehlt
+static func load_texture(path: String) -> ImageTexture:
+	if not ResourceLoader.exists(path):
+		return null
+	var img := (load(path) as Texture2D).get_image()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 
 func _kit_add(ctx: Dictionary, part: String, xf: Transform3D, color := Color.WHITE) -> void:
@@ -434,7 +487,7 @@ func _build_kit(parent: Node3D, kit: Dictionary) -> void:
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "Kit_%s" % part
 		mmi.multimesh = mm
-		mmi.material_override = _kit_material
+		mmi.material_override = _roof_materials.get(part, _kit_material)
 		parent.add_child(mmi)
 
 
