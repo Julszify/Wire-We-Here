@@ -21,7 +21,7 @@ func setup(cable: CableData) -> void:
 		_mat.emission = cable.color().lightened(0.3)
 		_mat.emission_energy_multiplier = 0.6
 		_label = Label3D.new()
-		_label.text = "Port %d · %s" % [cable.port_id + 1, ServiceRack.service_name(cable.port_id)]
+		_label.text = RackPlan.port_label(cable.port_id)
 		_label.font_size = 40
 		_label.outline_size = 10
 		_label.pixel_size = 0.004

@@ -1,8 +1,8 @@
 class_name Player
 extends CharacterBody3D
 ## Spielfigur in Third-Person. Kennt keine Kabel-Logik, meldet nur Absichten per Signal.
-## Steuerung: WASD laufen, Shift rennen, Maus umsehen, E greifen,
-## Leertaste/linke Maustaste ziehen, Q loslassen, Esc Maus freigeben.
+## Steuerung: WASD laufen, Shift rennen, Leertaste springen, Maus umsehen, E greifen,
+## linke Maustaste ziehen, Q loslassen, Esc Maus freigeben.
 
 signal interact_pressed
 signal pull_pressed
@@ -54,6 +54,11 @@ const MODEL_PARTS := {
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
 var _walk_phase := 0.0
+## Sprung: kurz vor der Landung gedrückt zählt noch (Puffer), kurz nach der Kante auch (Coyote-Zeit)
+var _jump_buffer := 0.0
+var _air_time := 0.0
+## Tempo-Faktor aus reaktivierten Diensten
+var speed_factor := 1.0
 
 
 func _ready() -> void:
@@ -79,6 +84,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var sens: float = Balancing.player["mouse_sensitivity"]
 		_yaw.rotation.y -= event.relative.x * sens
 		_pitch.rotation.x = clampf(_pitch.rotation.x - event.relative.y * sens, deg_to_rad(-75), deg_to_rad(35))
+	elif event.is_action_pressed("jump", false):
+		jump()
 	elif event.is_action_pressed("pull", false):
 		pull_pressed.emit()
 		_wiggle_arm()
@@ -95,11 +102,26 @@ func _physics_process(delta: float) -> void:
 	dir.y = 0.0
 	dir = dir.normalized()
 	var speed: float = p["sprint_speed_m_per_s"] if Input.is_action_pressed("sprint") else p["walk_speed_m_per_s"]
-	velocity.x = dir.x * speed
-	velocity.z = dir.z * speed
-	velocity.y = 0.0 if is_on_floor() else velocity.y - _gravity * delta
+	speed *= speed_factor
+	var on_floor := is_on_floor()
+	# Am Boden direkt, in der Luft träger lenken
+	var accel := float(p.get("ground_accel_m_per_s2", 45.0)) if on_floor else float(p.get("air_accel_m_per_s2", 14.0))
+	var flat := Vector2(velocity.x, velocity.z).move_toward(Vector2(dir.x, dir.z) * speed, accel * delta)
+	velocity.x = flat.x
+	velocity.z = flat.y
+	_air_time = 0.0 if on_floor else _air_time + delta
+	_jump_buffer = maxf(_jump_buffer - delta, 0.0)
+	var g := _gravity * float(p.get("gravity_factor", 1.0))
+	if on_floor:
+		velocity.y = 0.0
+	else:
+		velocity.y -= g * delta
+	if _jump_buffer > 0.0 and _air_time <= float(p.get("coyote_time_s", 0.1)) and velocity.y <= 0.01:
+		velocity.y = sqrt(2.0 * g * float(p.get("jump_height_m", 1.2)))
+		_jump_buffer = 0.0
+		_air_time = 1.0  # kein zweiter Sprung in der Coyote-Zeit
 	move_and_slide()
-	_animate_walk(delta, Vector2(velocity.x, velocity.z).length(), float(p["walk_speed_m_per_s"]))
+	_animate_walk(delta, Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0, float(p["walk_speed_m_per_s"]))
 
 	# Mit Kabel in der Hand: nicht weiter als die Leine vom Haufen weg
 	at_tether_limit = false
@@ -136,6 +158,11 @@ func _process(delta: float) -> void:
 		_auto_pull_t -= interval
 		pull_pressed.emit()
 		_wiggle_arm()
+
+
+## Sprung auslösen (wie ein Druck auf die Sprungtaste; auch für Tests)
+func jump() -> void:
+	_jump_buffer = float(Balancing.player.get("jump_buffer_s", 0.12))
 
 
 ## Strahl durch die Bildschirmmitte (Fadenkreuz): [Ursprung, Richtung]
@@ -179,6 +206,14 @@ func set_view_state(d: Dictionary) -> void:
 ## Globale Lage des Unterarms, um den das Kabel gewickelt wird
 func arm_transform() -> Transform3D:
 	return _arm.global_transform
+
+
+## Platz Nr. `index` für ein Knäuel am Rücken (Tasche): drei nebeneinander, weitere dahinter
+func back_transform(index: int) -> Transform3D:
+	var col := index % 3
+	var layer := floori(index / 3.0)
+	var local := Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3((col - 1) * 0.2, 1.38, 0.24 + layer * 0.09))
+	return _body.global_transform * local
 
 
 ## Einfaches Beine- und Armschwingen, Stärke abhängig vom Tempo

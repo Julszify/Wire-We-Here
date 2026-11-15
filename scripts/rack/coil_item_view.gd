@@ -1,7 +1,7 @@
 class_name CoilItemView
 extends Node3D
 ## Darstellung eines Knäuels: dieselben Schlaufen wie am Arm, mit Etikett.
-## Getragen folgt es dem Unterarm, am Boden liegt es flach.
+## In der Tasche hängt es am Rücken der Figur, am Boden liegt es flach.
 
 var data: CoilItem
 var _label: Label3D
@@ -23,7 +23,7 @@ func setup(item: CoilItem) -> void:
 	add_child(mi)
 
 	_label = Label3D.new()
-	_label.text = "Port %d · %s" % [item.port_id + 1, ServiceRack.service_name(item.port_id)]
+	_label.text = RackPlan.port_label(item.port_id)
 	_label.font_size = 40
 	_label.outline_size = 10
 	_label.pixel_size = 0.004
@@ -40,8 +40,18 @@ func follow_arm(arm: Transform3D) -> void:
 	_label.global_position = arm.origin + Vector3(0, 0.95, 0)
 
 
+## In der Tasche: hängt verkleinert am Rücken, ohne Etikett.
+func set_carried(carried: bool) -> void:
+	_label.visible = not carried
+
+
+func carry_at(xf: Transform3D) -> void:
+	global_transform = xf.scaled_local(Vector3.ONE * 0.55)
+
+
 ## Am Boden: flach hinlegen (Schlaufen waagerecht).
 func lie_at(pos: Vector3) -> void:
 	var flat := Basis(Vector3.FORWARD, PI * 0.5)
 	global_transform = Transform3D(flat, pos + Vector3(0, 0.12, 0.18))
 	_label.global_position = pos + Vector3(0, 0.6, 0)
+	_label.visibility_range_end = 25.0

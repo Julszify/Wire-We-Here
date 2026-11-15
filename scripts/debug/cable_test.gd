@@ -1,6 +1,6 @@
 extends Node3D
 ## Testaufbau für Meilenstein 3: ein Kabel an der Handkurbel ziehen und aufwickeln.
-## Leertaste: kurbeln (Aktion "pull") · N: nächstes Kabel · B: vorheriges · L: Balancing-JSON neu laden
+## Linksklick: kurbeln (Aktion "pull") · N: nächstes Kabel · B: vorheriges · L: Balancing-JSON neu laden
 ## Kommandozeile (zum Testen): godot -- --seed=5 --pull=2.5
 
 @export var start_seed: int = 1
@@ -129,4 +129,4 @@ func _update_label() -> void:
 	if _cable != null:
 		line = "Seed %d   ·   %.1f von %.1f m gezogen   ·   Knoten %d (noch ohne Wirkung)" % [
 			_seed, _cable.pulled_m, _cable.length_m, _cable.knots_m.size()]
-	_label.text = line + "\nLeertaste = kurbeln   N = nächstes Kabel   B = vorheriges   L = Balancing neu laden"
+	_label.text = line + "\nLinksklick = kurbeln   N = nächstes Kabel   B = vorheriges   L = Balancing neu laden"

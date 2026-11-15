@@ -65,6 +65,7 @@
 			"base_cost": 10.0,
 			"cost_growth": 1.9,
 			"effect_factor": 1.5,
+			"max_count": 6,
 			"description": "Jeder Zug holt 50 % mehr Kabel raus (Arm und Kurbel)."
 		},
 		"motor": {
@@ -72,6 +73,7 @@
 			"base_cost": 40.0,
 			"cost_growth": 2.2,
 			"effect_factor": 1.4,
+			"max_count": 8,
 			"description": "Alle Motorrollen ziehen 40 % schneller."
 		},
 		"extra_reel": {
@@ -87,6 +89,14 @@
 			"cost_growth": 2.3,
 			"effect_factor": 1.35,
 			"description": "Jeder Meter bringt 35 % mehr Geld."
+		},
+		"bag": {
+			"name": "Größere Tasche",
+			"base_cost": 40.0,
+			"cost_growth": 2.0,
+			"effect_add": 2,
+			"max_count": 6,
+			"description": "2 Knäuel mehr gleichzeitig tragen."
 		},
 		"auto_pull": {
 			"name": "Dauerzug",
@@ -127,6 +137,13 @@
 	"player": {
 		"walk_speed_m_per_s": 4.0,
 		"sprint_speed_m_per_s": 7.0,
+		"jump_height_m": 1.25,
+		"gravity_factor": 1.8,
+		"ground_accel_m_per_s2": 45.0,
+		"air_accel_m_per_s2": 14.0,
+		"jump_buffer_s": 0.12,
+		"coyote_time_s": 0.1,
+		"_kommentar_sprung": "jump_height_m: Sprunghöhe; gravity_factor: Vielfaches der Erdanziehung (höher = knackiger); air_accel: Lenken in der Luft; jump_buffer/coyote: Toleranz kurz vor der Landung bzw. kurz nach der Kante",
 		"mouse_sensitivity": 0.003,
 		"reach_m": 2.8,
 		"aim_radius_m": 0.35,
@@ -157,10 +174,26 @@
 		"grip",
 		"auto_pull",
 		"motor",
-		"copper"
+		"copper",
+		"bag"
 	],
 	"rack": {
 		"reach_m": 3.0
+	},
+	"bag": {
+		"_kommentar": "Tasche für fertige Knäuel wichtiger Kabel; mehr Platz durch Upgrade 'bag' und Dienste",
+		"capacity": 3
+	},
+	"server_room": {
+		"_kommentar": "Begehbarer Serverraum im Hinterhof. center = Mitte des Bodens, size = Breite (x), Höhe, Tiefe (z); Tür in der Wand Richtung Kabelberg (-z). Die Schränke stehen an Rück- und Seitenwänden, einer je Viertel. Blender liest dieselben Maße (tools/blender/building_designs.py).",
+		"center": [0.0, 0.0, 34.0],
+		"size": [20.0, 4.6, 12.0],
+		"wall_m": 0.4,
+		"door_width_m": 3.6,
+		"door_height_m": 3.0,
+		"rack_width_m": 1.5,
+		"rack_height_m": 2.7,
+		"rack_depth_m": 0.6
 	},
 	"cord": {
 		"_kommentar": "C.O.R.D. folgt dem Spieler und stellt die Bestellfalle",
@@ -178,7 +211,10 @@
 		"order_distance_m": 5.5,
 		"drop_height_m": 9.0,
 		"drop_time_s": 0.8,
-		"drop_stagger_s": 0.6
+		"drop_stagger_s": 0.6,
+		"snooze_s": 300.0,
+		"snooze_cooldown_s": 600.0,
+		"_kommentar_snooze": "Abschaltknopf (Port 20): C.O.R.D. schweigt snooze_s Sekunden, danach snooze_cooldown_s Wartezeit"
 	},
 	"save": {
 		"path": "user://savegame.json",

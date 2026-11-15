@@ -5,6 +5,8 @@ extends Control
 
 signal closed
 signal new_game_requested
+## Abschaltknopf für C.O.R.D. gedrückt (Dienst mit special "cord_snooze")
+signal snooze_requested
 
 var economy: Economy
 var rack: ServiceRack
@@ -14,6 +16,8 @@ var _money: Label
 var _services: Label
 var _rows: Dictionary = {}  # Upgrade-ID -> { level, button, desc }
 var _new_game: Button
+var _snooze: Button
+var _effects: Label
 var _confirm := false
 
 
@@ -69,6 +73,15 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 	_services = Label.new()
 	_services.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
 	box.add_child(_services)
+	_effects = Label.new()
+	_effects.add_theme_font_size_override("font_size", 14)
+	_effects.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
+	_effects.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_effects)
+	_snooze = Button.new()
+	_snooze.custom_minimum_size = Vector2(0, 40)
+	_snooze.pressed.connect(func() -> void: snooze_requested.emit())
+	box.add_child(_snooze)
 	var foot := HBoxContainer.new()
 	box.add_child(foot)
 	var hint := Label.new()
@@ -83,7 +96,7 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 
 	economy.money_changed.connect(func(_m: float) -> void: refresh())
 	economy.upgrade_bought.connect(func(_id: String, _l: int) -> void: refresh())
-	rack.service_activated.connect(func(_p: int, _n: String, _u: String) -> void: refresh())
+	rack.port_plugged.connect(func(_p: int) -> void: refresh())
 	refresh()
 
 
@@ -130,7 +143,7 @@ func refresh() -> void:
 		if blocker >= 0:
 			button.text = "Gesperrt"
 			button.disabled = true
-			desc.text = "Benötigt Dienst „%s“ (Port %d)." % [ServiceRack.service_name(blocker), blocker + 1]
+			desc.text = "Benötigt Dienst „%s“ (%s)." % [RackPlan.service_name(blocker), RackPlan.service_place(blocker)]
 			desc.add_theme_color_override("font_color", Color(0.9, 0.5, 0.4))
 		else:
 			desc.text = economy.upgrade_description(id)
@@ -141,10 +154,39 @@ func refresh() -> void:
 			else:
 				button.text = Economy.format_money(economy.cost(id))
 				button.disabled = not economy.can_buy(id)
-	_services.text = "Dienste online: %d / %d" % [rack.active_count(), ServiceRack.port_count()]
+	_services.text = "Dienste online: %d / %d   ·   Ports belegt: %d / %d   ·   Tasche: %d Knäuel" % [
+		rack.active_services(), RackPlan.total_services(), rack.active_count(), RackPlan.total_ports(), economy.bag_capacity()]
+	_effects.text = _effects_text()
+	_effects.visible = _effects.text != ""
+	_snooze.visible = RackPlan.has_special(economy.state, "cord_snooze")
+	var wait := economy.state.snooze_cooldown
+	_snooze.disabled = wait > 0.0
+	_snooze.text = "C.O.R.D. abschalten (5 Minuten Ruhe)" if wait <= 0.0 else "C.O.R.D.-Abschaltknopf lädt … noch %d:%02d" % [int(wait / 60.0), int(wait) % 60]
 	if not visible:
 		_confirm = false
 		_new_game.text = "Neues Spiel"
+
+
+## Kurze Liste, was die laufenden Dienste gerade bewirken
+func _effects_text() -> String:
+	var names := { "money": "Geld", "press": "Handzug", "motor": "Motorrollen", "walk": "Lauftempo",
+		"important_pay": "Wichtige Kabel", "order_count": "Bestellmenge", "ask_interval": "Pause zwischen Fragen" }
+	var parts := []
+	for key: String in names:
+		var f := economy.bonus(key)
+		if not is_equal_approx(f, 1.0):
+			parts.append("%s ×%s" % [names[key], ("%.2f" % f).replace(".", ",")])
+	if economy.bonus("answer_time") != 0.0:
+		parts.append("Antwortzeit +%d s" % int(economy.bonus("answer_time")))
+	if economy.bonus("knot_presses") != 0.0:
+		parts.append("Knoten %d Druck" % int(economy.bonus("knot_presses")))
+	return "" if parts.is_empty() else "Wirkung der Dienste: " + "  ·  ".join(parts)
+
+
+func _process(_delta: float) -> void:
+	# Wartezeit des Abschaltknopfs läuft sichtbar herunter
+	if visible and _snooze and _snooze.visible and _snooze.disabled:
+		refresh()
 
 
 ## Zweimal klicken, damit niemand aus Versehen alles löscht

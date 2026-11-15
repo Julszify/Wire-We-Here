@@ -19,6 +19,8 @@ var reels: Dictionary = {}   # id -> ReelData
 ## Upgrade-Wirkungen, von außen gesetzt (Festerer Griff, Stärkere Motoren)
 var press_multiplier: float = 1.0
 var motor_multiplier: float = 1.0
+## Dienst-Bonus: so viele Drücke weniger (negativ) oder mehr pro Knoten
+var untie_delta: int = 0
 
 
 func add_cable(cable: CableData) -> void:
@@ -83,13 +85,17 @@ func press(reel: ReelData) -> void:
 func untie(cable: CableData) -> void:
 	if not cable.is_stuck():
 		return
-	var needed := int(Balancing.knot["untie_presses"])
+	var needed := untie_needed()
 	cable.knot_presses += 1
 	knot_progress.emit(cable, cable.knot_presses, needed)
 	if cable.knot_presses >= needed:
 		cable.knot_presses = 0
 		cable.knots_solved += 1
 		knot_solved.emit(cable)
+
+
+func untie_needed() -> int:
+	return maxi(1, int(Balancing.knot["untie_presses"]) + untie_delta)
 
 
 ## Kabel loslassen: es rutscht komplett zurück in den Haufen, der Fortschritt geht verloren.

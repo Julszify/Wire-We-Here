@@ -30,6 +30,8 @@ var reel_id: int = -1
 var knots_solved: int = 0
 ## Tastendrücke am aktuellen Knoten
 var knot_presses: int = 0
+## Am anderen Ende gegriffen: die Bahn läuft dann umgekehrt (points[0] ist immer das gegriffene Ende)
+var reversed := false
 
 
 ## Erzeugt ein Kabel vollständig aus dem Seed. Gleicher Seed = gleiches Kabel.
@@ -98,6 +100,12 @@ func radius() -> float:
 	return float(Balancing.cable["radius_m"])
 
 
+## Dreht die Bahn um, damit das andere Ende zum gegriffenen Ende (points[0]) wird.
+func reverse() -> void:
+	path.points.reverse()
+	reversed = not reversed
+
+
 func is_important() -> bool:
 	return port_id >= 0
 
@@ -124,7 +132,7 @@ func color() -> Color:
 ## Veränderlicher Zustand für den Spielstand (Form kommt wieder aus dem Seed).
 func state_dict() -> Dictionary:
 	return { "id": id, "state": state, "pulled_m": pulled_m, "reel_id": reel_id,
-		"knots_solved": knots_solved, "knot_presses": knot_presses }
+		"knots_solved": knots_solved, "knot_presses": knot_presses, "reversed": reversed }
 
 
 func load_state(d: Dictionary) -> void:
@@ -133,3 +141,5 @@ func load_state(d: Dictionary) -> void:
 	reel_id = int(d.get("reel_id", -1))
 	knots_solved = int(d.get("knots_solved", 0))
 	knot_presses = int(d.get("knot_presses", 0))
+	if bool(d.get("reversed", false)) != reversed:
+		reverse()

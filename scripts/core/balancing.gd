@@ -5,6 +5,7 @@ extends Node
 const DATA_PATH := "res://data/balancing.json"
 const SERVICES_PATH := "res://data/services.json"
 const ZONE_PATH := "res://data/zone.json"
+const WORLD_PATH := "res://data/world.json"
 
 var cable: Dictionary = {}
 var heap: Dictionary = {}
@@ -21,11 +22,17 @@ var placement: Dictionary = {}
 var rack: Dictionary = {}
 var cord: Dictionary = {}
 var save: Dictionary = {}
+var bag: Dictionary = {}
+var server_room: Dictionary = {}
 var tablet_order: Array = []
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
 var services: Array = []
 ## Anordnung der Zone (Haufen, Streukabel, Schrank, Start)
 var zone: Dictionary = {}
+## Dienste der Reihen je Schrank: Viertel-ID -> [ { "name", optional "unlocks"/"bonus"/"effect" } ]
+var service_rows: Dictionary = {}
+## Rohdaten der Stadt (world.json); der Port-Plan (RackPlan) liest daraus
+var world: Dictionary = {}
 
 
 func _init() -> void:
@@ -57,9 +64,14 @@ func reload() -> void:
 	rack = parsed.get("rack", {})
 	cord = parsed.get("cord", {})
 	save = parsed.get("save", {})
+	bag = parsed.get("bag", {})
+	server_room = parsed.get("server_room", {})
 	tablet_order = parsed.get("tablet_order", [])
-	services = _load_json(SERVICES_PATH).get("services", [])
+	var sv := _load_json(SERVICES_PATH)
+	services = sv.get("services", [])
+	service_rows = sv.get("rows", {})
 	zone = _load_json(ZONE_PATH)
+	world = _load_json(WORLD_PATH)
 
 
 func _load_json(path: String) -> Dictionary:

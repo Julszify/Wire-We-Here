@@ -16,6 +16,10 @@ func _ready() -> void:
 	_test_multipliers()
 	_test_cord()
 	_test_save_roundtrip()
+	_test_rack_plan()
+	_test_both_ends()
+	_test_bonuses_and_bag()
+	_test_unit_important()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -116,13 +120,14 @@ func _test_rack_and_unlocks() -> void:
 	var eco := Economy.new()
 	add_child(eco)
 	var rack := ServiceRack.new(eco.state)
-	_check(ServiceRack.port_count() == 20, "20 Ports im Schrank")
+	_check(RackPlan.tutorial_count() == 20, "20 Einzel-Dienste im Campus-Schrank")
 	eco.state.money = 1000.0
 	_check(eco.is_locked("grip") and not eco.buy("grip"), "Festerer Griff anfangs gesperrt")
 	_check(not eco.is_locked("crank") and not eco.is_locked("extra_reel"), "Kurbel und Motorrolle frei")
 	var port := eco.locked_by("grip")
 	var events := []
 	rack.service_activated.connect(func(p, _n, u): events.append([p, u]))
+	port = RackPlan.service_ports(port)[0]
 	_check(rack.plug(port), "Einstecken")
 	_check(not rack.plug(port), "Port nicht doppelt belegbar")
 	_check(events.size() == 1 and events[0][1] == "grip", "Signal mit Freischaltung")
@@ -194,6 +199,14 @@ func _test_cord() -> void:
 	cord.ask_now()
 	cord.tick(cord.answer_time() + 0.01)
 	_check(events[-1] == "bestellt %d" % int(Balancing.cord["order_count"]), "Ohne Antwort wird bestellt")
+	cord.count_factor = 0.5
+	_check(cord.order_count() == int(Balancing.cord["order_count"]) / 2, "Dienst-Bonus verkleinert die Bestellung")
+	cord.ask_now()
+	cord.snooze(300.0)
+	_check(cord.phase == CordLogic.Phase.IDLE and cord.time_left >= 300.0, "Abschaltknopf: Frage weg, lange Ruhe")
+	var before := events.size()
+	cord.tick(299.0)
+	_check(events.size() == before, "Während der Ruhe fragt C.O.R.D. nicht")
 	_check(cord.orders_placed == 1 and cord.orders_declined == 1, "Zähler")
 	var a := CordLogic.new()
 	var b := CordLogic.new()
@@ -214,7 +227,8 @@ func _test_save_roundtrip() -> void:
 	var gs := GameState.new()
 	gs.money = 123.45
 	gs.upgrades = { "grip": 2, "crank": 1 }
-	gs.active_ports.append_array([0, 4])
+	gs.add_port(0)
+	gs.add_port(4)
 	var gs2 := GameState.new()
 	gs2.load_dict(JSON.parse_string(JSON.stringify(gs.to_dict())))
 	_check(is_equal_approx(gs2.money, 123.45) and gs2.level("grip") == 2 and gs2.active_ports == gs.active_ports, "GameState über JSON")
@@ -251,3 +265,101 @@ func _test_save_roundtrip() -> void:
 	var c2 := CableData.from_seed(1, 5, Vector3.ZERO)
 	c2.load_state(JSON.parse_string(JSON.stringify(c.state_dict())))
 	_check(c2.state == CableData.State.HOOKED and is_equal_approx(c2.pulled_m, 3.25) and c2.knots_solved == 1, "Kabelzustand über JSON")
+
+
+func _test_rack_plan() -> void:
+	_check(RackPlan.total_ports() == 2000, "2000 Ports im Plan (%d)" % RackPlan.total_ports())
+	_check(RackPlan.sections().size() == 10, "Zehn Schränke")
+	_check(RackPlan.total_services() == 20 + 198, "20 Einzel-Dienste + 198 Reihen (%d)" % RackPlan.total_services())
+	_check(RackPlan.service_of(7) == 7 and RackPlan.service_ports(7) == [7], "Einzel-Dienst = ein Port")
+	_check(RackPlan.service_of(20) == 20 and RackPlan.service_of(29) == 20 and RackPlan.service_of(30) == 21, "Reihen à 10 Ports")
+	var wohn := RackPlan.section("wohnviertel")
+	_check(int(wohn["first_port"]) == 50 and int(wohn["count"]) == 100 and int(wohn["rows"]) == 10, "Wohnviertel: Ports 50–149")
+	_check(RackPlan.row_ports("campus").size() == 30 and RackPlan.row_ports("campus")[0] == 20, "Campus: 30 Reihen-Ports")
+	_check(RackPlan.port_label(4) == "Port 5 · Chef-Kalender", "Etikett Einzel-Dienst: " + RackPlan.port_label(4))
+	_check(RackPlan.port_label(63).begins_with("Wohnviertel, Reihe 2"), "Etikett Reihe: " + RackPlan.port_label(63))
+	_check(RackPlan.service_of(1999) == RackPlan.total_services() - 1 and RackPlan.service_of(2000) == -1, "Letzter Port")
+	# Reihe wird erst mit dem zehnten Knäuel zum Dienst
+	var gs := GameState.new()
+	var rack := ServiceRack.new(gs)
+	var events := []
+	rack.service_activated.connect(func(s, _n, _u): events.append(s))
+	for p in range(50, 59):
+		rack.plug(p)
+	_check(events.is_empty() and rack.active_services() == 0, "Neun Ports: Reihe noch nicht online")
+	rack.plug(59)
+	_check(events == [RackPlan.service_of(50)] and rack.active_services() == 1, "Zehnter Port: Dienst online")
+	rack.free()
+
+
+func _test_bonuses_and_bag() -> void:
+	var eco := Economy.new()
+	add_child(eco)
+	var rack := ServiceRack.new(eco.state)
+	_check(eco.bag_capacity() == int(Balancing.bag["capacity"]), "Tasche: Startgröße")
+	var base := eco.pay_for_cable(10.0)
+	# Dienste mit Geld-Bonus aus services.json einstecken
+	var expected := 1.0
+	var bag_extra := 0
+	for port in 20:
+		var def := RackPlan.service_def(port)
+		expected *= float(def.get("bonus", {}).get("money", 1.0))
+		bag_extra += int(def.get("bonus", {}).get("bag", 0))
+		rack.plug(port)
+	eco.refresh_bonuses()
+	_check(is_equal_approx(eco.bonus("money"), expected) and expected > 1.0, "Geld-Bonus der Dienste (×%.2f)" % expected)
+	_check(is_equal_approx(eco.pay_for_cable(10.0), base * expected), "Bonus wirkt auf die Bezahlung")
+	_check(eco.bag_capacity() == int(Balancing.bag["capacity"]) + bag_extra, "Tasche wächst durch Dienste")
+	_check(RackPlan.has_special(eco.state, "cord_snooze"), "Port 20 schaltet den Abschaltknopf frei")
+	_check(eco.is_locked("bag"), "Größere Tasche gesperrt bis zur ersten Campus-Reihe")
+	for port in RackPlan.service_ports(eco.locked_by("bag")):
+		rack.plug(port)
+	eco.state.money = 1000.0
+	var cap := eco.bag_capacity()
+	_check(eco.buy("bag") and eco.bag_capacity() == cap + int(Balancing.upgrades["bag"]["effect_add"]), "Upgrade Größere Tasche")
+	var sys := CableSystem.new()
+	sys.untie_delta = int(eco.bonus("knot_presses"))
+	_check(sys.untie_needed() == int(Balancing.knot["untie_presses"]) - 1, "Knoten brauchen einen Druck weniger")
+	sys.free()
+	rack.free()
+	eco.queue_free()
+
+
+func _test_unit_important() -> void:
+	# Einheit ohne Stadt: Haufen von Hand, Ports des Wohnviertels verteilen
+	var u := CableUnit.new()
+	u.id = "wohnviertel"
+	u.first_id = CableUnit.ID_BASE
+	u.heaps.append(HeapData.new(1, 11, Vector3.ZERO, 180))
+	u.heaps.append(HeapData.new(2, 12, Vector3(20, 0, 0), 60))
+	u._assign_important("wohnviertel", 2001)
+	var ports := []
+	for i in u.cable_total():
+		var c := u.make_cable(i)
+		if c.is_important():
+			ports.append(c.port_id)
+	ports.sort()
+	_check(ports.size() == 100 and ports[0] == 50 and ports[-1] == 149, "Wohnviertel: 100 wichtige Kabel für Ports 50–149")
+	var again := CableUnit.new()
+	again.id = "wohnviertel"
+	again.heaps = u.heaps
+	again._assign_important("wohnviertel", 2001)
+	_check(again.important == u.important, "Verteilung der wichtigen Kabel reproduzierbar")
+
+
+func _test_both_ends() -> void:
+	var c := CableData.from_seed(1, 5, Vector3.ZERO)
+	var first := c.path.points[0]
+	var last := c.path.points[c.path.points.size() - 1]
+	# Strahl von oben auf das hintere Ende: wird als greifbares Ende erkannt
+	var hit := CableTargeting.find_end([c], last + Vector3(0, 2, 0), Vector3.DOWN, last)
+	_check(hit == c and CableTargeting.hit_tail, "Hinteres Kabelende ist greifbar")
+	hit = CableTargeting.find_end([c], first + Vector3(0, 2, 0), Vector3.DOWN, first)
+	_check(hit == c and not CableTargeting.hit_tail, "Vorderes Kabelende wie bisher")
+	c.reverse()
+	_check(c.path.points[0] == last and c.reversed, "Umdrehen: gegriffenes Ende ist points[0]")
+	c.state = CableData.State.HOOKED
+	c.pulled_m = 2.0
+	var c2 := CableData.from_seed(1, 5, Vector3.ZERO)
+	c2.load_state(JSON.parse_string(JSON.stringify(c.state_dict())))
+	_check(c2.reversed and c2.path.points[0] == last, "Umgedrehtes Kabel über JSON")

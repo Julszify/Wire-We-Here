@@ -18,8 +18,10 @@ var first_id: int = 0
 ## Sperre: blockiert eine Lücke, bis clear_fraction der Kabel abgetragen ist
 var barrier := false
 var clear_fraction := 0.75
-var blocker_center := Vector3.ZERO
-var blocker_size := Vector3.ZERO
+## Unsichtbare Wände der Sperre: [Mitte, Größe] je Kiste
+var blocker_boxes: Array[Array] = []
+## Wichtige Kabel der Einheit: Index des Kabels -> Port im Serverraum (aus RackPlan, zufällig verteilt)
+var important: Dictionary = {}
 
 
 ## Alle Einheiten der Stadt (in Szenen-Koordinaten der übergebenen Stadt)
@@ -60,9 +62,26 @@ func make_cable(index: int) -> CableData:
 	var k := index
 	for h in heaps:
 		if k < h.cable_count:
-			return CableData.from_seed(first_id + index, h.cable_seed(k), h.center, h)
+			var cable := CableData.from_seed(first_id + index, h.cable_seed(k), h.center, h)
+			cable.port_id = int(important.get(index, -1))
+			return cable
 		k -= h.cable_count
 	return null
+
+
+## Verteilt die Reihen-Ports eines Schranks (RackPlan) zufällig, aber reproduzierbar auf die Kabel
+func _assign_important(section_id: String, unit_seed: int) -> void:
+	important.clear()
+	var ports := RackPlan.row_ports(section_id)
+	if ports.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([unit_seed, id, "important"])
+	var pool: Array[int] = []
+	for i in cable_total():
+		pool.append(i)
+	for k in mini(ports.size(), pool.size()):
+		important[pool.pop_at(rng.randi_range(0, pool.size() - 1))] = ports[k]
 
 
 # ---------------------------------------------------------------- Aufbau
@@ -88,13 +107,27 @@ static func _barrier(city: CityWorld, b: Dictionary, index: int) -> CableUnit:
 		float(b["peak_m"]), HeapData.Kind.HEAP)
 	heap.name = u.name
 	u.heaps.append(heap)
-	# Blockade genau in der Zaunlücke (quer zur Ausgangsrichtung)
+	# Blockade hinter dem Berg (von innen gesehen): eine Rückwand jenseits des Zauns und zwei Seitenwände
+	# zurück zum Zaun. So bleibt der ganze Berg von der Campus-Seite aus erreichbar.
 	var wall: Dictionary = from.get("wall", {})
 	var gap := float(wall.get("gap_m", 20.0))
+	var depth := maxf(float(b.get("offset_m", 0.0)) + r + float(b.get("blocker_margin_m", 1.5)), 1.0)
 	var bp := city.to_scene(p)
-	u.blocker_center = bp + Vector3(0, 1.5, 0)
-	u.blocker_size = Vector3(gap if out.y != 0.0 else 2.0, 3.0, gap if out.x != 0.0 else 2.0)
+	var out3 := Vector3(out.x, 0, out.y)
+	var side3 := Vector3(-out.y, 0, out.x)
+	var up := Vector3(0, 2.0, 0)
+	u.blocker_boxes.append([bp + out3 * depth + up, _box_size(side3, gap + 2.0, out3, 1.0)])
+	for sgn in [-1.0, 1.0]:
+		u.blocker_boxes.append([bp + out3 * depth * 0.5 + side3 * sgn * (gap * 0.5 + 0.5) + up,
+			_box_size(side3, 1.0, out3, depth + 1.0)])
+	if b.has("important_section"):
+		u._assign_important(String(b["important_section"]), int(b.get("seed", 1)))
 	return u
+
+
+## Größe einer achsparallelen Kiste: `across` Meter quer (Richtung side), `along` Meter längs (Richtung out)
+static func _box_size(side: Vector3, across: float, out: Vector3, along: float) -> Vector3:
+	return Vector3(absf(side.x) * across + absf(out.x) * along, 4.0, absf(side.z) * across + absf(out.z) * along)
 
 
 static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
@@ -148,4 +181,5 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 		heap.name = "%s, Straße" % u.name
 		u.heaps.append(heap)
 		hid += 1
+	u._assign_important(u.id, int(cfg.get("seed", 1)))
 	return u

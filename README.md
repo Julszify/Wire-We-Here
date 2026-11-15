@@ -2,7 +2,7 @@
 
 *Arbeitstitel, alternativ „Wire We Here?“*
 
-Ein 3D-Incremental-Game mit offener Welt, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für bessere Werkzeuge. Wichtige Kabel gehören an feste Ports im Server-Schrank und bringen nach und nach die Cloud-Dienste der Welt zurück.
+Ein 3D-Incremental-Game mit offener Welt, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für bessere Werkzeuge. Wichtige Kabel gehören an feste Ports im Serverraum und bringen nach und nach die Cloud-Dienste der Welt zurück.
 
 ![Start im Wolkig-Hinterhof](docs/screenshot_hinterhof.jpg)
 
@@ -20,13 +20,15 @@ Das Spiel ist in Entwicklung. Spielbar ist der **Vertical Slice**, eingebettet i
 | --- | --- |
 | Kabel ziehen und aufwickeln | per Hand um den Arm, Handkurbel, Motorrollen, Dauerzug |
 | Knoten, Geld, Upgrades | Knoten lösen mit E, Geld pro Meter, Tablet mit 6 Upgrades |
-| Server-Schrank | 20 Ports; wichtige Kabel werden zu Knäueln, die man einsteckt |
+| Serverraum | begehbare Halle mit zehn Schränken und 2000 Ports; wichtige Kabel werden zu Knäueln, die man in der Tasche sammelt und einsteckt |
+| Dienste | 20 Einzel-Dienste und Reihen à 10 Ports; sie schalten Upgrades frei oder wirken dauerhaft (mehr Geld, schneller laufen, größere Tasche …) |
 | C.O.R.D. | folgt dem Spieler und stellt die Bestellfrage (ohne „Nein“ fallen 100 Kabel vom Himmel) |
-| Stadt | ca. 2 × 2 km mit Gelände, Bodentexturen, Straßen und grauen Gebäudeblöcken (Blockout) |
-| Kabel in der Stadt | Hinterhof, eine Sperre vor dem Wohnviertel und das Wohnviertel; Laden und Entladen pro Viertel |
+| Hinterhof | Bäume, Bänke, Laternen, Paletten und ein Lieferwagen rund um den Serverraum |
+| Stadt | ca. 2 × 2 km mit Gelände, Bodentexturen und Straßen; Wohnviertel mit Häusern, sonst graue Gebäudeblöcke (Blockout) |
+| Kabel in der Stadt | Hinterhof, eine Sperre vor dem Wohnviertel und das Wohnviertel, zusammen 150 wichtige Kabel; Laden und Entladen pro Viertel |
 | Speichern | Spielstand als JSON, automatisch alle 30 s |
 
-**Geplant:** Serverraum mit 2000 wichtigen Kabeln in zehn Vierteln, Springen und Klettern, Seilbahnen, echte Gebäude, Koop für 2–4 Spieler, Steam.
+**Geplant:** Kabel für die übrigen acht Viertel, Klettern, Seilbahnen, weitere Gebäude, Ton, Koop für 2–4 Spieler, Steam.
 
 ![Luftbild der Stadt](docs/screenshot_stadt.jpg)
 
@@ -43,10 +45,11 @@ Beim ersten Start nach einer Änderung an `data/world.json` erzeugt das Spiel H�
 | Taste | Aktion |
 | --- | --- |
 | WASD, Shift | laufen, rennen |
+| Leertaste | springen |
 | Maus | umsehen (Esc gibt die Maus frei) |
-| E | Kabelende greifen, Kabel an anvisierte Rolle hängen, Knoten lösen (3×), Knäuel aufheben oder einstecken |
-| Leertaste / Linksklick | wickeln bzw. kurbeln |
-| Q | Kabel loslassen bzw. Knäuel ablegen |
+| E | Kabelende greifen, Kabel an anvisierte Rolle hängen, Knoten lösen (3×), Knäuel aufheben, im Serverraum alle Knäuel einstecken |
+| Linksklick | wickeln bzw. kurbeln |
+| Q | Kabel loslassen bzw. ein Knäuel aus der Tasche ablegen |
 | Tab | Tablet mit Upgrades (das Spiel läuft weiter) |
 | N | „Nein“ zu C.O.R.D.s Bestellfrage |
 | F5 / F9 | speichern / laden |
@@ -59,7 +62,7 @@ Beim ersten Start nach einer Änderung an `data/world.json` erzeugt das Spiel H�
 - **Kabel ohne Seilphysik:** Jedes Kabel ist eine feste Kurve (Catmull-Rom, gleichmäßig nach Bogenlänge abgetastet), entlang der es beim Ziehen gleitet. Das ist günstig für tausende Kabel, stabil, und der Zustand eines Kabels besteht nur aus wenigen Werten. Gerendert wird es als Röhren-Mesh, die Stecker sitzen als zweite Fläche im selben Mesh.
 - **Deterministisch:** Zufall nur über Seeds. Haufen, Kabelformen und wichtige Kabel entstehen beim Laden neu; gespeichert wird nur, was sich verändert hat. Das ist auch die Grundlage für Koop.
 - **Stadt:** Gelände mit [Terrain3D](https://github.com/TokisanGames/Terrain3D), erzeugt aus `data/world.json`; Straßen und Gebäudeblöcke entstehen beim Start aus denselben Daten.
-- **Modelle:** C.O.R.D., Spielfigur und Stecker entstehen per Python-Skript in Blender (`tools/blender/`), die Bodentexturen per GDScript (`scripts/debug/make_terrain_textures.gd`).
+- **Modelle:** C.O.R.D., Spielfigur, Stecker, Wohnhäuser und der Serverraum entstehen per Python-Skript in Blender (`tools/blender/`), die Bodentexturen per GDScript (`scripts/debug/make_terrain_textures.gd`).
 - **Balancing:** alle Werte in `data/balancing.json`, nicht im Code.
 
 ## Projektstruktur
@@ -70,7 +73,7 @@ scenes/     world.tscn (Hauptszene), city_preview.tscn (Stadt-Vorschau), player.
 scripts/    cable/    Kabelbahnen, Röhren-Mesh, Haufen, Stecker, CableSystem
             world/    Stadt-Layout, Gelände, Blockout, Kabel-Einheiten der Viertel
             reel/     Aufwickler (Arm, Kurbel, Motor)
-            rack/     Server-Schrank, Knäuel
+            rack/     Serverraum, Port-Plan, Knäuel
             economy/  Geld und Upgrades
             cord/     C.O.R.D.-Logik und -Figur
             player/   Spielfigur, Anvisieren
@@ -80,7 +83,7 @@ scripts/    cable/    Kabelbahnen, Röhren-Mesh, Haufen, Stecker, CableSystem
             debug/    Testszenen und Werkzeuge
 assets/     Modelle (GLB) und Bodentexturen
 tools/      Blender-Skripte für Modelle (von Godot ignoriert)
-tests/      logic_test.tscn
+tests/      logic_test.tscn, balance_sim.tscn (Verlaufs-Rechnung fürs Balancing)
 addons/     Terrain3D
 reference/  ursprünglicher Browser-Prototyp (three.js)
 ```

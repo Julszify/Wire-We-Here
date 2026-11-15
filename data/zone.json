@@ -1,5 +1,5 @@
 {
-	"_kommentar": "Anordnung der Schubladen-Ebene. Alle Kabel liegen von Anfang an da. Winkel 90° (Richtung +Z) bleibt frei für Schrank und Start.",
+	"_kommentar": "Anordnung der Schubladen-Ebene. Alle Kabel liegen von Anfang an da. Winkel 90° (Richtung +Z) bleibt frei für Start und den Weg zum Serverraum (balancing.json, server_room).",
 	"seed": 1234,
 	"heaps": [
 		{
@@ -97,12 +97,58 @@
 		"height_min_m": 0.06,
 		"height_max_m": 0.16
 	},
+	"props": {
+		"_kommentar": "Ausstattung des Hinterhofs (Modelle: assets/models/props/yard_props.glb). items = feste Stücke: model, pos [x, z], rot in Grad (0 = Vorderseite nach +z), optional scale. ring = Bäume und Büsche zufällig (per seed) in einem Band um den Hof zwischen inner_m und outer_m; Straßen und Serverraum bleiben frei.",
+		"items": [
+			{ "model": "Lamp", "pos": [-3.4, 27.3], "rot": 180 },
+			{ "model": "Lamp", "pos": [3.4, 27.3], "rot": 180 },
+			{ "model": "Planter", "pos": [-4.8, 27.2] },
+			{ "model": "Planter", "pos": [4.8, 27.2] },
+			{ "model": "Bench", "pos": [-7.0, 27.3], "rot": 180 },
+			{ "model": "Bench", "pos": [7.0, 27.3], "rot": 180 },
+			{ "model": "Planter", "pos": [-9.3, 27.2] },
+			{ "model": "Planter", "pos": [9.3, 27.2] },
+			{ "model": "PalletStack", "pos": [-11.3, 29.6], "rot": 8 },
+			{ "model": "PalletStack", "pos": [-11.5, 31.4], "rot": -14 },
+			{ "model": "PalletStack", "pos": [-13.0, 30.4], "rot": 40 },
+			{ "model": "CableDrum", "pos": [-11.4, 34.6], "rot": 90 },
+			{ "model": "CableDrum", "pos": [-11.6, 36.4], "rot": 78 },
+			{ "model": "CableDrum", "pos": [-13.2, 35.6], "rot": 20 },
+			{ "model": "Bush", "pos": [-11.5, 39.4] },
+			{ "model": "Dumpster", "pos": [11.2, 29.8], "rot": 90 },
+			{ "model": "Dumpster", "pos": [11.2, 32.0], "rot": 90 },
+			{ "model": "Van", "pos": [13.0, 36.6], "rot": 180 },
+			{ "model": "Bush", "pos": [11.4, 39.6] },
+			{ "model": "TreePine", "pos": [-8.5, 43.2] },
+			{ "model": "TreeRound", "pos": [-3.0, 43.8] },
+			{ "model": "Bush", "pos": [0.2, 42.2] },
+			{ "model": "TreePine", "pos": [3.4, 43.4] },
+			{ "model": "TreeRound", "pos": [8.6, 43.9] },
+			{ "model": "Fence", "pos": [-10.5, 46.0] },
+			{ "model": "Fence", "pos": [-7.5, 46.0] },
+			{ "model": "Fence", "pos": [-4.5, 46.0] },
+			{ "model": "Fence", "pos": [-1.5, 46.0] },
+			{ "model": "Fence", "pos": [1.5, 46.0] },
+			{ "model": "Fence", "pos": [4.5, 46.0] },
+			{ "model": "Fence", "pos": [7.5, 46.0] },
+			{ "model": "Fence", "pos": [10.5, 46.0] },
+			{ "model": "Lamp", "pos": [21.5, -30.0], "rot": 90 },
+			{ "model": "Lamp", "pos": [21.5, 0.0], "rot": 90 },
+			{ "model": "Lamp", "pos": [-25.0, 16.5], "rot": 180 },
+			{ "model": "Lamp", "pos": [-45.0, 16.5], "rot": 180 },
+			{ "model": "Bench", "pos": [-32.0, 16.8], "rot": 180 },
+			{ "model": "Planter", "pos": [-35.0, 16.8] },
+			{ "model": "Planter", "pos": [-29.0, 16.8] }
+		],
+		"ring": {
+			"seed": 77,
+			"count": 70,
+			"inner_m": 46.0,
+			"outer_m": 63.0,
+			"models": ["TreeRound", "TreeRound", "TreePine", "Bush", "Bush", "Planter"]
+		}
+	},
 	"important_count": 20,
-	"rack_position": [
-		0.0,
-		0.0,
-		10.5
-	],
 	"player_start": [
 		3.0,
 		0.0,

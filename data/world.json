@@ -75,7 +75,9 @@
 				"lot_max": 15,
 				"h_min": 7,
 				"h_max": 11,
-				"fill": 0.75
+				"fill": 0.75,
+				"models": "houses",
+				"_kommentar": "models: houses = Hausmodelle aus Blender (assets/models/buildings/houses.glb) statt grauer Kisten"
 			},
 			"ground": "gras",
 			"important_cables": 100,
@@ -303,12 +305,16 @@
 			"id": "sperre_wohnviertel",
 			"name": "Kabelberg vor dem Wohnviertel",
 			"road": ["campus", "wohnviertel"],
-			"offset_m": -3,
+			"offset_m": -6,
+			"blocker_margin_m": 1.5,
+			"_kommentar_lage": "offset_m: Mitte des Bergs relativ zur Zaunlücke (negativ = auf der Campus-Seite). Die unsichtbare Blockade steht blocker_margin_m hinter dem Berg und schließt seitlich an den Zaun an.",
 			"count": 140,
 			"radius_m": 8.0,
 			"peak_m": 3.6,
 			"clear_fraction": 0.75,
-			"seed": 3001
+			"seed": 3001,
+			"important_section": "campus",
+			"_kommentar": "important_section: in diesem Berg liegen die wichtigen Kabel für die Reihen dieses Schranks (Campus: 3 Reihen = 30 Kabel)"
 		}
 	],
 	"streaming": {

@@ -20,6 +20,12 @@ var orders_placed: int = 0
 var orders_declined: int = 0
 ## Bei Tablet & Co. nicht pausieren: das Spiel läuft weiter (Koop-tauglich)
 var enabled := true
+## Wirkungen reaktivierter Dienste (von außen gesetzt)
+var answer_bonus_s := 0.0
+var interval_factor := 1.0
+var count_factor := 1.0
+## Abschaltknopf: so lange schweigt C.O.R.D. noch
+var snooze_left := 0.0
 
 var _rng := RandomNumberGenerator.new()
 
@@ -45,7 +51,18 @@ func ask_now() -> void:
 
 
 func answer_time() -> float:
-	return float(Balancing.cord["answer_time_s"])
+	return float(Balancing.cord["answer_time_s"]) + answer_bonus_s
+
+
+## Abschaltknopf: laufende Frage verwerfen und `seconds` lang schweigen
+func snooze(seconds: float) -> void:
+	phase = Phase.IDLE
+	snooze_left = seconds
+	time_left = maxf(time_left, seconds + float(Balancing.cord["first_ask_s"]))
+
+
+func order_count() -> int:
+	return maxi(1, roundi(float(Balancing.cord["order_count"]) * count_factor))
 
 
 func _process(delta: float) -> void:
@@ -56,6 +73,7 @@ func _process(delta: float) -> void:
 func tick(delta: float) -> void:
 	if not enabled:
 		return
+	snooze_left = maxf(snooze_left - delta, 0.0)
 	time_left -= delta
 	if time_left > 0.0:
 		return
@@ -64,7 +82,7 @@ func tick(delta: float) -> void:
 	else:
 		orders_placed += 1
 		_wait_for_next()
-		order_placed.emit(int(Balancing.cord["order_count"]))
+		order_placed.emit(order_count())
 
 
 func _start_asking() -> void:
@@ -76,13 +94,13 @@ func _start_asking() -> void:
 func _wait_for_next() -> void:
 	phase = Phase.IDLE
 	var c: Dictionary = Balancing.cord
-	time_left = _rng.randf_range(float(c["ask_interval_min_s"]), float(c["ask_interval_max_s"]))
+	time_left = _rng.randf_range(float(c["ask_interval_min_s"]), float(c["ask_interval_max_s"])) * interval_factor
 
 
 func to_dict() -> Dictionary:
 	# Zufallszustand als Text, damit große Zahlen im JSON nicht ungenau werden
 	return { "phase": phase, "time_left": time_left, "rng_seed": str(_rng.seed), "rng_state": str(_rng.state),
-		"orders_placed": orders_placed, "orders_declined": orders_declined }
+		"orders_placed": orders_placed, "orders_declined": orders_declined, "snooze_left": snooze_left }
 
 
 func load_dict(d: Dictionary) -> void:
@@ -92,3 +110,4 @@ func load_dict(d: Dictionary) -> void:
 	time_left = float(d.get("time_left", 30.0))
 	orders_placed = int(d.get("orders_placed", 0))
 	orders_declined = int(d.get("orders_declined", 0))
+	snooze_left = float(d.get("snooze_left", 0.0))

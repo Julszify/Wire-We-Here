@@ -6,6 +6,9 @@ signal money_changed(money: float)
 signal upgrade_bought(upgrade_id: String, level: int)
 
 var state := GameState.new()
+var _unlockers: Dictionary = {}  # Upgrade-ID -> Dienst, der es freischaltet
+## Boni der laufenden Dienste (RackPlan.bonuses); wird von außen gesetzt, wenn sich Dienste ändern
+var bonuses: Dictionary = {}
 
 
 func _ready() -> void:
@@ -16,7 +19,7 @@ func _ready() -> void:
 ## `factor` < 1 z. B. für wichtige Kabel, die zusätzlich einen Dienst reaktivieren.
 func pay_for_cable(length_m: float, factor: float = 1.0) -> float:
 	var per_meter: float = float(Balancing.economy["money_per_meter"]) * factor
-	per_meter *= factor("copper")
+	per_meter *= factor("copper") * bonus("money")
 	var amount := length_m * per_meter
 	state.money += amount
 	state.total_earned += amount
@@ -39,12 +42,31 @@ func is_locked(upgrade_id: String) -> bool:
 	return locked_by(upgrade_id) >= 0
 
 
-## Port des Dienstes, der das Upgrade noch sperrt, oder -1.
+## Dienst, der das Upgrade noch sperrt, oder -1.
 func locked_by(upgrade_id: String) -> int:
-	for port in Balancing.services.size():
-		if String(Balancing.services[port].get("unlocks", "")) == upgrade_id and not state.active_ports.has(port):
-			return port
+	if _unlockers.is_empty():
+		for service in RackPlan.total_services():
+			var u := RackPlan.service_unlocks(service)
+			if u != "":
+				_unlockers[u] = service
+	if _unlockers.has(upgrade_id) and not RackPlan.service_active(state, int(_unlockers[upgrade_id])):
+		return int(_unlockers[upgrade_id])
 	return -1
+
+
+## Bonus aus laufenden Diensten (Faktor; bei additiven Boni die Summe)
+func bonus(key: String) -> float:
+	return float(bonuses.get(key, 0.0 if RackPlan.ADDITIVE.has(key) else 1.0))
+
+
+func refresh_bonuses() -> void:
+	bonuses = RackPlan.bonuses(state)
+
+
+## Zahl der Knäuel, die in die Tasche passen
+func bag_capacity() -> int:
+	var per_level := int(Balancing.upgrades.get("bag", {}).get("effect_add", 0))
+	return int(Balancing.bag.get("capacity", 3)) + per_level * state.level("bag") + int(bonus("bag"))
 
 
 func can_buy(upgrade_id: String) -> bool:

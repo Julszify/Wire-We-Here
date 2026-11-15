@@ -1,5 +1,5 @@
 extends Node3D
-## Schubladen-Ebene: verbindet Spielfigur, Kabel-Logik, Wirtschaft, Server-Schrank und Darstellung.
+## Hauptszene: verbindet Spielfigur, Kabel-Logik, Wirtschaft, Serverraum, Stadt und Darstellung.
 ## Die Logik steckt in CableSystem, Economy und ServiceRack (Daten), hier wird nur verdrahtet und angezeigt.
 
 ## Mitte des großen Kabelbergs (Blickrichtung beim Start)
@@ -20,8 +20,8 @@ var _city: CityWorld
 var _system: CableSystem
 var _economy: Economy
 var _rack: ServiceRack
-var _rack_view: RackView
-var _rack_pos: Vector3
+var _room: ServerRoomView
+var _props: YardProps
 var _tablet: Tablet
 var _zone: ZoneData
 var _arm_reel: ReelData
@@ -30,7 +30,7 @@ var _reel_views: Dictionary = {}  # Rollen-ID -> ReelView
 var _knot_markers: Dictionary = {}  # Kabel-ID -> MeshInstance3D
 var _items: Dictionary = {}       # Knäuel-ID -> CoilItem
 var _item_views: Dictionary = {}  # Knäuel-ID -> CoilItemView
-var _carried: CoilItem            # Knäuel, das die Figur gerade trägt
+var _bag: Array[CoilItem] = []    # Knäuel in der Tasche (in der Reihenfolge, in der sie hineinkamen)
 var _fading: Array[CableView] = []
 var _next_cable_id := 0
 var _next_reel_id := 1
@@ -42,6 +42,7 @@ var _time := 0.0
 
 # Was gerade anvisiert ist
 var _target_end: CableData
+var _target_tail := false  # anvisiert ist das hintere Ende der Bahn
 var _target_knot: CableData
 var _target_reel: ReelData
 var _target_item: CoilItem
@@ -90,13 +91,14 @@ func _ready() -> void:
 	_rack = ServiceRack.new(_economy.state)
 	add_child(_rack)
 	_rack.service_activated.connect(_on_service_activated)
-	_build_rack()
+	_build_server_room()
 
 	_tablet = Tablet.new()
 	_hud.add_child(_tablet)
 	_tablet.setup(_economy, _rack)
 	_tablet.visible = false
 	_tablet.closed.connect(_close_tablet)
+	_tablet.snooze_requested.connect(_on_snooze_requested)
 
 	_arm_reel = ReelData.new(0, ReelData.Kind.ARM)
 	_arm_reel.owner_id = PLAYER_ID
@@ -144,6 +146,8 @@ func _ready() -> void:
 	_update_blockers()
 	_stream_update(true)
 
+	if save.is_empty():
+		_show_message("Der Serverraum steht hinter dir. Wichtige Kabel leuchten – ihre Knäuel gehören dort in die Schränke.")
 	# Nur zum automatischen Testen, siehe _apply_test_args
 	_apply_test_args()
 
@@ -203,8 +207,9 @@ func _process(delta: float) -> void:
 		else:
 			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position))
 
-	if _carried:
-		_item_views[_carried.id].follow_arm(arm)
+	for i in _bag.size():
+		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
+	_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
 
 	_cord_view.follow(_player.global_position, _player.facing(), delta)
 	if _cord.phase == CordLogic.Phase.ASKING:
@@ -249,7 +254,11 @@ func _notification(what: int) -> void:
 # --- Eingaben -------------------------------------------------------------
 
 func _arm_busy() -> bool:
-	return not _arm_reel.is_free() or _carried != null
+	return not _arm_reel.is_free()
+
+
+func _bag_full() -> bool:
+	return _bag.size() >= _economy.bag_capacity()
 
 
 func _on_interact() -> void:
@@ -260,28 +269,29 @@ func _on_interact() -> void:
 	# 2. Anvisierter Knoten (an einer Rolle)
 	elif _target_knot:
 		_system.untie(_target_knot)
-	# 3. Getragenes Knäuel in den Server-Schrank stecken
-	elif _carried and _target_rack:
-		_plug_carried()
+	# 3. Knäuel aus der Tasche in die Schränke stecken (alle auf einmal)
+	elif not _bag.is_empty() and _target_rack:
+		_deliver_bag()
 	# 4. Kabel vom Arm an eine freie Rolle hängen
 	elif held and _target_reel and _target_reel.is_free():
 		_system.transfer(_arm_reel, _target_reel)
 		_player.holding = false
 		_show_message("Eingehängt!" + (" Die Rolle zieht jetzt von selbst." if _target_reel.kind == ReelData.Kind.MOTOR else " Jetzt kurbeln."))
 	# 5. Knäuel vom Boden aufheben
-	elif _target_item and not _arm_busy():
+	elif _target_item:
 		_pick_up(_target_item)
 	# 6. Kabelende greifen
 	elif _target_end and not _arm_busy():
+		if _target_tail:
+			_target_end.reverse()  # am anderen Ende gegriffen: von dort aus aufwickeln
+			_target_tail = false
 		if _system.hook(_target_end, _arm_reel):
 			_player.holding = true
 			_player.tether_anchor = _target_end.path.points[0]
-			_show_message("Wichtiges Kabel gegriffen – aufrollen und zum Schrank bringen!" if _target_end.is_important() else "Kabel gegriffen – jetzt wickeln!")
+			_show_message("Wichtiges Kabel gegriffen – aufrollen und in den Serverraum bringen!" if _target_end.is_important() else "Kabel gegriffen – jetzt wickeln!")
 
 
 func _on_pull() -> void:
-	if _carried:
-		return
 	if not _arm_reel.is_free():
 		_system.press(_arm_reel)
 		return
@@ -292,10 +302,10 @@ func _on_pull() -> void:
 
 
 func _on_release() -> void:
-	if _carried:
-		_drop_carried()
-	else:
+	if not _arm_reel.is_free():
 		_system.release(_arm_reel)
+	elif not _bag.is_empty():
+		_drop_from_bag()
 
 
 func _open_tablet() -> void:
@@ -332,7 +342,8 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 	if cable.is_important():
 		# Wichtiges Kabel: wird zum beschrifteten Knäuel und bringt einen Teil des Meterpreises
 		view.queue_free()
-		var part := _economy.pay_for_cable(cable.length_m, float(Balancing.economy.get("important_pay_factor", 0.5)))
+		var part := _economy.pay_for_cable(cable.length_m,
+			minf(float(Balancing.economy.get("important_pay_factor", 0.5)) * _economy.bonus("important_pay"), 1.0))
 		var pay_at := (_player.global_position + Vector3(0, 2.1, 0)) if reel == _arm_reel else (reel.position + Vector3(0, 1.6, 0))
 		FloatText.spawn(self, pay_at, "+" + Economy.format_money(part))
 		var item := CoilItem.from_cable(_next_item_id, cable)
@@ -343,15 +354,22 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		iv.setup(item)
 		_item_views[item.id] = iv
 		if reel == _arm_reel:
-			item.carried_by = PLAYER_ID
-			_carried = item
-			_player.holding = true
+			_player.holding = false
+		var where := "Port" if RackPlan.row_of_service(RackPlan.service_of(item.port_id)) < 0 else "Reihe"
+		if reel == _arm_reel and not _bag_full():
+			_put_in_bag(item)
+			_show_message("Wichtiges Kabel fertig und in der Tasche (%d/%d). %s: %s" % [
+				_bag.size(), _economy.bag_capacity(), where, RackPlan.port_label(item.port_id)])
 		else:
-			var out := _player.global_position - reel.position
+			# Tasche voll oder an einer Rolle fertig geworden: Knäuel liegt am Boden
+			var base := _player.global_position if reel == _arm_reel else reel.position
+			var out := _player.facing() if reel == _arm_reel else _player.global_position - reel.position
 			out.y = 0.0
-			item.position = reel.position + (out.normalized() if out.length() > 0.01 else Vector3.BACK) * 1.4
+			item.position = base + (out.normalized() if out.length() > 0.01 else Vector3.BACK) * (0.9 if reel == _arm_reel else 1.4)
+			item.position.y = _ground_y(item.position)
 			iv.lie_at(item.position)
-		_show_message("Wichtiges Kabel fertig! Zum Server-Schrank bringen: Port %d · %s" % [item.port_id + 1, ServiceRack.service_name(item.port_id)])
+			_show_message("Tasche voll – das Knäuel liegt am Boden. Erst im Serverraum abliefern." if reel == _arm_reel
+				else "Wichtiges Kabel fertig! Knäuel an der Rolle aufheben: %s" % RackPlan.port_label(item.port_id))
 	else:
 		var pay_pos: Vector3
 		if reel == _arm_reel:
@@ -404,14 +422,33 @@ func _on_upgrade_bought(upgrade_id: String, _level: int) -> void:
 	_apply_upgrades()
 
 
-func _on_service_activated(port_id: int, service_name: String, unlocks: String) -> void:
-	_rack_view.set_port_active(port_id, true)
-	_rack_view.set_active_count(_rack.active_count(), ServiceRack.port_count())
-	FloatText.spawn(self, _rack_pos + Vector3(0, 2.3, 0), "%s online!" % service_name, Color(0.4, 1.0, 0.5))
+func _on_service_activated(service_id: int, service_name: String, unlocks: String) -> void:
+	var def := RackPlan.service_def(service_id)
+	var at := _room.port_position(RackPlan.service_ports(service_id)[0]) + Vector3(0, 0.4, 0)
+	FloatText.spawn(self, at, "%s online!" % service_name, Color(0.4, 1.0, 0.5))
+	var payout := float(def.get("payout", 0.0))
+	if payout > 0.0:
+		_economy.state.money += payout
+		_economy.state.total_earned += payout
+		_economy.money_changed.emit(_economy.state.money)
+	_apply_upgrades()
 	if unlocks != "":
 		_show_message("Dienst „%s“ läuft wieder – neu im Tablet: %s" % [service_name, _economy.upgrade_name(unlocks)])
+	elif def.has("effect"):
+		_show_message("Dienst „%s“ läuft wieder. %s." % [service_name, String(def["effect"])])
 	else:
 		_show_message("Dienst „%s“ läuft wieder." % service_name)
+
+
+func _on_snooze_requested() -> void:
+	if _economy.state.snooze_cooldown > 0.0 or not RackPlan.has_special(_economy.state, "cord_snooze"):
+		return
+	_cord.snooze(float(Balancing.cord.get("snooze_s", 300.0)))
+	_economy.state.snooze_cooldown = float(Balancing.cord.get("snooze_cooldown_s", 600.0))
+	_cord_view.set_asking(false)
+	_cord_prompt.visible = false
+	_tablet.refresh()
+	_show_message("C.O.R.D.: „Fahre herunter … Updates werden installiert.“ (5 Minuten Ruhe)")
 
 
 func _on_order_requested(answer_time: float) -> void:
@@ -512,7 +549,7 @@ func _find_free_spot(radius: float) -> Vector3:
 				continue
 			if _zone.heap_at(pos, radius + 0.5) != null:
 				continue
-			if Vector2(pos.x - _rack_pos.x, pos.z - _rack_pos.z).length() < radius + 2.0:
+			if ServerRoomView.rect().grow(radius + 2.0).has_point(Vector2(pos.x, pos.z)) or _props.blocked(pos, radius):
 				continue
 			return pos
 	# Kein Platz gefunden (z. B. Spieler unterwegs in der Stadt): Lieferung landet trotzdem im Hinterhof
@@ -523,40 +560,65 @@ func _find_free_spot(radius: float) -> Vector3:
 	return fallback
 
 
-## Upgrade-Wirkungen an Logik und Spielfigur weitergeben
+## Wirkungen von Upgrades und laufenden Diensten an Logik und Spielfigur weitergeben
 func _apply_upgrades() -> void:
-	_system.press_multiplier = _economy.factor("grip")
-	_system.motor_multiplier = _economy.factor("motor")
+	_economy.refresh_bonuses()
+	_system.press_multiplier = _economy.factor("grip") * _economy.bonus("press")
+	_system.motor_multiplier = _economy.factor("motor") * _economy.bonus("motor")
+	_system.untie_delta = int(_economy.bonus("knot_presses"))
+	_player.speed_factor = _economy.bonus("walk")
 	var auto: Dictionary = Balancing.upgrades.get("auto_pull", {})
 	_player.auto_pull_rate = float(auto.get("presses_per_second", 0.0)) if _economy.state.level("auto_pull") > 0 else 0.0
+	if _cord:
+		_cord.answer_bonus_s = _economy.bonus("answer_time")
+		_cord.interval_factor = _economy.bonus("ask_interval")
+		_cord.count_factor = _economy.bonus("order_count")
 
 
-func _plug_carried() -> void:
-	if _rack.plug(_carried.port_id):
-		_item_views[_carried.id].queue_free()
-		_item_views.erase(_carried.id)
-		_items.erase(_carried.id)
-		_carried = null
-		_player.holding = false
-	else:
-		_show_message("Port %d ist schon belegt." % (_carried.port_id + 1))
+## Geländehöhe an einer Stelle (Hinterhof = 0)
+func _ground_y(pos: Vector3) -> float:
+	return _city.ground_height(pos.x, pos.z)
+
+
+func _put_in_bag(item: CoilItem) -> void:
+	item.carried_by = PLAYER_ID
+	_bag.append(item)
+	_item_views[item.id].set_carried(true)
+
+
+## Alle Knäuel aus der Tasche in ihre Ports stecken
+func _deliver_bag() -> void:
+	var plugged := 0
+	for item in _bag.duplicate():
+		if _rack.plug(item.port_id):
+			plugged += 1
+		# Port schon belegt (kann nur durch alte Spielstände passieren): Knäuel verfällt
+		_item_views[item.id].queue_free()
+		_item_views.erase(item.id)
+		_items.erase(item.id)
+		_bag.erase(item)
+	_room.refresh(_economy.state)
+	_tablet.refresh()
+	if plugged > 1:
+		FloatText.spawn(self, _player.global_position + Vector3(0, 2.2, 0), "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
 
 
 func _pick_up(item: CoilItem) -> void:
-	item.carried_by = PLAYER_ID
-	_carried = item
-	_player.holding = true
-	_show_message("Knäuel aufgehoben: Port %d · %s" % [item.port_id + 1, ServiceRack.service_name(item.port_id)])
+	if _bag_full():
+		_show_message("Tasche voll (%d/%d) – erst im Serverraum abliefern." % [_bag.size(), _economy.bag_capacity()])
+		return
+	_put_in_bag(item)
+	_show_message("Knäuel eingesteckt (%d/%d): %s" % [_bag.size(), _economy.bag_capacity(), RackPlan.port_label(item.port_id)])
 
 
-func _drop_carried() -> void:
-	var item := _carried
+## Zuletzt eingestecktes Knäuel aus der Tasche auf den Boden legen
+func _drop_from_bag() -> void:
+	var item: CoilItem = _bag.pop_back()
 	item.carried_by = -1
 	item.position = _player.global_position + _player.facing() * 0.9
-	item.position.y = 0.0
+	item.position.y = _ground_y(item.position)
+	_item_views[item.id].set_carried(false)
 	_item_views[item.id].lie_at(item.position)
-	_carried = null
-	_player.holding = false
 
 
 func _update_targets() -> void:
@@ -569,21 +631,26 @@ func _update_targets() -> void:
 	_target_end = null
 	_target_item = null
 	_target_rack = false
-	if _target_knot == null and _carried:
+	if _target_knot == null and not _bag.is_empty():
 		var reach: float = Balancing.rack["reach_m"]
-		_target_rack = CableTargeting._hit(_rack_pos + Vector3(0, 1.0, 0), origin, dir, pos, reach) < 0.9
+		for rp in _room.rack_points():
+			if CableTargeting._hit(rp, origin, dir, pos, reach) < 1.3:
+				_target_rack = true
+				break
 	if _target_knot == null and not _target_rack:
 		_target_reel = CableTargeting.find_reel(_system.reels.values(), origin, dir, pos)
-	if _target_knot == null and _target_reel == null and not _arm_busy():
+	if _target_knot == null and _target_reel == null and not _target_rack:
 		_target_item = _find_item(origin, dir, pos)
-		if _target_item == null:
+		if _target_item == null and not _arm_busy():
 			_target_end = CableTargeting.find_end(_grabbable_cables(), origin, dir, pos)
+			_target_tail = _target_end != null and CableTargeting.hit_tail
 	var holding := not _arm_reel.is_free()
 	_crosshair.targeting = _target_knot != null or _target_end != null or _target_item != null or _target_rack \
 		or (holding and _target_reel != null and _target_reel.is_free())
 	_end_marker.visible = _target_end != null
 	if _target_end:
-		_end_marker.global_position = _target_end.path.points[0]
+		var ends := _target_end.path.points
+		_end_marker.global_position = ends[ends.size() - 1] if _target_tail else ends[0]
 
 
 func _find_item(origin: Vector3, dir: Vector3, player_pos: Vector3) -> CoilItem:
@@ -592,6 +659,8 @@ func _find_item(origin: Vector3, dir: Vector3, player_pos: Vector3) -> CoilItem:
 	for item: CoilItem in _items.values():
 		if item.carried_by >= 0:
 			continue
+		if absf(item.position.y - player_pos.y) > 3.0:
+			continue
 		var d := CableTargeting._hit(item.position + Vector3(0, 0.15, 0), origin, dir, player_pos, Balancing.player["reach_m"])
 		if d < best_d:
 			best_d = d
@@ -599,16 +668,17 @@ func _find_item(origin: Vector3, dir: Vector3, player_pos: Vector3) -> CoilItem:
 	return best
 
 
-func _build_rack() -> void:
-	var p: Array = Balancing.zone.get("rack_position", [0, 0, 10])
-	_rack_pos = Vector3(p[0], p[1], p[2])
-	_rack_view = RackView.new()
-	add_child(_rack_view)
-	_rack_view.position = _rack_pos
-	# Vorderseite (+Z) zum Haufen drehen
-	var to_heap := ZONE_CENTER - _rack_pos
-	_rack_view.rotation.y = atan2(to_heap.x, to_heap.z)
-	_rack_view.setup(ServiceRack.port_count())
+func _build_server_room() -> void:
+	_room = ServerRoomView.new()
+	_room.name = "ServerRoom"
+	add_child(_room)
+	_room.position = ServerRoomView.center()
+	_room.setup()
+	_room.refresh(_economy.state)
+	_props = YardProps.new()
+	_props.name = "YardProps"
+	add_child(_props)
+	_props.build(_city)
 
 
 func _place_reel(kind: ReelData.Kind) -> void:
@@ -642,7 +712,7 @@ func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> v
 		free_ports = ports
 	else:
 		# Wichtige Kabel nur für Ports, die noch frei sind und für die kein Knäuel unterwegs ist
-		for port in ServiceRack.port_count():
+		for port in RackPlan.tutorial_count():
 			var taken := _rack.is_active(port)
 			for item: CoilItem in _items.values():
 				taken = taken or item.port_id == port
@@ -656,7 +726,13 @@ func _spawn_zone(seed_value: int, ports: Variant = null, first_id: int = 0) -> v
 	_order_heaps.clear()
 	_removed_ids.clear()
 	var cables := _zone.create_cables(first_id, free_ports)
+	# Streukabel dürfen nicht durch die Wand des Serverraums laufen: an die Vorderwand schieben
+	var room := ServerRoomView.rect().grow(0.6)
 	for cable in cables:
+		for i in cable.path.points.size():
+			var pt := cable.path.points[i]
+			if room.has_point(Vector2(pt.x, pt.z)):
+				cable.path.points[i].z = room.position.y
 		_system.add_cable(cable)
 		var view := CableView.new()
 		add_child(view)
@@ -790,13 +866,14 @@ func _update_blockers() -> void:
 		elif not cleared and not _blockers.has(u.id):
 			var body := StaticBody3D.new()
 			body.name = "Blocker_%s" % u.id
-			var col := CollisionShape3D.new()
-			var shape := BoxShape3D.new()
-			shape.size = u.blocker_size
-			col.shape = shape
-			body.add_child(col)
+			for box: Array in u.blocker_boxes:
+				var col := CollisionShape3D.new()
+				var shape := BoxShape3D.new()
+				shape.size = box[1]
+				col.shape = shape
+				col.position = box[0]
+				body.add_child(col)
 			add_child(body)
-			body.global_position = u.blocker_center
 			_blockers[u.id] = body
 
 
@@ -817,34 +894,32 @@ func _remove_knot_marker(cable_id: int) -> void:
 
 func _update_hud() -> void:
 	var held := _system.cable_on(_arm_reel)
-	var presses := int(Balancing.knot["untie_presses"])
+	var presses := _system.untie_needed()
 	if held and held.is_stuck():
 		_hint.text = "Knoten! E: lösen (%d/%d)" % [held.knot_presses, presses]
 	elif _target_knot:
 		_hint.text = "E: Knoten lösen (%d/%d)" % [_target_knot.knot_presses, presses]
-	elif _carried and _target_rack:
-		_hint.text = "E: in Port %d einstecken (%s)" % [_carried.port_id + 1, ServiceRack.service_name(_carried.port_id)]
-	elif _carried:
-		_hint.text = "Knäuel zum Server-Schrank bringen   ·   Q: ablegen"
+	elif not _bag.is_empty() and _target_rack:
+		_hint.text = ("E: %d Knäuel einstecken" % _bag.size()) if _bag.size() > 1 else "E: Knäuel einstecken (%s)" % RackPlan.port_label(_bag[0].port_id)
 	elif held and _target_reel and _target_reel.is_free():
 		_hint.text = "E: Kabel an %s einhängen" % ("Motorrolle" if _target_reel.kind == ReelData.Kind.MOTOR else "Handkurbel")
 	elif held and _player.at_tether_limit:
 		_hint.text = "Das Kabel ist gespannt – erst aufwickeln oder an eine Rolle hängen (Q: loslassen)"
 	elif held:
-		_hint.text = "Leertaste / Linksklick: wickeln   ·   Q: loslassen"
+		_hint.text = "Linksklick: wickeln   ·   Q: loslassen"
 	elif _target_item:
-		_hint.text = "E: Knäuel aufheben (Port %d)" % (_target_item.port_id + 1)
+		_hint.text = "E: Knäuel aufheben (%s)" % RackPlan.port_label(_target_item.port_id)
 	elif _target_end:
 		_hint.text = "E: wichtiges Kabel greifen" if _target_end.is_important() else "E: Kabelende greifen"
 	else:
 		var crank := CableTargeting.nearest_reel(_system.reels.values(), _player.global_position, ReelData.Kind.HAND)
 		if crank and not crank.is_free():
-			_hint.text = "Leertaste / Linksklick: kurbeln"
+			_hint.text = "Linksklick: kurbeln"
 		else:
-			_hint.text = "Ein Kabelende am Rand des Haufens anvisieren"
+			_hint.text = "Knäuel in den Serverraum bringen   ·   Q: eins ablegen" if _bag_full() else "Ein Kabelende am Rand des Haufens anvisieren"
 
-	var line := "Kabel im Haufen: %d   ·   Aufgerollt: %d   ·   Dienste: %d/%d" % [
-		_heap_count(), _done_count, _rack.active_count(), ServiceRack.port_count()]
+	var line := "Kabel im Haufen: %d   ·   Aufgerollt: %d   ·   Dienste: %d/%d   ·   Tasche: %d/%d" % [
+		_heap_count(), _done_count, _rack.active_services(), RackPlan.total_services(), _bag.size(), _economy.bag_capacity()]
 	for reel: ReelData in _system.reels.values():
 		var c := _system.cable_on(reel)
 		if c:
@@ -932,9 +1007,8 @@ func _collect_save() -> Dictionary:
 
 func _apply_save(d: Dictionary) -> void:
 	_economy.state.load_dict(d.get("economy", {}))
-	for port in _economy.state.active_ports:
-		_rack_view.set_port_active(port, true)
-	_rack_view.set_active_count(_rack.active_count(), ServiceRack.port_count())
+	_apply_upgrades()
+	_room.refresh(_economy.state)
 
 	for o: Dictionary in d.get("orders", []):
 		_add_order_heap(HeapData.from_dict(o["heap"]), int(o["first_id"]), false)
@@ -986,9 +1060,8 @@ func _apply_save(d: Dictionary) -> void:
 		add_child(iv)
 		iv.setup(item)
 		_item_views[item.id] = iv
-		if item.carried_by >= 0 and _arm_reel.is_free() and _carried == null:
-			_carried = item
-			_player.holding = true
+		if item.carried_by >= 0 and not _bag_full():
+			_put_in_bag(item)
 		else:
 			item.carried_by = -1
 			iv.lie_at(item.position)
@@ -1031,14 +1104,18 @@ func _summary() -> String:
 	for u in _units:
 		if _unit_loaded.has(u.id):
 			loaded.append(u.id)
+	var important := 0
+	for c: CableData in _system.cables.values():
+		if c.is_important():
+			important += 1
 	var gp := _player.global_position
 	var hit := get_world_3d().direct_space_state.intersect_ray(
 		PhysicsRayQueryParameters3D.create(gp + Vector3(0, 0.5, 0), gp + Vector3(0, -60, 0), 1, [_player.get_rid()]))
 	var under := "%s@%.1f" % [hit["collider"].name, hit["position"].y] if hit else "nichts"
-	return ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
-		str(loaded), _blockers.size(),
-		_economy.state.money, str(_economy.state.active_ports), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
-		_system.reels.size(), str(hooked), _items.size(), str(_carried != null), _done_count, _orders,
+	return ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "wichtig=%d dienste=%d einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
+		important, _rack.active_services(), str(loaded), _blockers.size(),
+		_economy.state.money, str(_economy.state.active_ports) if _economy.state.active_ports.size() <= 24 else "%d Ports" % _economy.state.active_ports.size(), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
+		_system.reels.size(), str(hooked), _items.size(), "%d/%d" % [_bag.size(), _economy.bag_capacity()], _done_count, _orders,
 		_cord.phase, _cord.time_left, str(SaveGame.vec_to(_player.global_position))]
 
 
@@ -1075,7 +1152,9 @@ func _apply_test_args() -> void:
 	if opts.has("buy"):
 		for id in String(opts["buy"]).split(","):
 			while _economy.is_locked(id):
-				_rack.plug(_economy.locked_by(id))
+				for port in RackPlan.service_ports(_economy.locked_by(id)):
+					_rack.plug(port)
+			_room.refresh(_economy.state)
 			_economy.state.money += _economy.cost(id)
 			_economy.buy(id)
 	if opts.has("hang"):
@@ -1092,14 +1171,25 @@ func _apply_test_args() -> void:
 		for reel: ReelData in _system.reels.values():
 			if not reel.is_free():
 				_system.pull(reel, float(opts["pull"]))
-	if opts.has("plug") and _carried:
-		_plug_carried()
+	if opts.has("plug") and not _bag.is_empty():
+		_deliver_bag()
+	if opts.has("plugports"):
+		# z. B. --plugports=0-19 oder --plugports=50-59: Ports direkt belegen
+		var r := String(opts["plugports"]).split("-")
+		for port in range(int(r[0]), int(r[-1]) + 1):
+			_rack.plug(port)
+		_room.refresh(_economy.state)
+	if opts.has("room"):
+		# Vor die Tür des Serverraums (--room=in: hinein)
+		_player.global_position = (ServerRoomView.center() + Vector3(0, 0.05, -2.0)) if opts["room"] == "in" \
+			else ServerRoomView.door_point() + Vector3(0, 0.05, -4.0)
+		_player.look_toward(ServerRoomView.center() + Vector3(0, 0, 4.0))
 	if opts.has("tablet"):
 		_open_tablet()
 	if opts.has("ask"):
 		_cord.ask_now()
 	if opts.has("order"):
-		_spawn_order(int(Balancing.cord["order_count"]))
+		_spawn_order(_cord.order_count())
 		for id in _landing.keys():
 			_views[id].position.y = 0.0
 		_landing.clear()
@@ -1135,6 +1225,21 @@ func _apply_test_args() -> void:
 		var back: CableData = _system.cables.get(c.id)
 		print("STREAMTEST gespeichert=%s im_spielstand=%s zurueck=%s gezogen=%.1f knoten=%d" % [
 			stored, in_save, back != null, back.pulled_m if back else -1.0, back.knots_solved if back else -1])
+	if opts.has("fillbag"):
+		# So viele wichtige Kabel fertig aufrollen, wie angegeben (z. B. --fillbag=5): Tasche füllt sich, Rest fällt zu Boden
+		for k in int(opts["fillbag"]):
+			for c: CableData in _system.cables.values():
+				if c.is_important() and c.state == CableData.State.HEAP:
+					c.knots_m = PackedFloat32Array()
+					_system.hook(c, _arm_reel)
+					_system.pull(_arm_reel, 1000.0)
+					break
+	if opts.has("deliver"):
+		_deliver_bag()
+	if opts.has("jump"):
+		_player.jump()
+	if opts.has("snooze"):
+		_on_snooze_requested()
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):

@@ -1,69 +1,44 @@
 {
-	"_kommentar": "Dienste im Server-Schrank, ein Eintrag pro Port. 'unlocks' schaltet ein Upgrade im Tablet frei.",
+	"_kommentar": "Dienste im Serverraum. 'services': die 20 Einzel-Dienste (ein Port = ein Dienst, Campus-Schrank). 'rows': Dienste der Reihen je Schrank (eine volle Reihe à 10 Ports = ein Dienst); fehlt ein Eintrag, heißt der Dienst '<Viertel>, Reihe n' und hat keine Wirkung. Felder: 'unlocks' schaltet ein Upgrade im Tablet frei; 'bonus' wirkt dauerhaft (money, press, motor, walk, important_pay, ask_interval, order_count = Faktoren; bag, answer_time, knot_presses = werden addiert); 'payout' zahlt einmalig Geld; 'special' = Sonderfunktion; 'effect' = Text für den Spieler.",
 	"services": [
-		{
-			"name": "Wolkig-Mail",
-			"unlocks": "grip"
-		},
-		{
-			"name": "Kantinen-Speiseplan",
-			"unlocks": "auto_pull"
-		},
-		{
-			"name": "Kaffeemaschinen-Cloud",
-			"unlocks": "motor"
-		},
-		{
-			"name": "Druckerwarteschlange"
-		},
-		{
-			"name": "Chef-Kalender",
-			"unlocks": "copper"
-		},
-		{
-			"name": "Intranet-Witzseite"
-		},
-		{
-			"name": "Zeiterfassung"
-		},
-		{
-			"name": "Videokonferenz (nur Ton)"
-		},
-		{
-			"name": "Passwort zurücksetzen"
-		},
-		{
-			"name": "Gehaltsabrechnung"
-		},
-		{
-			"name": "Wetterdienst „Wolkig“"
-		},
-		{
-			"name": "Backup vom Backup"
-		},
-		{
-			"name": "Fax-zu-Cloud-Brücke"
-		},
-		{
-			"name": "Parkplatz-Reservierung"
-		},
-		{
-			"name": "Geburtstagsliste"
-		},
-		{
-			"name": "Stammtisch-Buchung"
-		},
-		{
-			"name": "Ticket-System"
-		},
-		{
-			"name": "Ersatzteil-Bestellung"
-		},
-		{
-			"name": "Aufzugsmusik-Stream"
-		},
-		{
-			"name": "C.O.R.D.-Abschaltknopf"
-		}
-	]
+		{ "name": "Wolkig-Mail", "unlocks": "grip" },
+		{ "name": "Kantinen-Speiseplan", "unlocks": "auto_pull" },
+		{ "name": "Kaffeemaschinen-Cloud", "unlocks": "motor" },
+		{ "name": "Druckerwarteschlange", "bonus": { "important_pay": 2.0 }, "effect": "Etiketten gedruckt: wichtige Kabel bringen den vollen Meterpreis" },
+		{ "name": "Chef-Kalender", "unlocks": "copper" },
+		{ "name": "Intranet-Witzseite", "bonus": { "walk": 1.1 }, "effect": "Gute Laune: 10 % schneller laufen" },
+		{ "name": "Zeiterfassung", "bonus": { "money": 1.1 }, "effect": "Überstunden zählen: 10 % mehr Geld pro Meter" },
+		{ "name": "Videokonferenz (nur Ton)", "bonus": { "answer_time": 3.0 }, "effect": "C.O.R.D. spricht deutlicher: 3 s mehr Zeit für „Nein“" },
+		{ "name": "Passwort zurücksetzen", "bonus": { "knot_presses": -1 }, "effect": "Knoten lösen sich mit einem Druck weniger" },
+		{ "name": "Gehaltsabrechnung", "payout": 100.0, "effect": "Nachzahlung: einmalig 100 €" },
+		{ "name": "Wetterdienst „Wolkig“", "bonus": { "order_count": 0.8 }, "effect": "Lieferungen bei Regen kleiner: 20 % weniger Kabel pro Bestellung" },
+		{ "name": "Backup vom Backup", "bonus": { "motor": 1.2 }, "effect": "Motorrollen ziehen 20 % schneller" },
+		{ "name": "Fax-zu-Cloud-Brücke", "bonus": { "press": 1.2 }, "effect": "Jeder Zug per Hand holt 20 % mehr Kabel" },
+		{ "name": "Parkplatz-Reservierung", "bonus": { "bag": 1 }, "effect": "Platz im Kofferraum: 1 Knäuel mehr in der Tasche" },
+		{ "name": "Geburtstagsliste", "payout": 150.0, "effect": "Kuchenkasse aufgelöst: einmalig 150 €" },
+		{ "name": "Stammtisch-Buchung", "bonus": { "money": 1.1 }, "effect": "Die Chefs sind abgelenkt: 10 % mehr Geld pro Meter" },
+		{ "name": "Ticket-System", "bonus": { "ask_interval": 1.5 }, "effect": "C.O.R.D. muss Tickets schreiben: fragt deutlich seltener" },
+		{ "name": "Ersatzteil-Bestellung", "bonus": { "order_count": 0.75 }, "effect": "Bestellmenge gedeckelt: 25 % weniger Kabel pro Bestellung" },
+		{ "name": "Aufzugsmusik-Stream", "bonus": { "walk": 1.1 }, "effect": "Mit Musik geht alles leichter: 10 % schneller laufen" },
+		{ "name": "C.O.R.D.-Abschaltknopf", "special": "cord_snooze", "effect": "Neu im Tablet: C.O.R.D. für 5 Minuten abschalten" }
+	],
+	"rows": {
+		"campus": [
+			{ "name": "Wolkig-Drive", "unlocks": "bag" },
+			{ "name": "Werksausweis-System", "bonus": { "walk": 1.15 }, "effect": "Alle Türen offen: 15 % schneller laufen" },
+			{ "name": "Campus-WLAN", "bonus": { "money": 1.15 }, "effect": "15 % mehr Geld pro Meter" }
+		],
+		"wohnviertel": [
+			{ "name": "Nachbarschafts-App", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
+			{ "name": "Paketstation", "bonus": { "bag": 1 }, "effect": "1 Knäuel mehr in der Tasche" },
+			{ "name": "Straßenlaternen-Steuerung", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
+			{ "name": "Müllabfuhr-Kalender", "bonus": { "order_count": 0.8 }, "effect": "20 % weniger Kabel pro Bestellung" },
+			{ "name": "Kita-Anmeldung", "bonus": { "press": 1.2 }, "effect": "Jeder Zug per Hand holt 20 % mehr Kabel" },
+			{ "name": "Stadtbücherei-Ausleihe", "payout": 500.0, "effect": "Mahngebühren erlassen: einmalig 500 €" },
+			{ "name": "Balkonkraftwerk-Portal", "bonus": { "motor": 1.25 }, "effect": "Motorrollen ziehen 25 % schneller" },
+			{ "name": "Lieferdienst „Pizza Wolke“", "bonus": { "walk": 1.1 }, "effect": "10 % schneller laufen" },
+			{ "name": "Vereins-Homepage", "bonus": { "money": 1.1 }, "effect": "10 % mehr Geld pro Meter" },
+			{ "name": "Smart-Home-Zentrale", "bonus": { "bag": 2 }, "effect": "2 Knäuel mehr in der Tasche" }
+		]
+	}
 }

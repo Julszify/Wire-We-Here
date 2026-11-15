@@ -17,6 +17,10 @@ var building_count := 0
 var _roads: Array[PackedVector2Array] = []  # Hauptstraßen als 2D-Linien (für Abstandstests)
 var _road_w := 12.0
 var _material: StandardMaterial3D
+## Hausmodelle aus Blender (tools/blender/building_designs.py): Einheitsmodelle 1 x 1 x 1 m, Vorderseite +Z
+const HOUSES_PATH := "res://assets/models/buildings/houses.glb"
+var _house_meshes: Array[Mesh] = []
+var _house_material: StandardMaterial3D
 
 
 func build(world_layout: WorldLayout) -> void:
@@ -100,6 +104,9 @@ func _build_district(d: Dictionary) -> void:
 	var body := StaticBody3D.new()
 	body.name = "Blockout_%s" % d["id"]
 	var ctx := { "d": d, "bo": bo, "rng": rng, "st": st, "body": body, "y": float(d["height_m"]) }
+	# Viertel mit "models": "houses" bekommen Hausmodelle statt grauer Kisten (Kollision bleibt die Kiste)
+	if String(bo.get("models", "")) == "houses" and _load_houses():
+		ctx["houses"] = []
 	if d.has("wall"):
 		_build_wall(ctx)
 	match String(bo.get("style", "grid")):
@@ -116,6 +123,49 @@ func _build_district(d: Dictionary) -> void:
 	mi.material_override = _material
 	body.add_child(mi)
 	add_child(body)
+	if ctx.has("houses"):
+		_build_houses(body, ctx["houses"])
+
+
+## Hausmodelle laden (einmal); false, wenn die Datei fehlt
+func _load_houses() -> bool:
+	if not _house_meshes.is_empty():
+		return true
+	if not ResourceLoader.exists(HOUSES_PATH):
+		return false
+	var scene := load(HOUSES_PATH) as PackedScene
+	if scene == null:
+		return false
+	var root := scene.instantiate()
+	for child in root.find_children("House*", "MeshInstance3D", true, false):
+		_house_meshes.append((child as MeshInstance3D).mesh)
+	root.free()
+	_house_material = StandardMaterial3D.new()
+	_house_material.vertex_color_use_as_albedo = true
+	_house_material.vertex_color_is_srgb = true  # Farben aus Blender sind sRGB-Werte
+	_house_material.roughness = 0.75
+	return not _house_meshes.is_empty()
+
+
+## Ein MultiMesh je Hausmodell: [Modell-Index, Transform, Farbton] je Haus
+func _build_houses(parent: Node3D, houses: Array) -> void:
+	for v in _house_meshes.size():
+		var list := houses.filter(func(h: Array) -> bool: return int(h[0]) == v)
+		if list.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = _house_meshes[v]
+		mm.instance_count = list.size()
+		for i in list.size():
+			mm.set_instance_transform(i, list[i][1])
+			mm.set_instance_color(i, list[i][2])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Houses%d" % (v + 1)
+		mmi.multimesh = mm
+		mmi.material_override = _house_material
+		parent.add_child(mmi)
 
 
 ## Straßenraster: Straßen auf den Mittelachsen und im Abstand block_m; dazwischen Grundstücke
@@ -183,7 +233,7 @@ func _fill_block(ctx: Dictionary, cell: Rect2) -> void:
 					1: r = Rect2(cell.position.x + t, cell.end.y - depth, w - 1.0, depth)
 					2: r = Rect2(cell.position.x, cell.position.y + depth + t, depth, w - 1.0)
 					_: r = Rect2(cell.end.x - depth, cell.position.y + depth + t, depth, w - 1.0)
-				_lot(ctx, r, h)
+				_lot(ctx, r, h, edge)
 			t += w
 
 
@@ -199,8 +249,9 @@ func _tower_block(ctx: Dictionary, cell: Rect2) -> void:
 	_lot(ctx, cell.grow(-6.0), 8.0)  # Sockelgeschoss
 
 
-## Ein Gebäude auf einem Grundstück (überspringt Grundstücke auf Hauptstraßen)
-func _lot(ctx: Dictionary, r: Rect2, height: float) -> void:
+## Ein Gebäude auf einem Grundstück (überspringt Grundstücke auf Hauptstraßen).
+## `edge` = Seite des Blocks, an der es steht (0 Nord, 1 Süd, 2 West, 3 Ost); die Haustür zeigt zur Straße.
+func _lot(ctx: Dictionary, r: Rect2, height: float, edge: int = 1) -> void:
 	if r.size.x < 3.0 or r.size.y < 3.0:
 		return
 	var center := r.get_center()
@@ -209,9 +260,21 @@ func _lot(ctx: Dictionary, r: Rect2, height: float) -> void:
 	var y: float = ctx["y"]
 	var shade := ctx["rng"].randf_range(0.66, 0.82) as float
 	var color := Color(shade, shade, shade + 0.02)
-	_box(ctx, Vector3(center.x, y + (height - BASE_DEPTH) * 0.5, center.y),
-		Vector3(r.size.x, height + BASE_DEPTH, r.size.y), color, true)
+	var box_center := Vector3(center.x, y + (height - BASE_DEPTH) * 0.5, center.y)
+	var box_size := Vector3(r.size.x, height + BASE_DEPTH, r.size.y)
 	building_count += 1
+	if not ctx.has("houses"):
+		_box(ctx, box_center, box_size, color, true)
+		return
+	# Hausmodell: Kollision als Kiste, Darstellung als Instanz im MultiMesh
+	_collider(ctx, box_center, box_size)
+	var angle: float = [PI, 0.0, -PI * 0.5, PI * 0.5][edge]
+	var along := r.size.x if edge < 2 else r.size.y
+	var deep := r.size.y if edge < 2 else r.size.x
+	var basis := Basis(Vector3.UP, angle) * Basis.from_scale(Vector3(along, height, deep))
+	var variant := posmod(hash([roundi(center.x), roundi(center.y)]), _house_meshes.size())
+	var tint := 0.82 + (shade - 0.66) / 0.16 * 0.18
+	(ctx["houses"] as Array).append([variant, Transform3D(basis, Vector3(center.x, y, center.y)), Color(tint, tint, tint)])
 
 
 func _is_kept_free(bo: Dictionary, cell: Rect2) -> bool:
@@ -377,9 +440,13 @@ func _box(ctx: Dictionary, center: Vector3, size: Vector3, color: Color, collide
 		st.add_vertex(a); st.add_vertex(b); st.add_vertex(cc)
 		st.add_vertex(a); st.add_vertex(cc); st.add_vertex(dd)
 	if collide:
-		var col := CollisionShape3D.new()
-		var shape := BoxShape3D.new()
-		shape.size = size
-		col.shape = shape
-		col.position = center
-		(ctx["body"] as StaticBody3D).add_child(col)
+		_collider(ctx, center, size)
+
+
+func _collider(ctx: Dictionary, center: Vector3, size: Vector3) -> void:
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	col.shape = shape
+	col.position = center
+	(ctx["body"] as StaticBody3D).add_child(col)
