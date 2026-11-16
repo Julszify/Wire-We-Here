@@ -9,7 +9,14 @@ var _spin: Node3D
 
 ## Trommelgröße relativ zur normalen Rolle (Wagen-Plätze sind kleiner)
 static func scale_of(reel: ReelData) -> float:
-	return float(Balancing.wagon.get("drum_scale", 0.6)) if reel.kind == ReelData.Kind.WAGON else 1.0
+	match reel.kind:
+		ReelData.Kind.WAGON:
+			return float(Balancing.wagon.get("drum_scale", 0.6))
+		ReelData.Kind.VACUUM:
+			return float(Balancing.vacuum.get("coil_scale", 0.28))
+		ReelData.Kind.DRONE:
+			return float(Balancing.drone.get("coil_scale", 0.3))
+	return 1.0
 
 
 func setup(reel: ReelData) -> void:
@@ -27,6 +34,8 @@ func setup(reel: ReelData) -> void:
 		flange_color = Color(0.54, 0.35, 0.23)
 	elif reel.kind == ReelData.Kind.WAGON:
 		flange_color = Color(0.2, 0.5, 0.9)
+	elif reel.kind == ReelData.Kind.WINCH:
+		flange_color = Color(0.25, 0.72, 0.35)
 	var flange_mat := _material(flange_color, 0.7, 0.0)
 
 	_spin = Node3D.new()
@@ -78,6 +87,22 @@ func setup(reel: ReelData) -> void:
 		motor.material_override = _material(Color(0.23, 0.26, 0.31), 0.6, 0.0)
 		motor.position = Vector3(flange_r + 0.2, 0.2, 0)
 		add_child(motor)
+		if reel.kind == ReelData.Kind.WINCH:
+			# Haufen-Winde: Mast mit Ausleger und grüner Lampe (von weitem zu erkennen)
+			var mast_mat := _material(Color(0.25, 0.72, 0.35), 0.6, 0.0)
+			_add_cylinder(self, 0.07, 2.6, Vector3(flange_r + 0.2, 1.5, 0), mast_mat)
+			var lamp := MeshInstance3D.new()
+			var lamp_mesh := SphereMesh.new()
+			lamp_mesh.radius = 0.16
+			lamp_mesh.height = 0.3
+			lamp.mesh = lamp_mesh
+			var glow := _material(Color(0.4, 1.0, 0.5), 0.3, 0.0)
+			glow.emission_enabled = true
+			glow.emission = Color(0.4, 1.0, 0.5)
+			glow.emission_energy_multiplier = 2.5
+			lamp.material_override = glow
+			lamp.position = Vector3(flange_r + 0.2, 2.9, 0)
+			add_child(lamp)
 
 
 ## Getragen: verkleinert neben der Figur; abgestellt: normale Größe am Boden

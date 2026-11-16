@@ -54,7 +54,7 @@ static func find_reel(reels: Array, ray_origin: Vector3, ray_dir: Vector3, playe
 	var best: ReelData = null
 	var best_d: float = Balancing.reel["flange_radius_m"]
 	for reel: ReelData in reels:
-		if reel.kind == ReelData.Kind.ARM:
+		if reel.kind == ReelData.Kind.ARM or reel.kind == ReelData.Kind.VACUUM or reel.kind == ReelData.Kind.DRONE:
 			continue
 		var center := reel.position + Vector3(0.0, 0.6, 0.0)
 		var d := _hit(center, ray_origin, ray_dir, player_pos, p["reel_reach_m"])

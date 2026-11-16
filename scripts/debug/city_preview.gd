@@ -28,7 +28,7 @@ func _ready() -> void:
 	ToonLook.install(self, _player.camera)
 	layout = city.layout
 	terrain = city.terrain
-	print("STADT erzeugt in %d ms (%d Gebäude)" % [Time.get_ticks_msec() - t0, city.blockout.building_count])
+	print("STADT erzeugt in %d ms (%d Gebäude, davon %d im Umland, dazu %d Bäume und Ausstattung)" % [Time.get_ticks_msec() - t0, city.blockout.building_count, city.blockout.countryside_count, city.blockout.countryside_props])
 	_build_district_signs()
 	_place(layout.spawn)
 

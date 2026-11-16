@@ -90,6 +90,7 @@
 			"base_cost": 60.0,
 			"cost_growth": 2.3,
 			"effect_factor": 1.35,
+			"max_count": 12,
 			"description": "Jeder Meter bringt 35 % mehr Geld."
 		},
 		"bag": {
@@ -114,6 +115,75 @@
 			"max_count": 1,
 			"presses_per_second": 4.0,
 			"description": "Zieh-Taste gedrückt halten statt hämmern."
+		},
+		"vacuum": {
+			"name": "Kabelsauger",
+			"base_cost": 1500.0,
+			"cost_growth": 1.0,
+			"max_count": 1,
+			"description": "Handgerät: Linksklick halten (Arm frei) saugt alle Kabelenden vor dir ein, mehrere gleichzeitig. Knoten schüttelt er selbst los."
+		},
+		"vacuum_power": {
+			"name": "Saugkraft",
+			"base_cost": 2500.0,
+			"cost_growth": 2.3,
+			"effect_factor": 1.5,
+			"max_count": 8,
+			"description": "Der Kabelsauger zieht 50 % schneller."
+		},
+		"vacuum_nozzle": {
+			"name": "Breitere Düse",
+			"base_cost": 4000.0,
+			"cost_growth": 2.5,
+			"max_count": 6,
+			"description": "Der Kabelsauger fasst 2 Kabel mehr gleichzeitig und reicht weiter."
+		},
+		"vacuum_auto": { "name": "Sauger-Dauerbetrieb", "base_cost": 6000.0, "cost_growth": 1.0, "max_count": 1, "description": "Der Kabelsauger läuft weiter, ohne dass du die Maustaste hältst: Linksklick schaltet ihn an und aus." },
+		"vacuum_cyclone": { "name": "Zyklon-Kammer", "base_cost": 20000.0, "cost_growth": 2.8, "effect_add": 3, "max_count": 4, "description": "Der Kabelsauger fasst 3 Kabel mehr gleichzeitig." },
+		"shoes": { "name": "Laufschuhe", "base_cost": 120.0, "cost_growth": 2.6, "effect_factor": 1.1, "max_count": 5, "description": "Du läufst und rennst 10 % schneller." },
+		"winch": {
+			"name": "Haufen-Winde",
+			"base_cost": 4000.0,
+			"cost_growth": 2.2,
+			"max_count": 6,
+			"description": "Stellt eine Winde auf, die einen Haufen in der Nähe Kabel für Kabel von selbst abrollt – auch wenn du weg bist."
+		},
+		"winch_speed": {
+			"name": "Windenmotor",
+			"base_cost": 6000.0,
+			"cost_growth": 3.0,
+			"effect_factor": 1.5,
+			"max_count": 6,
+			"description": "Alle Haufen-Winden ziehen 50 % schneller."
+		},
+		"drone": {
+			"name": "Abräum-Drohne",
+			"base_cost": 15000.0,
+			"cost_growth": 2.4,
+			"max_count": 8,
+			"description": "Fliegt in ihrem Einsatzgebiet von Haufen zu Haufen, rollt Kabel ab und bringt wichtige Knäuel selbst in den Serverraum."
+		},
+		"drone_speed": {
+			"name": "Drohnen-Turbo",
+			"base_cost": 25000.0,
+			"cost_growth": 3.5,
+			"effect_factor": 1.5,
+			"max_count": 5,
+			"description": "Drohnen ziehen und fliegen 50 % schneller."
+		},
+		"detector": {
+			"name": "Kabel-Detektor",
+			"base_cost": 300.0,
+			"cost_growth": 1.0,
+			"max_count": 1,
+			"description": "Zeigt unten rechts, wie nah das nächste wichtige Kabel ist: kalt, lau, warm, heiß."
+		},
+		"detector_arrow": {
+			"name": "Peilantenne",
+			"base_cost": 2500.0,
+			"cost_growth": 1.0,
+			"max_count": 1,
+			"description": "Der Detektor zeigt zusätzlich Richtung und Entfernung zum nächsten wichtigen Kabel."
 		}
 	},
 	"hand_crank": {
@@ -136,8 +206,12 @@
 		"recouple_range_m": 8.0
 	},
 	"zipline": {
-		"_kommentar": "Seilbahn zur Basis (Strecken in world.json → ziplines). hang_m = Abstand Seil bis Füße",
-		"speed_m_per_s": 16.0,
+		"_kommentar": "Seilbahn zur Basis (Strecken in world.json → ziplines). hang_m = Abstand Seil bis Füße. Fährt mit start_speed an, beschleunigt (accel) bis speed_m_per_s und bremst (brake) auf arrive_speed vor der Endstation",
+		"speed_m_per_s": 42.0,
+		"start_speed_m_per_s": 6.0,
+		"accel_m_per_s2": 12.0,
+		"brake_m_per_s2": 14.0,
+		"arrive_speed_m_per_s": 5.0,
 		"hang_m": 2.05,
 		"sag_per_m": 0.025,
 		"min_clearance_m": 3.0,
@@ -176,6 +250,8 @@
 		"aim_radius_m": 0.35,
 		"tether_length_m": 6.0,
 		"max_speed_factor": 1.6,
+		"max_total_speed_factor": 2.2,
+		"_kommentar_tempo": "max_speed_factor deckelt die Dienst-Boni fürs Lauftempo, max_total_speed_factor alles zusammen mit den Laufschuhen",
 		"reel_reach_m": 3.2
 	},
 	"arm": {
@@ -214,7 +290,19 @@
 		"motor",
 		"copper",
 		"bag",
-		"wagon"
+		"shoes",
+		"detector",
+		"wagon",
+		"detector_arrow",
+		"vacuum",
+		"vacuum_power",
+		"vacuum_nozzle",
+		"vacuum_cyclone",
+		"vacuum_auto",
+		"winch",
+		"winch_speed",
+		"drone",
+		"drone_speed"
 	],
 	"rack": {
 		"reach_m": 3.0
@@ -271,5 +359,41 @@
 		"cell_m": 25.0,
 		"jobs_per_frame": 6,
 		"lod_jobs_per_check": 24
+	},
+	"vacuum": {
+		"_kommentar": "Kabelsauger: Linksklick halten bei freiem Arm. slots = Kabel gleichzeitig (+slots_per_nozzle je Stufe Breitere Düse), radius_m = Reichweite um die Saugmitte (reach_ahead_m vor der Figur), pull_speed je Kabel (× Saugkraft), auto_untie_s = Knoten lösen sich nach so vielen Sekunden",
+		"slots": 3,
+		"slots_per_nozzle": 2,
+		"radius_m": 3.5,
+		"radius_per_nozzle_m": 0.8,
+		"reach_ahead_m": 2.2,
+		"pull_speed_m_per_s": 4.0,
+		"auto_untie_s": 1.0,
+		"grab_interval_s": 0.12,
+		"coil_scale": 0.28
+	},
+	"winch": {
+		"_kommentar": "Haufen-Winde: hängt selbst das nächste Kabelende im Umkreis radius_m ein und zieht es ab (× Windenmotor)",
+		"radius_m": 10.0,
+		"pull_speed_m_per_s": 6.0,
+		"auto_untie_s": 2.0,
+		"grab_interval_s": 0.4
+	},
+	"drone": {
+		"_kommentar": "Abräum-Drohne: arbeitet im Umkreis work_radius_m um ihren Einsatzort (Tablet: Drohnen zu mir rufen), fliegt in cruise_height_m über dem Boden, schwebt beim Ziehen hover_height_m über dem Kabelende, bringt bis zu capacity Knäuel in den Serverraum (× Drohnen-Turbo für Ziehen und Fliegen)",
+		"work_radius_m": 45.0,
+		"fly_speed_m_per_s": 14.0,
+		"cruise_height_m": 10.0,
+		"hover_height_m": 1.6,
+		"pull_speed_m_per_s": 8.0,
+		"auto_untie_s": 1.5,
+		"capacity": 3,
+		"coil_scale": 0.3,
+		"stream_radius_m": 60.0
+	},
+	"detector": {
+		"_kommentar": "Kabel-Detektor: Reichweite in Metern (darüber kalt) und wie oft das nächste wichtige Kabel gesucht wird",
+		"range_m": 80.0,
+		"scan_interval_s": 0.25
 	}
 }

@@ -56,7 +56,7 @@
 			},
 			"ground": "platten",
 			"important_cables": 50,
-			"cables": {"seed": 2107, "unit": 4, "section": "turm", "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Wolkig-Turm", "at": [-658.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-742.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}]},
+			"cables": {"seed": 2107, "unit": 4, "section": "", "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Wolkig-Turm", "at": [-658.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-742.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}]},
 			"wall": {
 				"height_m": 2.6,
 				"thickness_m": 1.2,
@@ -260,6 +260,32 @@
 		"center": [120, 735],
 		"size": [320, 130],
 		"depth_m": -8
+	},
+	"countryside": {
+		"_kommentar": "Bebauung zwischen den Vierteln (CityBlockout._build_countryside), ohne Kabel: Häuser (Blender-Modelle) und Scheunen (Kiste + Bausatz-Dach) an den Hauptstraßen (roadside), verstreute Höfe auf der Wiese (farms, Raster cell_m bis ±extent_m) und kleine Vororte (suburbs). Abstände: district_gap_m zu Vierteln, barrier_gap_m zu Straßenenden (dort liegen die Sperren), zipline_gap_m zu Seilbahnen; max_slope_m = größter Höhenunterschied unter einem Gebäude; Größen *_size = [[längs], [tief], [hoch]] in Metern",
+		"district_gap_m": 35,
+		"barrier_gap_m": 60,
+		"zipline_gap_m": 15,
+		"max_slope_m": 2.5,
+		"min_height_m": 1.5,
+		"blockout": {
+			"kit": { "facade": "warehouse", "roofs": [["RoofGable", 3], ["RoofSawtooth", 1]], "roof_palette": ["#9b4a3a", "#7d5a44", "#5c6470", "#a5452f"] },
+			"palette": ["#c9a27a", "#b5894f", "#d8c7a8", "#a8b49a", "#c98b6b"]
+		},
+		"roadside": { "chance": 0.55, "barn_chance": 0.25, "setback_m": 7, "spacing_min_m": 22, "spacing_max_m": 38, "end_gap_m": 45 },
+		"farms": { "cell_m": 85, "extent_m": 940, "chance": 0.45, "barn_chance": 0.85, "second_barn_chance": 0.3 },
+		"props": { "_kommentar": "Ausstattung im Umland mit den Modellen des Hinterhofs (YardProps): in Kacheln zu chunk_m, ab range_m ausgeblendet", "chunk_m": 160, "range_m": 380, "house_trees": ["TreeRound", "TreeRound", "TreeAutumn", "TreePine"] },
+		"avenues": { "road_chance": 0.7, "spacing_m": 14, "offset_m": 3.5, "end_gap_m": 50, "models": ["TreeRound", "TreeAutumn", "TreePine"] },
+		"groves": { "cell_m": 110, "extent_m": 980, "chance": 0.5, "radius_max_m": 26, "trees_min": 5, "trees_max": 14, "pine_above_m": 25 },
+		"suburbs": [
+			{ "name": "Sonnenhang", "center": [290, 60], "size": [190, 150] },
+			{ "name": "Kirchberg", "center": [330, -135], "size": [150, 100], "lamp": "LampOld" },
+			{ "name": "Lindenau", "center": [-280, 290], "size": [150, 120] },
+			{ "name": "Nordheide", "center": [70, -720], "size": [230, 110] },
+			{ "name": "Westend", "center": [-760, 75], "size": [140, 100], "lamp": "LampOld" },
+			{ "name": "Seeblick", "center": [-560, 515], "size": [300, 80] },
+			{ "name": "Am Ostrand", "center": [770, -330], "size": [130, 170] }
+		]
 	},
 	"landmarks": [
 		{
@@ -473,5 +499,7 @@
 		"load_m": 150,
 		"unload_m": 220,
 		"_kommentar": "Einheiten (Viertel, Sperren) laden, wenn der Spieler näher als load_m an ihrem Rand ist, und entladen ab unload_m"
-	}
+	},
+	"sites": [{"id": "turm_oben", "name": "Wolkig-Turm", "unit": 18, "seed": 2108, "section": "turm", "at": [-700, -700], "half": [35, 35], "heaps": [{"name": "Etage 40", "at": [-677, -700], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-723, -700], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-700, -723], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-688, -677], "lift_m": 120, "count": 150, "radius": 3.0, "peak": 1.5}, {"name": "Etage 40", "at": [-712, -677], "lift_m": 120, "count": 150, "radius": 3.0, "peak": 1.5}, {"name": "Dach", "at": [-692, -692], "lift_m": 200, "count": 400, "radius": 3.5, "peak": 2.0}, {"name": "Dach", "at": [-710, -689], "lift_m": 200, "count": 400, "radius": 3.5, "peak": 2.0}, {"name": "Dach", "at": [-686, -702], "lift_m": 200, "count": 400, "radius": 3.0, "peak": 1.8}], "_kommentar": "Kabel oben im Turm (Etage 40 und Dach) mit den 150 Turm-Kabeln; lift_m = Höhe über dem Boden"}],
+	"tower_finale": {"_kommentar": "Finale im Wolkig-Turm: Aufzug mit drei Halten (Erdgeschoss, Etage 40 mit umlaufender Plattform, Dach). Er fährt erst, wenn alle anderen Schränke voll sind. Auf dem Dach steht C.O.R.D.s Kern; sind alle 2000 Ports belegt, schaltet E ihn ab.", "landmark": "turm", "deck_height_m": 120, "deck_width_m": 10, "railing_m": 1.2, "stops": [{"name": "Erdgeschoss", "at": [-700, -680.5], "lift_m": 0}, {"name": "Etage 40", "at": [-700, -676], "lift_m": 120}, {"name": "Dach", "at": [-700, -685], "lift_m": 200}], "core": {"at": [-709, -709], "lift_m": 200}}
 }

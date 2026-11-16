@@ -7,6 +7,8 @@ signal closed
 signal new_game_requested
 ## Abschaltknopf für C.O.R.D. gedrückt (Dienst mit special "cord_snooze")
 signal snooze_requested
+## Alle Abräum-Drohnen arbeiten ab jetzt dort, wo der Spieler steht
+signal drones_recall_requested
 
 var economy: Economy
 var rack: ServiceRack
@@ -17,7 +19,9 @@ var _services: Label
 var _rows: Dictionary = {}  # Upgrade-ID -> { level, button, desc }
 var _new_game: Button
 var _snooze: Button
+var _recall: Button
 var _effects: Label
+var _progress: Label
 var _confirm := false
 
 
@@ -63,9 +67,15 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 	head.add_child(_money)
 
 	box.add_child(HSeparator.new())
+	# Viele Werkzeuge: Liste scrollt, damit das Tablet auf den Bildschirm passt
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 430)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 10)
-	box.add_child(_list)
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_list)
 	for id in Balancing.tablet_order:
 		_add_row(String(id))
 
@@ -73,6 +83,11 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 	_services = Label.new()
 	_services.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
 	box.add_child(_services)
+	_progress = Label.new()
+	_progress.add_theme_font_size_override("font_size", 14)
+	_progress.add_theme_color_override("font_color", Color(0.75, 0.82, 0.95))
+	_progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_progress)
 	_effects = Label.new()
 	_effects.add_theme_font_size_override("font_size", 14)
 	_effects.add_theme_color_override("font_color", Color(0.6, 0.85, 0.7))
@@ -82,6 +97,11 @@ func setup(eco: Economy, service_rack: ServiceRack) -> void:
 	_snooze.custom_minimum_size = Vector2(0, 40)
 	_snooze.pressed.connect(func() -> void: snooze_requested.emit())
 	box.add_child(_snooze)
+	_recall = Button.new()
+	_recall.custom_minimum_size = Vector2(0, 40)
+	_recall.text = "Drohnen zu mir rufen (arbeiten ab jetzt hier)"
+	_recall.pressed.connect(func() -> void: drones_recall_requested.emit())
+	box.add_child(_recall)
 	var foot := HBoxContainer.new()
 	box.add_child(foot)
 	var hint := Label.new()
@@ -158,6 +178,12 @@ func refresh() -> void:
 		rack.active_services(), RackPlan.total_services(), rack.active_count(), RackPlan.total_ports(), economy.bag_capacity()]
 	_effects.text = _effects_text()
 	_effects.visible = _effects.text != ""
+	# Fortschritt je Viertel: eingesteckte wichtige Kabel / Ports des Schranks
+	var parts: PackedStringArray = []
+	for sec in RackPlan.sections():
+		parts.append("%s %d/%d" % [sec["name"], RackPlan.section_plugged(economy.state, sec["id"]), int(sec["count"])])
+	_progress.text = "Wichtige Kabel je Viertel:  " + "  ·  ".join(parts)
+	_recall.visible = economy.state.level("drone") > 0
 	_snooze.visible = RackPlan.has_special(economy.state, "cord_snooze")
 	var wait := economy.state.snooze_cooldown
 	_snooze.disabled = wait > 0.0

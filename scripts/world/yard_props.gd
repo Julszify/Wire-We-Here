@@ -42,23 +42,31 @@ func build(city: CityWorld) -> void:
 		placed.append([String(it["model"]), Vector3(float(p[0]), 0.0, float(p[1])), float(it.get("rot", 0.0)), float(it.get("scale", 1.0))])
 	_ring(cfg.get("ring", {}), city)
 
-	var scene := load(MODEL_PATH) as PackedScene
-	var root := scene.instantiate()
-	var tripo := _load_tripo()
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.vertex_color_is_srgb = true  # Farben aus Blender sind sRGB-Werte
-	mat.roughness = 0.7
+	for pr in placed:
+		pr[1].y = city.ground_height(pr[1].x, pr[1].z)
 	var body := StaticBody3D.new()
 	body.name = "PropsBody"
 	add_child(body)
+	add_items(self, body, placed)
+
+
+## Stücke aufstellen: [Modell, Position (mit Bodenhöhe), Drehung in Grad, Größe] je Stück; ein MultiMesh je Modell
+## bzw. Tripo-Variante, Kollision als Kisten in `body` (null = keine). Mit `chunk_m` > 0 wird nach Kacheln
+## getrennt und ab `range_m` ausgeblendet (für weit verteilte Stücke wie im Umland).
+static func add_items(parent: Node3D, body: StaticBody3D, items: Array, chunk_m := 0.0, range_m := 0.0) -> void:
+	if items.is_empty():
+		return
+	var tripo := _tripo_variants()
 	var by_model := {}
-	for pr in placed:
-		pr[1].y = city.ground_height(pr[1].x, pr[1].z)
-		if not by_model.has(pr[0]):
-			by_model[pr[0]] = []
-		by_model[pr[0]].append(pr)
-		if COLLIDERS.has(pr[0]):
+	for pr in items:
+		var key := String(pr[0])
+		if chunk_m > 0.0:
+			var p: Vector3 = pr[1]
+			key += "@%d,%d" % [floori(p.x / chunk_m), floori(p.z / chunk_m)]
+		if not by_model.has(key):
+			by_model[key] = []
+		by_model[key].append(pr)
+		if body and COLLIDERS.has(pr[0]):
 			var size: Vector3 = COLLIDERS[pr[0]] * float(pr[3])
 			var col := CollisionShape3D.new()
 			var shape := BoxShape3D.new()
@@ -67,32 +75,64 @@ func build(city: CityWorld) -> void:
 			col.position = pr[1] + Vector3(0, size.y * 0.5, 0)
 			col.rotation.y = deg_to_rad(pr[2])
 			body.add_child(col)
-	for model: String in by_model:
+	var root: Node = null
+	for key: String in by_model:
+		var model := key.get_slice("@", 0)
+		var list: Array = by_model[key]
+		var nodes: Array[GeometryInstance3D] = []
 		if tripo.has(model):
-			_add_tripo(model, tripo[model], by_model[model])
-			continue
-		var src := root.find_child(model, true, false) as MeshInstance3D
-		if src == null:
-			push_warning("Hof-Ausstattung: Modell %s fehlt" % model)
-			continue
-		var list: Array = by_model[model]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = src.mesh
-		mm.instance_count = list.size()
-		for i in list.size():
-			var basis := Basis(Vector3.UP, deg_to_rad(list[i][2])).scaled(Vector3.ONE * float(list[i][3]))
-			mm.set_instance_transform(i, Transform3D(basis, list[i][1]))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = model
-		mmi.multimesh = mm
-		mmi.material_override = mat
-		add_child(mmi)
-	root.free()
+			nodes = _add_tripo(parent, model, tripo[model], list)
+		else:
+			if root == null:
+				if not ResourceLoader.exists(MODEL_PATH):
+					continue
+				root = (load(MODEL_PATH) as PackedScene).instantiate()
+			var src := root.find_child(model, true, false) as MeshInstance3D
+			if src == null:
+				push_warning("Ausstattung: Modell %s fehlt" % model)
+				continue
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = src.mesh
+			mm.instance_count = list.size()
+			for i in list.size():
+				mm.set_instance_transform(i, _place_xf(list[i]))
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = model
+			mmi.multimesh = mm
+			mmi.material_override = _blender_material()
+			parent.add_child(mmi)
+			nodes.append(mmi)
+		if range_m > 0.0:
+			for n in nodes:
+				n.visibility_range_end = range_m
+				n.visibility_range_end_margin = range_m * 0.1
+				n.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	if root:
+		root.free()
+
+
+static var _blender_mat: StandardMaterial3D
+static func _blender_material() -> StandardMaterial3D:
+	if _blender_mat == null:
+		_blender_mat = StandardMaterial3D.new()
+		_blender_mat.vertex_color_use_as_albedo = true
+		_blender_mat.vertex_color_is_srgb = true  # Farben aus Blender sind sRGB-Werte
+		_blender_mat.roughness = 0.7
+	return _blender_mat
+
+
+static var _tripo_cache: Dictionary = {}
+static var _tripo_loaded := false
+static func _tripo_variants() -> Dictionary:
+	if not _tripo_loaded:
+		_tripo_cache = _load_tripo()
+		_tripo_loaded = true
+	return _tripo_cache
 
 
 ## Tripo-Varianten laden: Teilname -> [[Mesh, Normalisierung (auf Höhe, Fuß bei 0, zentriert)], …]
-func _load_tripo() -> Dictionary:
+static func _load_tripo() -> Dictionary:
 	var out := {}
 	for model: String in TRIPO:
 		var cfg: Dictionary = TRIPO[model]
@@ -127,7 +167,8 @@ func _load_tripo() -> Dictionary:
 
 
 ## Ein MultiMesh je Tripo-Variante; Laternen bekommen ein kleines Leuchtteil am Lampenkopf
-func _add_tripo(model: String, variants: Array, list: Array) -> void:
+static func _add_tripo(parent: Node3D, model: String, variants: Array, list: Array) -> Array[GeometryInstance3D]:
+	var out: Array[GeometryInstance3D] = []
 	var cfg: Dictionary = TRIPO[model]
 	var per := []
 	for v in variants:
@@ -155,7 +196,8 @@ func _add_tripo(model: String, variants: Array, list: Array) -> void:
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "%s_%d" % [model, vi + 1]
 		mmi.multimesh = mm
-		add_child(mmi)
+		parent.add_child(mmi)
+		out.append(mmi)
 		if glow_mat:
 			# Leuchtkugel am Lampenkopf: Lage als Anteil der Breite (seitlich) und Höhe
 			var size: Vector3 = variants[vi][2]
@@ -168,9 +210,11 @@ func _add_tripo(model: String, variants: Array, list: Array) -> void:
 				var mi := MeshInstance3D.new()
 				mi.mesh = bulb
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				add_child(mi)
+				parent.add_child(mi)
+				out.append(mi)
 				mi.transform = _place_xf(it) * Transform3D(Basis.IDENTITY,
 					Vector3(0, float(g[1]) * size.y, float(g[0]) * maxf(size.x, size.z)))
+	return out
 
 
 static func _place_xf(pr: Array) -> Transform3D:

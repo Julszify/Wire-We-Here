@@ -14,6 +14,8 @@ const ROAD_COLOR := Color(0.27, 0.28, 0.31)
 
 var layout: WorldLayout
 var building_count := 0
+var countryside_count := 0  # davon im Umland
+var countryside_props := 0  # Bäume, Büsche, Laternen … im Umland
 var _roads: Array[PackedVector2Array] = []  # Hauptstraßen als 2D-Linien (für Abstandstests)
 var _road_w := 12.0
 var _material: ShaderMaterial
@@ -75,6 +77,7 @@ func build(world_layout: WorldLayout) -> void:
 	for d in layout.districts:
 		_build_district(d)
 	_build_landmarks()
+	_build_countryside()
 
 
 # ---------------------------------------------------------------- Hauptstraßen
@@ -640,6 +643,371 @@ func _build_landmarks() -> void:
 	add_child(body)
 	if ctx.has("kit"):
 		_build_kit(body, ctx["kit"])
+
+
+# ---------------------------------------------------------------- Umland
+
+## Bebauung zwischen den Vierteln (world.json → countryside): Häuser und Scheunen an den Hauptstraßen und
+## kleine Vororte ohne Kabel in den großen Lücken. Alles steht auf dem Gelände (keine eingeebnete Fläche);
+## Stellen zu nah an Vierteln, Sperren, Seilbahnen, Meer, Krater oder an steilen Hängen bleiben frei.
+func _build_countryside() -> void:
+	var cfg: Dictionary = layout.raw().get("countryside", {})
+	if cfg.is_empty():
+		return
+	var before := building_count
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("umland")
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var body := StaticBody3D.new()
+	body.name = "Blockout_umland"
+	var bo: Dictionary = cfg.get("blockout", {})
+	var ctx := { "bo": bo, "rng": rng, "st": st, "body": body, "y": 0.0, "taken": [], "cfg": cfg, "props": [] }
+	if _load_houses():
+		ctx["houses"] = []
+	var kit_ctx := ctx.duplicate()  # Scheunen und Hallen: Kiste mit Bausatz-Dach
+	kit_ctx.erase("houses")
+	if bo.has("kit") and _load_kit():
+		kit_ctx["kit"] = {}
+	ctx["kit_ctx"] = kit_ctx
+	var streets := SurfaceTool.new()
+	streets.begin(Mesh.PRIMITIVE_TRIANGLES)
+	ctx["streets"] = streets
+	for v in cfg.get("suburbs", []):
+		_build_suburb(ctx, v)
+	_build_roadside(ctx, cfg.get("roadside", {}))
+	_build_farms(ctx, cfg.get("farms", {}))
+	_build_avenues(ctx, cfg.get("avenues", {}))
+	_build_groves(ctx, cfg.get("groves", {}))
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _material
+	body.add_child(mi)
+	var smi := MeshInstance3D.new()
+	smi.name = "Streets"
+	smi.mesh = streets.commit()
+	smi.material_override = _material
+	body.add_child(smi)
+	add_child(body)
+	if ctx.has("houses"):
+		_build_houses(body, ctx["houses"])
+	if kit_ctx.has("kit"):
+		_build_kit(body, kit_ctx["kit"])
+	countryside_count = building_count - before
+	# Ausstattung aus dem Hinterhof (Tripo-Bäume, Büsche, Laternen …): in Kacheln, weit weg ausgeblendet
+	var pc: Dictionary = cfg.get("props", {})
+	YardProps.add_items(body, body, ctx["props"], float(pc.get("chunk_m", 160.0)), float(pc.get("range_m", 380.0)))
+	countryside_props = (ctx["props"] as Array).size()
+
+
+## Häuser und Scheunen links und rechts der Hauptstraßen, Vorderseite zur Straße
+func _build_roadside(ctx: Dictionary, rs: Dictionary) -> void:
+	if rs.is_empty():
+		return
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var end_gap := float(rs.get("end_gap_m", 90.0))
+	for line in _roads:
+		var a: Vector2 = line[0]
+		var b: Vector2 = line[1]
+		var length := a.distance_to(b)
+		var dir := (b - a) / maxf(length, 0.01)
+		var t := end_gap
+		while t < length - end_gap:
+			for side in [-1.0, 1.0]:
+				if rng.randf() > float(rs.get("chance", 0.5)):
+					continue
+				var barn := rng.randf() < float(rs.get("barn_chance", 0.2))
+				var size := _building_size(rng, rs, barn)
+				var normal: Vector2 = dir.orthogonal() * side
+				var at: Vector2 = a + dir * (t + rng.randf_range(-4.0, 4.0)) \
+					+ normal * (_road_w * 0.5 + float(rs.get("setback_m", 6.0)) + size.y * 0.5)
+				_country_building(ctx, at, size, -normal, barn)
+			t += rng.randf_range(float(rs.get("spacing_min_m", 22.0)), float(rs.get("spacing_max_m", 40.0)))
+
+
+## Verstreute Höfe auf der freien Wiese: Raster mit Zufallsversatz, je Hof ein Haus und meist eine Scheune
+## daneben (beide zur gleichen Seite), selten eine zweite
+func _build_farms(ctx: Dictionary, f: Dictionary) -> void:
+	if f.is_empty():
+		return
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var cell := float(f.get("cell_m", 80.0))
+	var reach := float(f.get("extent_m", 900.0))
+	var x := -reach
+	while x <= reach:
+		var z := -reach
+		while z <= reach:
+			if rng.randf() < float(f.get("chance", 0.4)):
+				var at := Vector2(x, z) + Vector2(rng.randf_range(-0.35, 0.35), rng.randf_range(-0.35, 0.35)) * cell
+				var face := Vector2.from_angle(rng.randi_range(0, 3) * PI * 0.5 + PI * 0.5)
+				if _country_building(ctx, at, _building_size(rng, f, false), face, false):
+					var side := face.orthogonal() * (1.0 if rng.randf() < 0.5 else -1.0)
+					for k in (2 if rng.randf() < float(f.get("second_barn_chance", 0.25)) else 1):
+						if rng.randf() < float(f.get("barn_chance", 0.8)):
+							var barn := _building_size(rng, f, true)
+							_country_building(ctx, at + side * (14.0 + barn.x * 0.5 + k * (barn.x + 6.0))
+								- face * rng.randf_range(0.0, 6.0), barn, face, true)
+			z += cell
+		x += cell
+
+
+## Größe (längs der Straße, Tiefe, Höhe) eines Hauses bzw. einer Scheune
+static func _building_size(rng: RandomNumberGenerator, cfg: Dictionary, barn: bool) -> Vector3:
+	var key := "barn" if barn else "house"
+	var s: Array = cfg.get(key + "_size", [[16, 24], [12, 18], [6, 9]] if barn else [[10, 14], [9, 12], [6, 9]])
+	return Vector3(rng.randf_range(float(s[0][0]), float(s[0][1])), rng.randf_range(float(s[1][0]), float(s[1][1])),
+		rng.randf_range(float(s[2][0]), float(s[2][1]))).round()
+
+
+## Vorort: Wohnstraßen quer, eine Mittelstraße längs, Häuser zu beiden Seiten; eine Zufahrt zur nächsten
+## Hauptstraße
+func _build_suburb(ctx: Dictionary, v: Dictionary) -> void:
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var c := WorldLayout._v2(v["center"])
+	var half := WorldLayout._v2(v["size"]) * 0.5
+	var street := float(v.get("street_m", 8.0))
+	var spacing := float(v.get("street_spacing_m", 42.0))
+	var streets: SurfaceTool = ctx["streets"]
+	# Mittelstraße längs der längeren Seite, Wohnstraßen quer dazu
+	var along_x := half.x >= half.y
+	var main_a := c - (Vector2(half.x, 0) if along_x else Vector2(0, half.y))
+	var main_b := c + (Vector2(half.x, 0) if along_x else Vector2(0, half.y))
+	var lines: Array[PackedVector2Array] = [PackedVector2Array([main_a, main_b])]
+	var cross_half := half.y if along_x else half.x
+	var long_half := half.x if along_x else half.y
+	var k := -floorf(long_half / spacing)
+	while k * spacing <= long_half - 10.0:
+		var off := k * spacing
+		var p := c + (Vector2(off, 0) if along_x else Vector2(0, off))
+		var side := Vector2(0, cross_half) if along_x else Vector2(cross_half, 0)
+		if absf(off) > 1.0:
+			lines.append(PackedVector2Array([p - side, p + side]))
+		k += 1.0
+	# Zufahrt: vom nächsten Ende der Mittelstraße zum nächsten Punkt einer Hauptstraße
+	var best := Vector2.INF
+	var from := main_a
+	for end in [main_a, main_b]:
+		for line in _roads:
+			var q := Geometry2D.get_closest_point_to_segment(end, line[0], line[1])
+			if q.distance_to(end) < best.distance_to(from):
+				best = q
+				from = end
+	if best != Vector2.INF and from.distance_to(best) < float(v.get("max_access_m", 400.0)):
+		lines.append(PackedVector2Array([from, best]))
+	for line in lines:
+		_add_ribbon(streets, line[0], line[1], street, ROAD_COLOR)
+	# Laternen am Straßenrand (abwechselnd links und rechts), ab und zu eine Bank
+	var lamp := String(v.get("lamp", "Lamp"))
+	for line in lines:
+		var a: Vector2 = line[0]
+		var b: Vector2 = line[1]
+		var length := a.distance_to(b)
+		var dir := (b - a) / maxf(length, 0.01)
+		var n := 0
+		var t := 6.0
+		while t < length - 4.0:
+			var side := 1.0 if n % 2 == 0 else -1.0
+			var at: Vector2 = a + dir * t + dir.orthogonal() * side * (street * 0.5 + 0.8)
+			var face := rad_to_deg(atan2(-dir.orthogonal().x * side, -dir.orthogonal().y * side))
+			_add_prop(ctx, lamp, at, face, 1.0)
+			if rng.randf() < float(v.get("bench_chance", 0.25)):
+				_add_prop(ctx, "Bench", at + dir * 3.0 + dir.orthogonal() * side * 0.6, face + 180.0, 1.0)
+			t += float(v.get("lamp_spacing_m", 30.0))
+			n += 1
+	(ctx["taken"] as Array).append_array(lines.map(func(l: PackedVector2Array) -> Array: return [l, street * 0.5 + 2.0]))
+	# Häuser zu beiden Seiten jeder Straße (nicht an der Zufahrt), Vorderseite zur Straße
+	for i in lines.size() - (1 if lines.size() > 1 and from.distance_to(best) < 400.0 else 0):
+		var a: Vector2 = lines[i][0]
+		var b: Vector2 = lines[i][1]
+		var length := a.distance_to(b)
+		var dir := (b - a) / maxf(length, 0.01)
+		var t := 8.0
+		while t < length - 8.0:
+			for side in [-1.0, 1.0]:
+				if rng.randf() > float(v.get("fill", 0.85)):
+					continue
+				var barn := rng.randf() < float(v.get("barn_chance", 0.05))
+				var size := _building_size(rng, v, barn)
+				var normal: Vector2 = dir.orthogonal() * side
+				var at: Vector2 = a + dir * t + normal * (street * 0.5 + float(v.get("setback_m", 4.0)) + size.y * 0.5)
+				_country_building(ctx, at, size, -normal, barn)
+			t += rng.randf_range(float(v.get("lot_min", 15.0)), float(v.get("lot_max", 19.0)))
+
+
+## Ein Gebäude im Umland, wenn die Stelle frei und flach genug ist. `size` = längs, tief, hoch;
+## `face` = Richtung der Vorderseite (zur Straße). Häuser drehen sich frei, Scheunen rasten auf 90° ein
+## (der Fassaden-Shader rechnet mit achsenparallelen Wänden).
+func _country_building(ctx: Dictionary, at: Vector2, size: Vector3, face: Vector2, barn: bool) -> bool:
+	var cfg: Dictionary = ctx["cfg"]
+	var radius := Vector2(size.x, size.y).length() * 0.5
+	if not _country_free(ctx, at, radius):
+		return false
+	# Boden: tiefste Ecke; zu steil (mehr als BASE_DEPTH Unterschied) bleibt frei
+	var lo := INF
+	var hi := -INF
+	for o in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1), Vector2.ZERO]:
+		var h := layout.height(at.x + o.x * radius * 0.7, at.y + o.y * radius * 0.7)
+		lo = minf(lo, h)
+		hi = maxf(hi, h)
+	if hi - lo > float(cfg.get("max_slope_m", 2.5)) or lo < float(cfg.get("min_height_m", 1.5)):
+		return false
+	(ctx["taken"] as Array).append([at, radius + 2.0])
+	_building_props(ctx, at, size, face, barn)
+	if barn or not ctx.has("houses"):
+		var kit_ctx: Dictionary = ctx["kit_ctx"]
+		kit_ctx["y"] = lo
+		# Kante, an der die Vorderseite liegt: 0 Nord (-z), 1 Süd (+z), 2 West, 3 Ost
+		var edge := (1 if face.y > 0.0 else 0) if absf(face.y) >= absf(face.x) else (3 if face.x > 0.0 else 2)
+		var r := Rect2(at - Vector2(size.x, size.y) * 0.5, Vector2(size.x, size.y)) if edge < 2 \
+			else Rect2(at - Vector2(size.y, size.x) * 0.5, Vector2(size.y, size.x))
+		_lot(kit_ctx, r, size.z, edge)
+		return true
+	# Haus aus Blender: Einheitsmodell, Vorderseite +z zeigt nach `face`
+	var angle := atan2(face.x, face.y)
+	var rot := Basis(Vector3.UP, angle)
+	var center := Vector3(at.x, lo, at.y)
+	(ctx["houses"] as Array).append([posmod(hash([roundi(at.x), roundi(at.y)]), _house_meshes.size()),
+		Transform3D(rot * Basis.from_scale(Vector3(size.x, size.z, size.y)), center),
+		Color.from_hsv(0.0, 0.0, (ctx["rng"] as RandomNumberGenerator).randf_range(0.82, 1.0))])
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(size.x, size.z + BASE_DEPTH, size.y)
+	col.shape = shape
+	col.transform = Transform3D(rot, center + Vector3(0, (size.z - BASE_DEPTH) * 0.5, 0))
+	(ctx["body"] as StaticBody3D).add_child(col)
+	building_count += 1
+	return true
+
+
+## Ausstattung an einem Gebäude: beim Haus Bäume dahinter und daneben, Busch oder Blumenkübel vorn, manchmal ein
+## Lieferwagen; bei der Scheune Paletten, Kabeltrommeln, Felsen
+func _building_props(ctx: Dictionary, at: Vector2, size: Vector3, face: Vector2, barn: bool) -> void:
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var side := face.orthogonal()
+	var front := at + face * (size.y * 0.5 + 2.0)
+	if barn:
+		for k in rng.randi_range(1, 3):
+			var model := "PalletStack" if rng.randf() < 0.55 else "CableDrum"
+			_add_prop(ctx, model, front + side * rng.randf_range(-size.x * 0.5, size.x * 0.5) + face * rng.randf_range(0.5, 3.0),
+				rng.randf_range(0.0, 360.0), 1.0)
+		if rng.randf() < 0.4:
+			_add_prop(ctx, "Rock", at - face * (size.y * 0.5 + 3.0) + side * rng.randf_range(-6.0, 6.0), rng.randf_range(0.0, 360.0),
+				rng.randf_range(0.8, 1.6))
+		return
+	var trees: Array = ctx["cfg"].get("props", {}).get("house_trees", ["TreeRound", "TreeRound", "TreeAutumn", "TreePine"])
+	for k in rng.randi_range(1, 3):
+		var back := at - face * (size.y * 0.5 + rng.randf_range(3.0, 7.0)) + side * rng.randf_range(-size.x * 0.7, size.x * 0.7)
+		_add_prop(ctx, String(trees[rng.randi_range(0, trees.size() - 1)]), back, rng.randf_range(0.0, 360.0),
+			rng.randf_range(0.8, 1.2))
+	if rng.randf() < 0.6:
+		_add_prop(ctx, "Bush", front + side * (size.x * 0.5 - 1.0) * (1.0 if rng.randf() < 0.5 else -1.0),
+			rng.randf_range(0.0, 360.0), rng.randf_range(0.8, 1.3))
+	if rng.randf() < 0.3:
+		_add_prop(ctx, "Planter", front - face * 0.8 + side * 1.6, 0.0, 0.8)
+	if rng.randf() < 0.08:
+		_add_prop(ctx, "Van", at + side * (size.x * 0.5 + 3.0), rad_to_deg(atan2(face.x, face.y)), 1.0)
+
+
+## Allee: Bäume in Reihen links und rechts der Hauptstraßen, wo kein Gebäude steht
+func _build_avenues(ctx: Dictionary, av: Dictionary) -> void:
+	if av.is_empty():
+		return
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var trees: Array = av.get("models", ["TreeRound"])
+	for line in _roads:
+		if rng.randf() > float(av.get("road_chance", 0.6)):
+			continue
+		var a: Vector2 = line[0]
+		var b: Vector2 = line[1]
+		var length := a.distance_to(b)
+		var dir := (b - a) / maxf(length, 0.01)
+		var model := String(trees[rng.randi_range(0, trees.size() - 1)])  # eine Baumart je Straße
+		var t := float(av.get("end_gap_m", 50.0))
+		while t < length - float(av.get("end_gap_m", 50.0)):
+			for side in [-1.0, 1.0]:
+				var at: Vector2 = a + dir * t + dir.orthogonal() * side * (_road_w * 0.5 + float(av.get("offset_m", 3.5)))
+				if _country_free(ctx, at, 1.5, true):
+					_add_prop(ctx, model, at, rng.randf_range(0.0, 360.0), rng.randf_range(0.85, 1.1))
+			t += float(av.get("spacing_m", 14.0))
+
+
+## Wäldchen auf der freien Wiese: Gruppen von Bäumen (Nadelbäume vor allem an den Hügeln), dazwischen Büsche
+## und Felsen; auch an Hängen, nur nicht im Wasser
+func _build_groves(ctx: Dictionary, g: Dictionary) -> void:
+	if g.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("waeldchen")
+	var cell := float(g.get("cell_m", 110.0))
+	var reach := float(g.get("extent_m", 980.0))
+	var x := -reach
+	while x <= reach:
+		var z := -reach
+		while z <= reach:
+			if rng.randf() < float(g.get("chance", 0.45)):
+				var c := Vector2(x, z) + Vector2(rng.randf_range(-0.4, 0.4), rng.randf_range(-0.4, 0.4)) * cell
+				var hill := layout.height(c.x, c.y) > float(g.get("pine_above_m", 25.0))
+				var r := rng.randf_range(10.0, float(g.get("radius_max_m", 26.0)))
+				for k in rng.randi_range(int(g.get("trees_min", 5)), int(g.get("trees_max", 14))):
+					var at := c + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * r
+					if not _country_free(ctx, at, 1.5, true):
+						continue
+					var roll := rng.randf()
+					var model := "TreePine" if hill or roll < 0.25 else ("TreeAutumn" if roll < 0.35 else "TreeRound")
+					if roll > 0.9:
+						model = "Bush"
+					elif roll > 0.85:
+						model = "Rock"
+					_add_prop(ctx, model, at, rng.randf_range(0.0, 360.0), rng.randf_range(0.8, 1.3))
+			z += cell
+		x += cell
+
+
+## Ein Stück Ausstattung aufs Gelände (Drehung in Grad); nicht im Wasser
+func _add_prop(ctx: Dictionary, model: String, at: Vector2, rot_deg: float, scale: float) -> void:
+	var h := layout.height(at.x, at.y)
+	if h < float(ctx["cfg"].get("min_height_m", 1.5)):
+		return
+	(ctx["props"] as Array).append([model, Vector3(at.x, h, at.y), rot_deg, scale])
+
+
+## Stelle frei? Abstand zu Vierteln, Sperren (Straßenenden), Hauptstraßen, Seilbahnen, Krater, Hinterhof
+## und schon gesetzten Gebäuden und Straßen
+func _country_free(ctx: Dictionary, at: Vector2, radius: float, small := false) -> bool:
+	var cfg: Dictionary = ctx["cfg"]
+	var margin := float(cfg.get("district_gap_m", 35.0))
+	if small:
+		margin = minf(margin, 12.0)  # Bäume dürfen näher an Zäune und Viertel
+	for d in layout.districts:
+		var rect := Rect2(WorldLayout._v2(d["center"]) - WorldLayout._v2(d["size"]) * 0.5, WorldLayout._v2(d["size"]))
+		if rect.grow(margin + radius).has_point(at):
+			return false
+	var barrier_gap := float(cfg.get("barrier_gap_m", 80.0))
+	for line in _roads:
+		if at.distance_to(line[0]) < barrier_gap or at.distance_to(line[1]) < barrier_gap:
+			return false
+		if Geometry2D.get_closest_point_to_segment(at, line[0], line[1]).distance_to(at) < radius + _road_w * 0.5 + 2.0:
+			return false
+	var zip_gap := float(cfg.get("zipline_gap_m", 15.0))
+	for z: Dictionary in layout.raw().get("ziplines", []):
+		var pts: Array = z["points"]
+		for i in pts.size() - 1:
+			var p0 := Vector2(float(pts[i][0]), float(pts[i][1]))
+			var p1 := Vector2(float(pts[i + 1][0]), float(pts[i + 1][1]))
+			if Geometry2D.get_closest_point_to_segment(at, p0, p1).distance_to(at) < radius + zip_gap:
+				return false
+	var cr: Dictionary = layout.raw().get("crater", {})
+	if not cr.is_empty() and at.distance_to(WorldLayout._v2(cr["center"])) < float(cr["rim_radius_m"]) + 30.0 + radius:
+		return false
+	for t: Array in ctx["taken"]:
+		if t[0] is PackedVector2Array:
+			var l: PackedVector2Array = t[0]
+			# Straße: Gebäude stehen mit der schmalen Seite davor, halbe Diagonale wäre zu streng
+			if Geometry2D.get_closest_point_to_segment(at, l[0], l[1]).distance_to(at) < radius * 0.6 + float(t[1]):
+				return false
+		elif (t[0] as Vector2).distance_to(at) < radius + float(t[1]):
+			return false
+	return true
 
 
 # ---------------------------------------------------------------- Kisten

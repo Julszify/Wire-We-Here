@@ -29,6 +29,12 @@ var connector: Dictionary = {}
 var server_room: Dictionary = {}
 ## Blöcke ruhender Kabel (CableBatch): Detailstufen und Thread-Aufträge
 var cable_batch: Dictionary = {}
+## Werkzeuge für die Masse: Kabelsauger, Haufen-Winde, Abräum-Drohne
+var vacuum: Dictionary = {}
+var winch: Dictionary = {}
+var drone: Dictionary = {}
+## Kabel-Detektor (warm/kalt)
+var detector: Dictionary = {}
 var tablet_order: Array = []
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
 var services: Array = []
@@ -75,6 +81,10 @@ func reload() -> void:
 	connector = parsed.get("connector", {})
 	server_room = parsed.get("server_room", {})
 	cable_batch = parsed.get("cable_batch", {})
+	vacuum = parsed.get("vacuum", {})
+	winch = parsed.get("winch", {})
+	drone = parsed.get("drone", {})
+	detector = parsed.get("detector", {})
 	tablet_order = parsed.get("tablet_order", [])
 	var sv := _load_json(SERVICES_PATH)
 	services = sv.get("services", [])

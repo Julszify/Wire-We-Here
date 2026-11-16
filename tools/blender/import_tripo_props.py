@@ -4,6 +4,7 @@
 # Aufruf:
 #   Blender -b --python tools/blender/import_tripo_props.py -- <zielordner> <datei.glb> [<datei.glb> …]
 # Der Dateiname wird klein geschrieben (Baum_Gruen_1.glb -> baum_gruen_1.glb).
+# Auch für Figuren mit Skelett (Chefs): das Skelett bleibt erhalten, nur das Mesh wird reduziert.
 
 import os
 import sys
@@ -16,7 +17,7 @@ os.makedirs(out_dir, exist_ok=True)
 MAX = 1024
 # Ziel-Dreiecke je Modell (nach Namensanfang); sonst DEFAULT
 TARGETS = {"baum": 5000, "herbstbaum": 5000, "nadelbaum": 3500, "busch": 3000, "blumenkuebel": 3000,
-           "laterne": 3000, "felsen": 2000}
+           "laterne": 3000, "felsen": 2000, "chef_": 20000, "jukebox": 7500}
 DEFAULT = 5000
 
 

@@ -74,7 +74,18 @@ var _zone_first_id := 0               # erste Kabel-ID der Zone
 var _order_heaps: Array[Dictionary] = []  # { "heap": HeapData, "first_id": int }
 var _removed_ids: Dictionary = {}     # Kabel-ID -> true: fertig aufgerollt (fehlen beim Neuerzeugen)
 var _batcher: CableBatcher             # zeichnet ruhende Kabel blockweise
+var _tools: MassTools                  # Kabelsauger, Haufen-Winden, Abräum-Drohnen
 var _heap_count_cache := 0
+var _tower: TowerFinale                # Finale: Aufzug, Etage 40, Dach, C.O.R.D.s Kern
+var _tower_open := false
+var _tower_open_override := false      # Testoption --turmopen
+var _target_stop := -1                 # Aufzug-Halt in Reichweite
+var _target_core := false
+var _finale_screen: Control
+var _detector: Detector
+var _detector_t := 0.0
+var _progress_text := ""                # Fortschritt des Viertels, in dem der Spieler steht
+var _progress_t := -1.0
 var _heap_count_t := 0.0
 var _saving_enabled := true
 var _autosave_t := 0.0
@@ -92,6 +103,10 @@ func _ready() -> void:
 	($WorldEnvironment as WorldEnvironment).environment = CityLook.environment()
 	CityLook.setup_sun($Sun)
 	_build_city()
+	_tower = TowerFinale.new()
+	_tower.name = "TowerFinale"
+	add_child(_tower)
+	_tower.build(_city)
 	ToonLook.install(self, _player.camera)
 	_system = CableSystem.new()
 	add_child(_system)
@@ -101,6 +116,10 @@ func _ready() -> void:
 	_batcher.name = "CableBatches"
 	add_child(_batcher)
 	_batcher.camera = _player.camera
+	_tools = MassTools.new()
+	_tools.name = "MassTools"
+	_tools.world = self
+	add_child(_tools)
 	_system.cable_released.connect(_on_cable_released)
 	_system.knot_hit.connect(_on_knot_hit)
 	_system.knot_progress.connect(_on_knot_progress)
@@ -121,6 +140,9 @@ func _ready() -> void:
 	_tablet.visible = false
 	_tablet.closed.connect(_close_tablet)
 	_tablet.snooze_requested.connect(_on_snooze_requested)
+	_tablet.drones_recall_requested.connect(func() -> void:
+		_tools.recall_drones(_player.global_position)
+		_show_message("Die Drohnen arbeiten ab jetzt hier (Umkreis %d m)." % int(Balancing.drone.get("work_radius_m", 45.0))))
 
 	_arm_reel = ReelData.new(0, ReelData.Kind.ARM)
 	_arm_reel.owner_id = PLAYER_ID
@@ -138,6 +160,10 @@ func _ready() -> void:
 	_waypoint.label = "Serverraum"
 	_waypoint.target = ServerRoomView.door_point()
 	_waypoint.visible = false
+	_detector = Detector.new()
+	_hud.add_child(_detector)
+	_detector.camera = _player.camera
+	_detector.visible = false
 	# Spielstand laden, falls vorhanden (außer bei "Neues Spiel" oder --nosave)
 	_saving_enabled = not OS.get_cmdline_user_args().has("--nosave")
 	var save := {}
@@ -175,6 +201,15 @@ func _ready() -> void:
 	_update_blockers()
 	_stream_update(true)
 
+	_refresh_finale(false)
+	# Intro beim neuen Spiel (erster Start oder „Neues Spiel“); in Testläufen mit --nosave nur mit --intro
+	var args := OS.get_cmdline_user_args()
+	var intro_arg := ""
+	for a in args:
+		if a.begins_with("--intro"):
+			intro_arg = a
+	if save.is_empty() and (_saving_enabled or intro_arg != ""):
+		_play_intro(int(intro_arg.get_slice("=", 1)) if intro_arg.contains("=") else 0)
 	if save.is_empty():
 		_show_message("Der Serverraum steht hinter dir. Wichtige Kabel leuchten – ihre Knäuel gehören dort in die Schränke.")
 	# Nur zum automatischen Testen, siehe _apply_test_args
@@ -257,7 +292,11 @@ func _process(delta: float) -> void:
 			view.show_on_arm(arm, _player.global_position.y)
 		else:
 			var ground := _wagon.position.y if (_wagon and _wagon.owns(reel)) else reel.position.y
-			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel), ground))
+			if not _reel_views.has(reel.id):
+				ground = _ground_y(reel.position)  # Sauger und Drohnen: Rolle schwebt, Boden darunter
+			var phase := view.show_on_reel(reel.position, ReelView.scale_of(reel), ground)
+			if _reel_views.has(reel.id):
+				_reel_views[reel.id].set_phase(phase)
 
 	for i in _bag.size():
 		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
@@ -269,6 +308,8 @@ func _process(delta: float) -> void:
 	if _cranking_reel and _player.is_cranking() and _reel_views.has(_cranking_reel.id):
 		_player.crank_point = _reel_views[_cranking_reel.id].handle_point()
 	_update_wagon(delta)
+	_tools.update(delta, _economy)
+	_update_detector(delta)
 	_update_ride(delta)
 	_wagon_confirm_t = maxf(_wagon_confirm_t - delta, 0.0)
 	var far := _player.global_position.distance_to(ServerRoomView.door_point()) > 30.0
@@ -358,10 +399,17 @@ func _on_interact() -> void:
 	# 4b. Wagen ankoppeln bzw. parken, Rolle aufheben (ohne Kabel in der Hand)
 	elif not held and _target_reel and _wagon and _wagon.owns(_target_reel):
 		_toggle_wagon()
-	elif not held and _target_reel and _target_reel.is_movable() and _target_reel.is_free():
+	elif not held and _target_reel and _target_reel.is_movable() and (_target_reel.is_free() or _target_reel.kind == ReelData.Kind.WINCH):
+		if not _target_reel.is_free():
+			_system.release(_target_reel)  # Winde: laufendes Kabel rutscht zurück
 		_pick_up_reel(_target_reel)
 		_player.act("pickup")
 	# 4c. Seilbahn
+	# 4d. Aufzug im Wolkig-Turm und C.O.R.D.s Kern
+	elif _target_stop >= 0:
+		_ride_elevator(_target_stop, held != null)
+	elif _target_core:
+		_use_core()
 	elif not held and not _target_station.is_empty():
 		_start_ride(_target_station[0], _target_station[1])
 	# 5. Knäuel vom Boden aufheben
@@ -437,12 +485,14 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 	_removed_ids[cable.id] = true
 	_done_count += 1
 
+	# Am Arm oder im Kabelsauger: das Knäuel kommt direkt in die Tasche
+	var personal := reel == _arm_reel or reel.kind == ReelData.Kind.VACUUM
 	if cable.is_important():
 		# Wichtiges Kabel: wird zum beschrifteten Knäuel und bringt einen Teil des Meterpreises
 		view.queue_free()
 		var part := _economy.pay_for_cable(cable.length_m,
 			minf(float(Balancing.economy.get("important_pay_factor", 0.5)) * _economy.bonus("important_pay"), 1.0))
-		var pay_at := (_player.global_position + Vector3(0, 2.1, 0)) if reel == _arm_reel else (reel.position + Vector3(0, 1.6, 0))
+		var pay_at := (_player.global_position + Vector3(0, 2.1, 0)) if personal else (reel.position + Vector3(0, 1.6, 0))
 		FloatText.spawn(self, pay_at, "+" + Economy.format_money(part))
 		var item := CoilItem.from_cable(_next_item_id, cable)
 		_next_item_id += 1
@@ -454,20 +504,24 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		if reel == _arm_reel:
 			_player.holding = false
 		var where := "Port" if RackPlan.row_of_service(RackPlan.service_of(item.port_id)) < 0 else "Reihe"
-		if reel == _arm_reel and not _bag_full():
+		if personal and not _bag_full():
 			_put_in_bag(item)
 			_show_message("Wichtiges Kabel fertig und in der Tasche (%d/%d). %s: %s" % [
 				_bag.size(), _economy.bag_capacity(), where, RackPlan.port_label(item.port_id)])
 		else:
 			# Tasche voll oder an einer Rolle fertig geworden: Knäuel liegt am Boden
-			var base := _player.global_position if reel == _arm_reel else reel.position
-			var out := _player.facing() if reel == _arm_reel else _player.global_position - reel.position
+			var base := _player.global_position if personal else reel.position
+			var out := _player.facing() if personal else _player.global_position - reel.position
 			out.y = 0.0
-			item.position = base + (out.normalized() if out.length() > 0.01 else Vector3.BACK) * (0.9 if reel == _arm_reel else 1.4)
+			if reel.kind == ReelData.Kind.DRONE:
+				out = Vector3.ZERO  # Drohne: Knäuel fällt genau darunter, sie holt es gleich
+			item.position = base + (out.normalized() if out.length() > 0.01 else Vector3.ZERO) * (0.9 if personal else 1.4)
 			item.position.y = _ground_y(item.position)
 			iv.lie_at(item.position)
-			_show_message("Tasche voll – das Knäuel liegt am Boden. Erst im Serverraum abliefern." if reel == _arm_reel
-				else "Wichtiges Kabel fertig! Knäuel an der Rolle aufheben: %s" % RackPlan.port_label(item.port_id))
+			if personal:
+				_show_message("Tasche voll – das Knäuel liegt am Boden. Erst im Serverraum abliefern.")
+			elif reel.kind != ReelData.Kind.DRONE:
+				_show_message("Wichtiges Kabel fertig! Knäuel bei %s aufheben: %s" % [_reel_name(reel), RackPlan.port_label(item.port_id)])
 	else:
 		var pay_pos: Vector3
 		if reel == _arm_reel:
@@ -475,8 +529,10 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 			view.show_on_arm(_player.arm_transform())
 			pay_pos = _player.global_position + Vector3(0, 2.1, 0)
 		else:
-			_reel_views[reel.id].set_phase(view.show_on_reel(reel.position, ReelView.scale_of(reel)))
-			pay_pos = reel.position + Vector3(0, 1.6, 0)
+			var phase := view.show_on_reel(reel.position, ReelView.scale_of(reel))
+			if _reel_views.has(reel.id):
+				_reel_views[reel.id].set_phase(phase)
+			pay_pos = (_player.global_position + Vector3(0, 2.1, 0)) if personal else reel.position + Vector3(0, 1.6, 0)
 		var amount := _economy.pay_for_cable(cable.length_m)
 		FloatText.spawn(self, pay_pos, "+" + Economy.format_money(amount))
 		_fading.append(view)
@@ -491,6 +547,8 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 
 func _on_knot_hit(cable: CableData, reel: ReelData) -> void:
 	_add_knot_marker(cable)
+	if reel.is_automatic():
+		return  # Sauger, Winde und Drohne lösen Knoten selbst
 	if reel == _arm_reel:
 		_show_message("Knoten! E drücken, um ihn zu lösen.")
 	else:
@@ -504,7 +562,9 @@ func _on_knot_progress(_cable: CableData, presses: int, needed: int) -> void:
 
 func _on_knot_solved(cable: CableData) -> void:
 	_remove_knot_marker(cable.id)
-	_show_message("Knoten gelöst!")
+	var reel := _system.reel_of(cable)
+	if reel == null or not reel.is_automatic():
+		_show_message("Knoten gelöst!")
 
 
 func _on_upgrade_bought(upgrade_id: String, _level: int) -> void:
@@ -515,6 +575,15 @@ func _on_upgrade_bought(upgrade_id: String, _level: int) -> void:
 		"extra_reel":
 			_place_reel(ReelData.Kind.MOTOR)
 			_show_message("Motorrolle aufgestellt. Sie zieht eingehängte Kabel von selbst. Leer kannst du sie mit E aufheben und woanders abstellen.")
+		"vacuum":
+			_show_message("Kabelsauger gekauft! Mit freiem Arm Linksklick halten: er saugt alle Kabelenden vor dir ein.")
+		"winch":
+			_place_reel(ReelData.Kind.WINCH)
+			_show_message("Haufen-Winde aufgestellt. Sie rollt die Kabel in ihrer Nähe von selbst ab; mit E kannst du sie umstellen.")
+		"drone":
+			if _economy.state.level("drone") == 1:
+				_tools.drone_anchor = _player.global_position
+			_show_message("Abräum-Drohne gestartet! Sie arbeitet im Umkreis von %d m. Im Tablet: Drohnen zu mir rufen." % int(Balancing.drone.get("work_radius_m", 45.0)))
 		"wagon":
 			_spawn_wagon(null)
 			_show_message("Kabeltrommel-Wagen da! Er folgt dir. Kabel daran einhängen: er parkt und zieht drei Kabel gleichzeitig.")
@@ -534,6 +603,7 @@ func _on_service_activated(service_id: int, service_name: String, unlocks: Strin
 		_economy.money_changed.emit(_economy.state.money)
 	_apply_upgrades()
 	_refresh_ziplines()
+	_refresh_finale(true)
 	if unlocks != "":
 		_show_message("Dienst „%s“ läuft wieder – neu im Tablet: %s" % [service_name, _economy.upgrade_name(unlocks)])
 	elif def.has("effect"):
@@ -673,9 +743,13 @@ func _apply_upgrades() -> void:
 	_system.motor_multiplier = _economy.factor("motor") * _economy.bonus("motor")
 	_system.untie_delta = int(_economy.bonus("knot_presses"))
 	# Lauftempo gedeckelt, damit viele kleine Dienst-Boni die Figur nicht unsteuerbar schnell machen
-	_player.speed_factor = minf(_economy.bonus("walk"), float(Balancing.player.get("max_speed_factor", 1.6)))
+	# Laufschuhe kommen dazu, gedeckelt ist auch die Summe
+	_player.speed_factor = minf(minf(_economy.bonus("walk"), float(Balancing.player.get("max_speed_factor", 1.6)))
+		* _economy.factor("shoes"), float(Balancing.player.get("max_total_speed_factor", 2.2)))
 	var auto: Dictionary = Balancing.upgrades.get("auto_pull", {})
 	_player.auto_pull_rate = float(auto.get("presses_per_second", 0.0)) if _economy.state.level("auto_pull") > 0 else 0.0
+	if _tools:
+		_tools.sync(_economy)
 	if _cord:
 		_cord.answer_bonus_s = _economy.bonus("answer_time")
 		_cord.interval_factor = _economy.bonus("ask_interval")
@@ -684,7 +758,7 @@ func _apply_upgrades() -> void:
 
 ## Geländehöhe an einer Stelle (Hinterhof = 0)
 func _ground_y(pos: Vector3) -> float:
-	return _city.ground_height(pos.x, pos.z)
+	return _ground_spot(pos).y
 
 
 func _put_in_bag(item: CoilItem) -> void:
@@ -695,19 +769,27 @@ func _put_in_bag(item: CoilItem) -> void:
 
 ## Alle Knäuel aus der Tasche in ihre Ports stecken
 func _deliver_bag() -> void:
+	var items := _bag.duplicate()
+	_bag.clear()
+	_plug_items(items, _player.global_position + Vector3(0, 2.2, 0))
+
+
+## Knäuel in ihre Ports stecken (Spieler am Schrank oder Drohne an der Tür)
+func _plug_items(items: Array, label_at: Vector3) -> void:
 	var plugged := 0
-	for item in _bag.duplicate():
+	for item: CoilItem in items:
 		if _rack.plug(item.port_id):
 			plugged += 1
 		# Port schon belegt (kann nur durch alte Spielstände passieren): Knäuel verfällt
-		_item_views[item.id].queue_free()
-		_item_views.erase(item.id)
+		if _item_views.has(item.id):
+			_item_views[item.id].queue_free()
+			_item_views.erase(item.id)
 		_items.erase(item.id)
 		_bag.erase(item)
 	_room.refresh(_economy.state)
 	_tablet.refresh()
 	if plugged > 1:
-		FloatText.spawn(self, _player.global_position + Vector3(0, 2.2, 0), "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
+		FloatText.spawn(self, label_at, "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
 
 
 func _pick_up(item: CoilItem) -> void:
@@ -755,6 +837,8 @@ func _update_targets() -> void:
 	_target_station = []
 	if _target_knot == null and _target_reel == null and _target_item == null and _target_end == null and not _arm_busy():
 		_target_station = _station_near(pos)
+	_target_stop = _tower.stop_near(pos, 2.6) if _target_knot == null and _target_end == null else -1
+	_target_core = _tower.near_core(pos, 3.5) and _target_end == null
 	var holding := not _arm_reel.is_free()
 	_crosshair.targeting = _target_knot != null or _target_end != null or _target_item != null or _target_rack \
 		or (holding and _target_reel != null and _target_reel.is_free()) \
@@ -769,8 +853,8 @@ func _find_item(origin: Vector3, dir: Vector3, player_pos: Vector3) -> CoilItem:
 	var best: CoilItem = null
 	var best_d := 0.6
 	for item: CoilItem in _items.values():
-		if item.carried_by >= 0:
-			continue
+		if item.carried_by != -1:
+			continue  # in der Tasche oder an einer Drohne
 		if absf(item.position.y - player_pos.y) > 3.0:
 			continue
 		var d := CableTargeting._hit(item.position + Vector3(0, 0.15, 0), origin, dir, player_pos, Balancing.player["reach_m"])
@@ -884,9 +968,13 @@ func _stream_update(now: bool) -> void:
 	var cfg: Dictionary = _city.layout.raw().get("streaming", {})
 	var load_m := float(cfg.get("load_m", 150.0))
 	var unload_m := float(cfg.get("unload_m", 220.0))
-	var p := _player.global_position
+	var points: Array[Vector3] = [_player.global_position]
+	if _tools:
+		points.append_array(_tools.stream_points())  # Drohnen-Einsatzort und Winden halten ihre Kabel geladen
 	for u in _units:
-		var dist := u.distance_to(p)
+		var dist := INF
+		for p in points:
+			dist = minf(dist, u.distance_to(p))
 		if dist < load_m and not _unit_loaded.has(u.id):
 			_load_unit(u, now)
 		elif dist > unload_m and _unit_loaded.has(u.id) and not _unit_busy(u):
@@ -1064,8 +1152,23 @@ func _update_hud() -> void:
 			_hint.text = "E: Wagen ankoppeln (löst die eingehängten Kabel)" + ("  – nochmal E!" if _wagon_confirm_t > 0.0 else "")
 		else:
 			_hint.text = "E: Wagen ankoppeln (folgt dir)"
-	elif not held and _target_reel and _target_reel.is_movable() and _target_reel.is_free():
+	elif not held and _target_reel and _target_reel.is_movable() and (_target_reel.is_free() or _target_reel.kind == ReelData.Kind.WINCH):
 		_hint.text = "E: %s aufheben und umstellen" % _reel_name(_target_reel)
+	elif _target_stop >= 0:
+		var stop_name := String(_tower.stops[(_target_stop + 1) % _tower.stops.size()]["name"])
+		if _tower_open or _tower_open_override:
+			_hint.text = "E: Aufzug nach oben – %s" % stop_name if _target_stop + 1 < _tower.stops.size() else "E: Aufzug nach unten – Erdgeschoss"
+		else:
+			_hint.text = "Aufzug außer Betrieb – erst alle anderen Viertel ans Netz bringen (%d von %d Ports)" % [
+				mini(_economy.state.active_ports.size(), _tower_gate_ports()), _tower_gate_ports()]
+	elif _target_core:
+		if _economy.state.finale_done:
+			_hint.text = "C.O.R.D.s Kern ist abgeschaltet. Die Cloud läuft wieder."
+		elif _economy.state.active_ports.size() >= RackPlan.total_ports():
+			_hint.text = "E: C.O.R.D.s Kern abschalten"
+		else:
+			_hint.text = "C.O.R.D.s Kern – erst alle %d Ports belegen (noch %d)" % [RackPlan.total_ports(),
+				RackPlan.total_ports() - _economy.state.active_ports.size()]
 	elif not _target_station.is_empty():
 		var zl: Zipline = _target_station[0]
 		if RackPlan.has_special(_economy.state, zl.unlock):
@@ -1085,22 +1188,83 @@ func _update_hud() -> void:
 		if crank and not crank.is_free():
 			_hint.text = "Linksklick: kurbeln"
 		else:
-			_hint.text = "Knäuel in den Serverraum bringen   ·   Q: eins ablegen" if _bag_full() else "Ein Kabelende am Rand des Haufens anvisieren"
+			_hint.text = "Knäuel in den Serverraum bringen   ·   Q: eins ablegen" if _bag_full() else ("Linksklick halten: Kabelsauger   ·   E: Kabelende greifen" if not _tools.vacuum_reels.is_empty() else "Ein Kabelende am Rand des Haufens anvisieren")
 
 	var line := "Kabel im Haufen: %d   ·   Aufgerollt: %d   ·   Dienste: %d/%d   ·   Tasche: %d/%d" % [
 		_heap_count(), _done_count, _rack.active_services(), RackPlan.total_services(), _bag.size(), _economy.bag_capacity()]
+	var progress := _district_progress()
+	if progress != "":
+		line += "\n" + progress
+	var busy := {}  # Werkzeug-Art -> Zahl der Kabel (Sauger, Winden, Drohnen nur zusammengefasst)
 	for reel: ReelData in _system.reels.values():
 		var c := _system.cable_on(reel)
-		if c:
-			var who := "Am Arm" if reel.kind == ReelData.Kind.ARM else _reel_name(reel)
-			line += "\n%s: %.1f von %.1f m%s%s" % [who, c.pulled_m, c.length_m,
-				"  (wichtig)" if c.is_important() else "", "  – KNOTEN!" if c.is_stuck() else ""]
+		if c == null:
+			continue
+		if reel.is_automatic():
+			var key := _reel_name(reel) if reel.kind != ReelData.Kind.WINCH else "Haufen-Winden"
+			busy[key] = int(busy.get(key, 0)) + 1
+			continue
+		var who := "Am Arm" if reel.kind == ReelData.Kind.ARM else _reel_name(reel)
+		line += "\n%s: %.1f von %.1f m%s%s" % [who, c.pulled_m, c.length_m,
+			"  (wichtig)" if c.is_important() else "", "  – KNOTEN!" if c.is_stuck() else ""]
+	for key: String in busy:
+		line += "\n%s: %d Kabel" % [key if key != "Drohne" else "Drohnen", busy[key]]
 	if _message_t > 0.0:
 		line += "\n" + _message
 	_status.text = line
 
 	_money.text = Economy.format_money(_economy.state.money)
 	_shop.text = "Tab: Tablet (Upgrades)"
+
+
+## Kabel-Detektor: nächstes wichtiges Kabelende im Haufen suchen (einige Male pro Sekunde)
+func _update_detector(delta: float) -> void:
+	_detector.visible = _economy.state.level("detector") > 0
+	_detector.show_arrow = _economy.state.level("detector_arrow") > 0
+	if not _detector.visible:
+		return
+	_detector_t -= delta
+	if _detector_t > 0.0:
+		return
+	_detector_t = float(Balancing.detector.get("scan_interval_s", 0.25))
+	var p := _player.global_position
+	var best := INF
+	var best_point := Vector3.ZERO
+	for c: CableData in _system.important.values():
+		if c.state != CableData.State.HEAP:
+			continue
+		var pts := c.path.points
+		for q in [pts[0], pts[pts.size() - 1]]:
+			var d := p.distance_to(q)
+			if d < best:
+				best = d
+				best_point = q
+	_detector.has_target = best < INF
+	_detector.distance = best
+	_detector.target = best_point
+
+
+## „Gamer-Viertel: 37 von 200 …“ für das Viertel, in dem der Spieler steht (zweimal pro Sekunde neu)
+func _district_progress() -> String:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _progress_t < 0.5:
+		return _progress_text
+	_progress_t = now
+	var p := _player.global_position
+	var sec_id := String(_city.district_at(p.x, p.z).get("id", ""))
+	# Rund um den Wolkig-Turm zählt der Turm-Schrank
+	for l: Dictionary in _city.layout.landmarks:
+		if String(l["id"]) == "turm":
+			var t := _city.to_scene(WorldLayout._v2(l["pos"]))
+			if Vector2(p.x - t.x, p.z - t.z).length() < 70.0:
+				sec_id = "turm"
+	var sec := RackPlan.section(sec_id)
+	if sec.is_empty():
+		_progress_text = ""
+	else:
+		_progress_text = "%s: %d von %d wichtigen Kabeln eingesteckt" % [sec["name"],
+			RackPlan.section_plugged(_economy.state, sec_id), int(sec["count"])]
+	return _progress_text
 
 
 ## Kabel im Haufen (nur einmal pro Sekunde gezählt; bei zehntausenden Kabeln zu teuer für jedes Bild)
@@ -1145,13 +1309,117 @@ func _reel_name(reel: ReelData) -> String:
 			return "Handkurbel"
 		ReelData.Kind.WAGON:
 			return "Wagen, Platz %d" % (_wagon.slots.find(reel) + 1) if _wagon else "Wagen"
+		ReelData.Kind.WINCH:
+			return "Haufen-Winde"
+		ReelData.Kind.VACUUM:
+			return "Kabelsauger"
+		ReelData.Kind.DRONE:
+			return "Drohne"
 		_:
 			return "Motorrolle %d" % reel.id
 
 
+# --- Story ------------------------------------------------------------------------
+
+## Intro abspielen: Spiel läuft im Hintergrund, Spieler und C.O.R.D. warten, Anzeige aus
+func _play_intro(jump: int = 0) -> void:
+	var intro := IntroScene.new()
+	intro.name = "Intro"
+	add_child(intro)
+	_player.input_enabled = false
+	_hud.visible = false
+	_cord.enabled = false
+	intro.finished.connect(func() -> void:
+		_player.input_enabled = true
+		_hud.visible = true
+		_cord.enabled = not _economy.state.finale_done
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_show_message("Der Serverraum steht hinter dir. Wichtige Kabel leuchten – ihre Knäuel gehören dort in die Schränke."))
+	intro.start(_player)
+	if jump > 0:
+		intro.jump_to(jump)
+
+
+# --- Finale im Wolkig-Turm ---------------------------------------------------
+
+## Ports, die vor dem Aufzug belegt sein müssen (alle Schränke außer dem Turm)
+func _tower_gate_ports() -> int:
+	return int(RackPlan.sections()[-1]["first_port"])
+
+
+## Aufzug freigeben, sobald alle anderen Schränke voll sind; Kern-Zustand setzen. announce = Meldung zeigen
+func _refresh_finale(announce: bool) -> void:
+	var was := _tower_open
+	_tower_open = RackPlan.all_but_last_plugged(_economy.state)
+	_tower.set_unlocked(_tower_open or _tower_open_override)
+	_tower.set_core_on(not _economy.state.finale_done)
+	if _economy.state.finale_done and _cord:
+		_cord.enabled = false
+		_cord_view.sleeping = true
+	if announce and _tower_open and not was:
+		_show_message("Alle Viertel laufen wieder! Der Aufzug im Wolkig-Turm fährt jetzt – oben warten die letzten Kabel.")
+	if announce and _economy.state.active_ports.size() >= RackPlan.total_ports() and not _economy.state.finale_done:
+		_show_message("Alle 2000 Ports belegt! Auf dem Dach des Wolkig-Turms wartet C.O.R.D.s Kern.")
+
+
+## Mit dem Aufzug zum nächsten Halt (unten → Etage 40 → Dach → unten)
+func _ride_elevator(from: int, holding_cable: bool) -> void:
+	if not (_tower_open or _tower_open_override):
+		_show_message("Der Aufzug fährt erst, wenn alle anderen Viertel wieder am Netz sind.")
+		return
+	if holding_cable:
+		_show_message("Mit Kabel am Arm passt du nicht in den Aufzug – erst aufrollen oder loslassen (Q).")
+		return
+	var to := (from + 1) % _tower.stops.size()
+	var stop: Dictionary = _tower.stops[to]
+	_player.global_position = (stop["pos"] as Vector3) + Vector3(0, 0.1, 0)
+	_player.velocity = Vector3.ZERO
+	_show_message("Ding! %s." % String(stop["name"]))
+
+
+## C.O.R.D.s Kern abschalten: das Finale
+func _use_core() -> void:
+	if _economy.state.finale_done:
+		return
+	if _economy.state.active_ports.size() < RackPlan.total_ports():
+		_show_message("C.O.R.D.: „Zugriff verweigert. Es fehlen noch %d Ports.“" % (RackPlan.total_ports() - _economy.state.active_ports.size()))
+		return
+	_economy.state.finale_done = true
+	_refresh_finale(false)
+	_show_finale_screen()
+
+
+func _show_finale_screen() -> void:
+	if _finale_screen:
+		return
+	_finale_screen = FinaleScreen.new()
+	_hud.add_child(_finale_screen)
+	_finale_screen.setup(_done_count, _economy.state.total_earned)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_player.input_enabled = false
+	_finale_screen.closed.connect(func() -> void:
+		_finale_screen.queue_free()
+		_finale_screen = null
+		_player.input_enabled = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+
+
+## Steht eine belegte Handkurbel in Reichweite? (Linksklick kurbelt dann statt zu saugen)
+func _crank_in_reach() -> bool:
+	var crank := CableTargeting.nearest_reel(_system.reels.values(), _player.global_position, ReelData.Kind.HAND)
+	return crank != null and not crank.is_free()
+
+
 ## Punkt am Boden (Gelände) unter `p`
 func _ground_spot(p: Vector3) -> Vector3:
-	return Vector3(p.x, _city.ground_height(p.x, p.z), p.z)
+	var terrain := _city.ground_height(p.x, p.z)
+	# Hoch oben (Plattform, Dach): die Fläche darunter per Strahl suchen, sonst das Gelände
+	if p.y > terrain + 3.0 and is_inside_tree():
+		var hit := get_world_3d().direct_space_state.intersect_ray(
+			PhysicsRayQueryParameters3D.create(p + Vector3(0, 1.5, 0), p - Vector3(0, 8.0, 0)))
+		if not hit.is_empty():
+			return Vector3(p.x, (hit["position"] as Vector3).y, p.z)
+	return Vector3(p.x, terrain, p.z)
 
 
 func _pick_up_reel(reel: ReelData) -> void:
@@ -1297,7 +1565,8 @@ func _start_ride(zl: Zipline, station: int) -> void:
 	if not RackPlan.has_special(_economy.state, zl.unlock):
 		_show_message("Diese Seilbahn läuft erst, wenn der Dienst „%s“ wieder online ist." % _zipline_service(zl))
 		return
-	_ride = { "line": zl, "s": 0.0 if station == 0 else zl.length, "dir": 1.0 if station == 0 else -1.0 }
+	_ride = { "line": zl, "s": 0.0 if station == 0 else zl.length, "dir": 1.0 if station == 0 else -1.0,
+		"v": float(Balancing.zipline.get("start_speed_m_per_s", 6.0)) }
 	_player.riding = true
 	if _trolley == null:
 		_trolley = MeshInstance3D.new()
@@ -1317,7 +1586,19 @@ func _update_ride(delta: float) -> void:
 		return
 	var zl: Zipline = _ride["line"]
 	var z: Dictionary = Balancing.zipline
-	var s := float(_ride["s"]) + float(_ride["dir"]) * float(z.get("speed_m_per_s", 16.0)) * delta
+	# Anfahren bis Höchsttempo, vor der Endstation abbremsen (Anschluss-Strecke zählt zur Bremsstrecke)
+	var dir := float(_ride["dir"])
+	var left := zl.length - float(_ride["s"]) if dir > 0.0 else float(_ride["s"])
+	var next_line: Zipline = _ziplines.get(zl.continues) if dir > 0.0 else null
+	if next_line and RackPlan.has_special(_economy.state, next_line.unlock):
+		left += next_line.length
+	var v_end := float(z.get("arrive_speed_m_per_s", 5.0))
+	var v_max := minf(float(z.get("speed_m_per_s", 16.0)),
+		sqrt(v_end * v_end + 2.0 * float(z.get("brake_m_per_s2", 12.0)) * maxf(left, 0.0)))
+	var v := float(_ride.get("v", v_max))
+	v = minf(v + float(z.get("accel_m_per_s2", 10.0)) * delta, v_max)
+	_ride["v"] = v
+	var s := float(_ride["s"]) + dir * v * delta
 	_ride["s"] = s
 	var on_rope := zl.point_at(s)
 	_trolley.global_position = on_rope + Vector3(0, 0.1, 0)
@@ -1332,7 +1613,7 @@ func _update_ride(delta: float) -> void:
 	# Weiter auf der Anschluss-Strecke Richtung Basis?
 	var next: Zipline = _ziplines.get(zl.continues) if float(_ride["dir"]) > 0.0 else null
 	if next and RackPlan.has_special(_economy.state, next.unlock):
-		_ride = { "line": next, "s": 0.0, "dir": 1.0 }
+		_ride = { "line": next, "s": 0.0, "dir": 1.0, "v": float(_ride["v"]) }
 		return
 	var st: Vector3 = zl.stations[1 if float(_ride["dir"]) > 0.0 else 0]
 	_ride = {}
@@ -1361,14 +1642,19 @@ func _collect_save() -> Dictionary:
 		cables.append(st)
 	var reels := []
 	for r: ReelData in _system.reels.values():
-		if r.kind != ReelData.Kind.ARM:
+		if not r.is_transient():
 			var rd := r.to_dict()
 			if r.carried:
 				rd["position"] = SaveGame.vec_to(_ground_spot(_player.global_position + _player.facing()))
 			reels.append(rd)
 	var items := []
 	for item: CoilItem in _items.values():
-		items.append(item.to_dict())
+		var idd := item.to_dict()
+		if item.carried_by <= -100:
+			# Von einer Drohne getragen: liegt im Spielstand unter der Drohne
+			idd["carried_by"] = -1
+			idd["position"] = SaveGame.vec_to(_ground_spot(item.position))
+		items.append(idd)
 	var orders := []
 	for o in _order_heaps:
 		orders.append({ "heap": (o["heap"] as HeapData).to_dict(), "first_id": o["first_id"] })
@@ -1381,6 +1667,7 @@ func _collect_save() -> Dictionary:
 		"reels": reels,
 		"items": items,
 		"wagon": _wagon.to_dict() if _wagon else {},
+		"drones": { "anchor": SaveGame.vec_to(_tools.drone_anchor) },
 		"economy": _economy.state.to_dict(),
 		"cord": _cord.to_dict(),
 		"player": _player.view_state(),
@@ -1391,6 +1678,8 @@ func _collect_save() -> Dictionary:
 
 func _apply_save(d: Dictionary) -> void:
 	_economy.state.load_dict(d.get("economy", {}))
+	if d.has("drones"):
+		_tools.drone_anchor = SaveGame.vec_from((d["drones"] as Dictionary).get("anchor", [0, 0, 0]))
 	_apply_upgrades()
 	_room.refresh(_economy.state)
 
@@ -1567,6 +1856,28 @@ func _apply_test_args() -> void:
 			_room.refresh(_economy.state)
 			_economy.state.money += _economy.cost(id)
 			_economy.buy(id)
+	if opts.has("turmopen"):
+		# Aufzug im Turm freigeben, ohne alle Viertel zu schaffen
+		_tower_open_override = true
+		_refresh_finale(false)
+	if opts.has("tower"):
+		# --tower=<Halt>: an einen Aufzug-Halt (0 Erdgeschoss, 1 Etage 40, 2 Dach) versetzen, Kabel dort laden
+		var stop: Dictionary = _tower.stops[clampi(int(opts["tower"]), 0, _tower.stops.size() - 1)]
+		_player.global_position = (stop["pos"] as Vector3) + Vector3(0, 0.1, 0)
+		_player.look_toward(_tower.core_pos if int(opts["tower"]) == 2 else (stop["pos"] as Vector3) + Vector3(0, 0, -10))
+		_stream_update(true)
+	if opts.has("finale"):
+		# Alle Ports belegen und den Kern abschalten (Abspann)
+		for port in RackPlan.total_ports():
+			_rack.plug(port)
+		_room.refresh(_economy.state)
+		_refresh_finale(false)
+		_use_core()
+	if opts.has("phone"):
+		_player.set_phone(true)
+	if opts.has("vacuum"):
+		# Kabelsauger dauerhaft an (wie Linksklick halten), z. B. --buy=vacuum --vacuum
+		_tools.force_vacuum = true
 	if opts.has("hang"):
 		for reel: ReelData in _system.reels.values():
 			if reel.kind != ReelData.Kind.ARM and reel.is_free():

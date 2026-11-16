@@ -28,9 +28,15 @@ const GRID_CELL_M := 4.0
 var _grid: Dictionary = {}
 
 
+## Geladene wichtige Kabel (id -> CableData), für Detektor und Drohnen
+var important: Dictionary = {}
+
+
 func add_cable(cable: CableData) -> void:
 	cables[cable.id] = cable
 	_index(cable, true)
+	if cable.is_important():
+		important[cable.id] = cable
 
 
 func remove_cable(cable_id: int) -> void:
@@ -38,6 +44,7 @@ func remove_cable(cable_id: int) -> void:
 	if cable:
 		_index(cable, false)
 	cables.erase(cable_id)
+	important.erase(cable_id)
 
 
 ## Kabel, deren Enden in Zellen um `pos` liegen (Radius in Metern); ein Kabel kann doppelt vorkommen
@@ -193,7 +200,20 @@ func _process(delta: float) -> void:
 	for reel: ReelData in reels.values():
 		if reel.is_free():
 			continue
-		if reel.is_motorized():
+		if reel.is_automatic():
+			# Sauger, Winde, Drohne: eigenes Tempo (Upgrades der Werkzeug-Art), Knoten lösen sich nach einer Weile
+			var cable := cable_on(reel)
+			if cable.is_stuck():
+				reel.stuck_t += delta
+				if reel.stuck_t >= float(reel.tuning().get("auto_untie_s", 2.0)):
+					reel.stuck_t = 0.0
+					cable.knot_presses = 0
+					cable.knots_solved += 1
+					knot_solved.emit(cable)
+				continue
+			reel.stuck_t = 0.0
+			pull(reel, float(reel.tuning()["pull_speed_m_per_s"]) * reel.speed_factor * delta)
+		elif reel.is_motorized():
 			pull(reel, float(reel.tuning()["pull_speed_m_per_s"]) * motor_multiplier * delta)
 		elif reel.pending_m > 0.0:
 			var feed: float = float(reel.tuning()["feed_speed_m_per_s"]) * press_multiplier

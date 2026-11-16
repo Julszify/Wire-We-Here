@@ -64,6 +64,35 @@ static func section_of_service(service: int) -> Dictionary:
 
 
 ## Ports eines Schranks, die zu Reihen gehören (ohne die Einzel-Dienste)
+## Eingesteckte Ports eines Schranks (Fortschritt eines Viertels)
+static func section_plugged(state: GameState, section_id: String) -> int:
+	var sec := section(section_id)
+	if sec.is_empty():
+		return 0
+	var first := int(sec["first_port"])
+	var n := 0
+	for p in state.active_ports:
+		if p >= first and p < first + int(sec["count"]):
+			n += 1
+	return n
+
+
+## Sind alle Ports bis auf die des letzten Schranks (Turm) belegt? Dann fährt der Aufzug zum Finale.
+static func all_but_last_plugged(state: GameState) -> bool:
+	var s := sections()
+	if s.is_empty():
+		return false
+	return state.active_ports.size() >= int(s[-1]["first_port"]) and _plugged_below(state, int(s[-1]["first_port"]))
+
+
+static func _plugged_below(state: GameState, limit: int) -> bool:
+	var n := 0
+	for p in state.active_ports:
+		if p < limit:
+			n += 1
+	return n >= limit
+
+
 static func row_ports(section_id: String) -> Array[int]:
 	var out: Array[int] = []
 	var s := section(section_id)

@@ -34,6 +34,9 @@ static func build_all(city: CityWorld) -> Array[CableUnit]:
 	for d in layout.districts:
 		if d.has("cables"):
 			units.append(_district(city, d, int(d["cables"].get("unit", units.size()))))
+	# Feste Orte mit Kabeln, auch in der Höhe (z. B. oben im Wolkig-Turm)
+	for site: Dictionary in layout.raw().get("sites", []):
+		units.append(_site(city, site, int(site.get("unit", units.size()))))
 	return units
 
 
@@ -143,6 +146,26 @@ static func _barrier(city: CityWorld, b: Dictionary, index: int) -> CableUnit:
 			_box_size(side3, 1.0, out3, absf(depth) + 1.0)])
 	if b.has("important_section"):
 		u._assign_important(String(b["important_section"]), int(b.get("seed", 1)))
+	return u
+
+
+## Ort mit festen Haufen (lift_m = Höhe über dem Gelände), wichtige Kabel aus `section`
+static func _site(city: CityWorld, cfg: Dictionary, index: int) -> CableUnit:
+	var u := CableUnit.new()
+	u.id = String(cfg["id"])
+	u.name = String(cfg.get("name", u.id))
+	u.first_id = ID_BASE + index * ID_STEP
+	u.center = city.to_scene(WorldLayout._v2(cfg["at"]))
+	u.half = WorldLayout._v2(cfg.get("half", [30, 30]))
+	var hid := 9100 + index * 100
+	for e: Dictionary in cfg.get("heaps", []):
+		var at := city.to_scene(WorldLayout._v2(e["at"]))
+		var h := HeapData.new(hid, hash([int(cfg.get("seed", 1)), u.id, hid]), at + Vector3(0, float(e.get("lift_m", 0.0)), 0),
+			int(e["count"]), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
+		h.name = "%s, %s" % [u.name, String(e.get("name", "Haufen"))]
+		u.heaps.append(h)
+		hid += 1
+	u._assign_important(String(cfg.get("section", "")), int(cfg.get("seed", 1)))
 	return u
 
 

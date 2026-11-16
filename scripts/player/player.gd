@@ -71,6 +71,10 @@ var _air_time := 0.0
 var speed_factor := 1.0
 ## Trägt eine Rolle (rechte Hand)
 var carrying := false
+## Hält den Kabelsauger (Arme nach vorn)
+var tool_hold := false
+var _phone: Node3D                # Smartphone in der rechten Hand (Intro)
+var _phone_bone := -1
 ## Griff der Handkurbel, an der gerade gedreht wird (Weltposition)
 var crank_point := Vector3.ZERO
 var _crank_t := 0.0
@@ -301,6 +305,7 @@ func _update_animator(delta: float, speed: float) -> void:
 	_anim.holding = holding
 	_anim.riding = riding
 	_anim.carrying = carrying
+	_anim.tool_hold = tool_hold
 	_anim.straining = at_tether_limit or debug_strain
 	_anim.wind = _wiggle
 	_anim.look_yaw = 0.0 if debug_no_look else wrapf(_yaw.rotation.y - yaw, -PI, PI)
@@ -312,6 +317,38 @@ func _update_animator(delta: float, speed: float) -> void:
 	else:
 		_anim.crank_dir = Vector3.ZERO
 	_anim.update(delta)
+	if _phone and _phone.visible and _phone_bone >= 0:
+		_phone.global_transform = _skel.global_transform * _skel.get_bone_global_pose(_phone_bone)
+
+
+## Smartphone in die rechte Hand nehmen bzw. wegstecken (Anruf im Intro)
+func set_phone(on: bool) -> void:
+	if _anim:
+		_anim.phoning = on
+	if on and _phone == null and _skel:
+		var path := "res://assets/models/props/pub/tripo/smartphone.glb"
+		if not ResourceLoader.exists(path):
+			return
+		# Halter folgt dem Hand-Knochen; die Lage setzt _update_animator jedes Bild aus der Knochen-Pose
+		# (BoneAttachment3D folgt per Code gesetzten Posen nicht zuverlässig)
+		var att := Node3D.new()
+		add_child(att)
+		_phone_bone = _skel.find_bone("mixamorig_RightHand")
+		att.global_transform = _skel.global_transform * _skel.get_bone_global_pose(_phone_bone)
+		var model := (load(path) as PackedScene).instantiate() as Node3D
+		att.add_child(model)
+		# Auf 32 cm Höhe in Weltmaßen bringen (die Spielzeug-Hand ist groß), mittig in die Hand
+		var box := ChefView._world_aabb(model)
+		model.scale *= 0.32 / maxf(box.size.y, 0.001)
+		box = ChefView._world_aabb(model)
+		var local_center := att.global_transform.affine_inverse() * box.get_center()
+		model.position -= local_center
+		# Vor die Faust (in Blickrichtung der Figur) und etwas höher, damit es nicht in der Hand verschwindet
+		var basis := att.global_transform.basis
+		model.position += basis.inverse() * (facing() * 0.16 + Vector3(0, 0.1, 0))
+		_phone = att
+	if _phone:
+		_phone.visible = on
 
 
 ## Kurze Bewegung abspielen: "tug" (Knoten-Ruck), "reach" (Einstecken), "pickup" (Aufheben)

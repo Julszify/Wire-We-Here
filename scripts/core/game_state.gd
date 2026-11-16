@@ -12,6 +12,8 @@ var active_ports: Array[int] = []
 var _port_set: Dictionary = {}
 ## C.O.R.D.-Abschaltknopf: Sekunden, bis er wieder gedrückt werden kann
 var snooze_cooldown: float = 0.0
+## Finale geschafft: C.O.R.D.s Kern auf dem Turm abgeschaltet (C.O.R.D. bestellt nichts mehr)
+var finale_done := false
 
 
 func level(upgrade_id: String) -> int:
@@ -30,7 +32,7 @@ func add_port(port: int) -> void:
 
 func to_dict() -> Dictionary:
 	return { "money": money, "total_earned": total_earned, "upgrades": upgrades.duplicate(), "active_ports": Array(active_ports),
-		"snooze_cooldown": snooze_cooldown }
+		"snooze_cooldown": snooze_cooldown, "finale_done": finale_done }
 
 
 func load_dict(d: Dictionary) -> void:
@@ -45,3 +47,4 @@ func load_dict(d: Dictionary) -> void:
 	for p in d.get("active_ports", []):
 		add_port(int(p))
 	snooze_cooldown = float(d.get("snooze_cooldown", 0.0))
+	finale_done = bool(d.get("finale_done", false))

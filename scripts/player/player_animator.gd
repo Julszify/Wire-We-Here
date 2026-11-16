@@ -44,6 +44,8 @@ var riding := false                # an der Seilbahn
 var carrying := false              # Rolle in der rechten Hand
 var straining := false             # zieht gegen die Leine
 var crank_dir := Vector3.ZERO      # Richtung zum Kurbelgriff (Modell-Raum), solange gekurbelt wird
+var phoning := false               # hält ein Smartphone vor sich (rechte Hand)
+var tool_hold := false             # hält ein Handgerät (Kabelsauger) mit beiden Armen nach vorn
 var look_yaw := 0.0                # Kamera relativ zum Körper
 var look_pitch := 0.0
 
@@ -64,6 +66,8 @@ var _crank_target := Vector3.FORWARD
 var _carry := 0.0
 var _hold := 0.0
 var _ride := 0.0
+var _tool := 0.0
+var _phone := 0.0
 var _idle_t := 0.0
 var _glance := Vector2.ZERO        # Umschauen im Stand (Gieren, Nicken)
 var _glance_target := Vector2.ZERO
@@ -132,6 +136,8 @@ func update(delta: float) -> void:
 	_carry = lerpf(_carry, 1.0 if carrying else 0.0, k)
 	_hold = lerpf(_hold, 1.0 if holding else 0.0, 1.0 - exp(-16.0 * delta))
 	_ride = lerpf(_ride, 1.0 if riding else 0.0, k)
+	_tool = lerpf(_tool, 1.0 if tool_hold else 0.0, k)
+	_phone = lerpf(_phone, 1.0 if phoning else 0.0, k)
 	for key in ["_tug_t", "_reach_t", "_pickup_t"]:
 		var v: float = get(key)
 		if v >= 0.0:
@@ -182,7 +188,7 @@ func _pose() -> void:
 	var s := sin(_phase)
 	var c := cos(_phase)
 	var tug := _pulse(_tug_t, TUG_S, 0.2)
-	var reach := _pulse(_reach_t, REACH_S, 0.35)
+	var reach := maxf(_pulse(_reach_t, REACH_S, 0.35), _tool * 0.8)
 	var pickup := _pulse(_pickup_t, PICKUP_S, 0.4)
 	var breath := sin(_t * TAU * BREATH_HZ) * (1.0 - m)
 
@@ -270,6 +276,10 @@ func _pose() -> void:
 	if pickup > 0.01:
 		r_up = r_up.lerp(Vector3(-0.15, -0.6, 0.8), pickup)
 		r_fore = r_fore.lerp(Vector3(0.0, -0.8, 0.6), pickup)
+	if _phone > 0.01:
+		# Smartphone vor das Gesicht halten
+		r_up = r_up.lerp(Vector3(-0.35, -0.8, 0.45), _phone)
+		r_fore = r_fore.lerp(Vector3(0.25, 0.3, 0.92), _phone)
 	_arm(-1.0, chest, r_up, r_fore)
 
 	# Linker Arm: mit Kabel waagerecht nach vorn (die Wicklung hängt daran), sonst wie rechts

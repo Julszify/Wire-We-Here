@@ -23,6 +23,8 @@ func _ready() -> void:
 	_test_zipline_path()
 	_test_bonuses_and_bag()
 	_test_unit_important()
+	_test_auto_reels()
+	_test_finale_gate()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -65,6 +67,53 @@ func _test_knots_and_completion() -> void:
 	sys.pull(arm, 1000.0)
 	_check(completed.size() == 1 and c.state == CableData.State.DONE, "Kabel fertig")
 	_check(arm.is_free(), "Arm wieder frei")
+	sys.free()
+
+
+## Fortschritt je Schrank und Freigabe des Turm-Aufzugs (alle Ports außer dem Turm belegt)
+func _test_finale_gate() -> void:
+	var st := GameState.new()
+	var last := RackPlan.sections()[-1]
+	_check(String(last["id"]) == "turm" and int(last["count"]) == 150, "Letzter Schrank ist der Turm mit 150 Ports")
+	for p in 5:
+		st.add_port(int(RackPlan.section("gamer")["first_port"]) + p)
+	_check(RackPlan.section_plugged(st, "gamer") == 5 and RackPlan.section_plugged(st, "altstadt") == 0, "Fortschritt je Viertel")
+	_check(not RackPlan.all_but_last_plugged(st), "Aufzug noch gesperrt")
+	for p in int(last["first_port"]):
+		st.add_port(p)
+	_check(RackPlan.all_but_last_plugged(st), "Aufzug frei, wenn alle anderen Schränke voll sind")
+	var d := st.to_dict()
+	d["finale_done"] = true
+	var st2 := GameState.new()
+	st2.load_dict(d)
+	_check(st2.finale_done, "Finale im Spielstand")
+
+
+## Sauger, Winde und Drohne ziehen mit eigenem Tempo und lösen Knoten nach auto_untie_s selbst
+func _test_auto_reels() -> void:
+	var sys := CableSystem.new()
+	var winch := ReelData.new(5, ReelData.Kind.WINCH, Vector3(3, 0, 0))
+	winch.speed_factor = 2.0
+	sys.add_reel(winch)
+	var c := CableData.from_seed(9, 4242, Vector3.ZERO)
+	c.knots_m = PackedFloat32Array([1.0])
+	sys.add_cable(c)
+	_check(winch.is_motorized() and winch.is_automatic() and winch.is_movable() and not winch.is_transient(), "Winde: zieht selbst, tragbar, wird gespeichert")
+	_check(ReelData.new(1, ReelData.Kind.VACUUM).is_transient() and ReelData.new(1, ReelData.Kind.DRONE).is_transient(), "Sauger und Drohne werden nicht gespeichert")
+	sys.hook(c, winch)
+	sys._process(0.25)
+	var speed := float(Balancing.winch["pull_speed_m_per_s"]) * 2.0
+	_check(is_equal_approx(c.pulled_m, minf(0.25 * speed, 1.0)), "Winde zieht mit eigenem Tempo (%.2f m)" % c.pulled_m)
+	sys._process(0.2)
+	_check(c.is_stuck(), "Winde hängt am Knoten")
+	var t := 0.0
+	while c.is_stuck() and t < 10.0:
+		sys._process(0.1)
+		t += 0.1
+	_check(not c.is_stuck() and c.knots_solved == 1, "Knoten löst sich von selbst nach %.1f s" % t)
+	for i in 400:
+		sys._process(0.1)
+	_check(c.state == CableData.State.DONE and winch.is_free(), "Winde rollt das Kabel ganz ab")
 	sys.free()
 
 

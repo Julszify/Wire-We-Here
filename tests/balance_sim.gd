@@ -1,6 +1,7 @@
 extends Node
-## Grober Spielverlauf als Rechnung (kein echter Spieltest!): spielt Hinterhof, Sperre und Wohnviertel
-## mit einem einfachen Modell-Spieler durch und zeigt, wann was passiert. Hilft beim Einstellen von
+## Grober Spielverlauf als Rechnung (kein echter Spieltest!): spielt Hinterhof und erste Sperre Kabel für Kabel,
+## danach alle Viertel bis zum Turm-Finale als Durchsatz-Modell (Werkzeuge, Suchen, Abliefern) mit einem einfachen
+## Modell-Spieler durch und zeigt, wann was passiert. Hilft beim Einstellen von
 ## data/balancing.json, ersetzt aber nicht das Gefühl beim Spielen.
 ##   godot --headless res://tests/balance_sim.tscn
 ## Annahmen über den Spieler stehen in ASSUME und werden mit ausgegeben.
@@ -20,6 +21,14 @@ const ASSUME := {
 	"weg_zur_station_m": 180.0,   # mittlerer Fußweg zur nächsten Seilbahn-Station im Viertel
 	"seil_wohnviertel_m": 250.0,  # Seilbahn Wohnviertel -> Basis (Fahrstrecke)
 	"seil_altstadt_m": 650.0,     # Seilbahn Altstadt -> Basis (über das Wohnviertel)
+	# Stadt-Viertel (Durchsatz-Modell, 1:100)
+	"suchen_s": 75.0,             # ein wichtiges Kabel unter ~100 gewöhnlichen finden, ohne Detektor
+	"suchen_detektor_s": 30.0,    # mit Detektor (warm/kalt)
+	"suchen_peilung_s": 15.0,     # mit Peilantenne (Richtung)
+	"sauger_anteil": 0.6,         # so viel Zeit hält der Spieler den Sauger (der Rest: suchen, laufen)
+	"drohne_wichtig_s": 45.0,     # eine Drohne bringt im Einsatzgebiet alle so viele Sekunden ein wichtiges Kabel
+	"weg_faktor": 1.25,           # Luftlinie -> Fußweg
+	"schritt_s": 5.0,             # Zeitschritt der Rechnung
 }
 
 ## Längste Dauer einer Phase in der Rechnung (danach Abbruch mit Hinweis)
@@ -72,41 +81,22 @@ func _ready() -> void:
 	_work(barrier, func() -> bool: return _done(barrier) >= need, float(ASSUME["weg_sperre_m"]), false)
 	_mark("Sperre abgetragen (%d von %d Kabeln) nach %s an der Sperre" % [need, barrier.size(), _dur(t - t0)])
 
-	# 3. Wohnviertel: Kurbel und Rollen bleiben an der Sperre, nur der Wagen kommt mit
+	# 3. Stadt: Viertel in Spielreihenfolge, jeweils Sperre (falls vorhanden) und alle Ports des Schranks
 	tools_here = false
-	phase = "wohnviertel"
-	var wcfg: Dictionary = {}
-	for d: Dictionary in Balancing.world["districts"]:
-		if d["id"] == "wohnviertel":
-			wcfg = d["cables"]
-	var count := int(wcfg["crossing_heaps"]) * (int(wcfg["heap_count"][0]) + int(wcfg["heap_count"][1])) / 2 + int(wcfg["street_cables"])
-	var wohn := _cables(count, RackPlan.row_ports("wohnviertel"), 600000)
-	t0 = t
-	var w0 := rack.active_count()
-	_work(wohn, func() -> bool: return rack.active_count() - w0 >= 100, float(ASSUME["weg_wohnviertel_m"]), false)
-	_mark("Alle 100 Wohnviertel-Ports belegt (%d von %d Kabeln aufgerollt) nach %s im Viertel" % [_done(wohn), wohn.size(), _dur(t - t0)])
-
-	# 4. Sperre vor der Altstadt und Altstadt
-	phase = "altstadt"
-	var acfg: Dictionary = Balancing.world["barriers"][1]
-	var barrier2 := _cables(int(acfg["count"]), [], 800000)
-	var need2 := int(ceil(barrier2.size() * float(acfg["clear_fraction"])))
-	t0 = t
-	_work(barrier2, func() -> bool: return _done(barrier2) >= need2, float(ASSUME["weg_altstadt_m"]), false)
-	_mark("Sperre vor der Altstadt abgetragen (%d Kabel) nach %s" % [need2, _dur(t - t0)])
-	var alt_cfg: Dictionary = {}
-	for d: Dictionary in Balancing.world["districts"]:
-		if d["id"] == "altstadt":
-			alt_cfg = d["cables"]
-	var acount := int(alt_cfg["crossing_heaps"]) * (int(alt_cfg["heap_count"][0]) + int(alt_cfg["heap_count"][1])) / 2 \
-		+ int(alt_cfg["street_cables"])
-	for e: Dictionary in alt_cfg.get("extra_heaps", []):
-		acount += int(e["count"])
-	var alt := _cables(acount, RackPlan.row_ports("altstadt"), 900000)
-	t0 = t
-	var a0 := rack.active_count()
-	_work(alt, func() -> bool: return rack.active_count() - a0 >= 150, float(ASSUME["weg_altstadt_m"]), false)
-	_mark("Alle 150 Altstadt-Ports belegt (%d von %d Kabeln aufgerollt) nach %s in der Altstadt" % [_done(alt), alt.size(), _dur(t - t0)])
+	var order: Array = Balancing.world["important_plan"]["order"]
+	for id: String in order.slice(1):
+		var barrier_cfg := _barrier_for(id)
+		var way := _way_m(id)
+		if not barrier_cfg.is_empty():
+			var need_b := int(ceil(int(barrier_cfg["count"]) * float(barrier_cfg["clear_fraction"])))
+			t0 = t
+			_mass_phase(id, need_b, 0, way)
+			_mark("%s abgetragen (%d Kabel) nach %s" % [String(barrier_cfg["name"]), need_b, _dur(t - t0)])
+		t0 = t
+		var sec := RackPlan.section(id)
+		_mass_phase(id, 0, int(sec["count"]), way)
+		_mark("%s: alle %d Ports belegt nach %s im Viertel (Werkzeuge: Sauger %d, Winden %d, Drohnen %d)" % [sec["name"],
+			int(sec["count"]), _dur(t - t0), eco.state.level("vacuum"), eco.state.level("winch"), eco.state.level("drone")])
 
 	print("\nVERLAUF")
 	for line in log:
@@ -194,6 +184,125 @@ func _work(cables: Array[CableData], stop: Callable, way_m: float, cord_active: 
 		_deliver(way_m)
 
 
+## Durchsatz-Modell für ein Viertel: `need_normal` gewöhnliche Kabel abtragen (Sperre) bzw. `need_ports`
+## wichtige Kabel finden und einstecken. Werkzeuge bringen nebenbei Geld; gekauft wird laufend.
+func _mass_phase(id: String, need_normal: int, need_ports: int, way_m: float) -> void:
+	var dt := float(ASSUME["schritt_s"])
+	var avg_len := (float(Balancing.cable["length_min_m"]) + float(Balancing.cable["length_max_m"])) * 0.5
+	var pay := avg_len * float(Balancing.economy["money_per_meter"]) * eco.factor("copper") * eco.bonus("money")
+	var cleared := 0.0
+	var found := 0.0
+	var plugged := 0
+	var find_t := 0.0
+	var t_start := t
+	phase = id
+	while (need_normal > 0 and cleared < need_normal) or (need_ports > 0 and plugged < need_ports):
+		if t - t_start > MAX_PHASE_S:
+			_mark("ABBRUCH nach %s" % _dur(MAX_PHASE_S))
+			return
+		var rate := _mass_rate(avg_len)
+		cleared += rate * dt
+		eco.state.money += rate * dt * pay
+		eco.state.total_earned += rate * dt * pay
+		if need_ports > 0:
+			# Spieler sucht wichtige Kabel (Detektor hilft), Drohnen bringen zusätzlich welche
+			var search := float(ASSUME["suchen_s"])
+			if eco.state.level("detector_arrow") > 0:
+				search = float(ASSUME["suchen_peilung_s"])
+			elif eco.state.level("detector") > 0:
+				search = float(ASSUME["suchen_detektor_s"])
+			find_t += dt
+			var pull_s := avg_len / maxf(_hand_rate(), 0.1) if eco.state.level("vacuum") == 0 else 4.0
+			while find_t >= search + pull_s and found + plugged < need_ports:
+				find_t -= search + pull_s
+				found += 1.0
+			var drone_found := eco.state.level("drone") * dt / float(ASSUME["drohne_wichtig_s"])
+			var by_drones := minf(drone_found, float(need_ports - plugged) - found)
+			if by_drones > 0.0:
+				var dn := by_drones + _drone_rest
+				var k := int(floor(dn))
+				_drone_rest = dn - k
+				if k > 0:
+					_plug_section(id, k)
+					plugged += k
+			# Abliefern, wenn die Tasche voll ist oder alle gefunden sind
+			if found >= eco.bag_capacity() or (found > 0.0 and found + plugged >= need_ports):
+				var n := int(found)
+				t += 2.0 * way_m / (float(Balancing.player["sprint_speed_m_per_s"]) * _walk_factor()) + 3.0
+				_plug_section(id, n)
+				plugged += n
+				found -= n
+		t += dt
+		eco.refresh_bonuses()
+		_shop()
+
+
+var _drone_rest := 0.0  # angefangene Drohnen-Funde (Bruchteile) bis zum nächsten ganzen Kabel
+
+
+## Gewöhnliche Kabel pro Sekunde aus allen Werkzeugen (Sauger nur, solange der Spieler ihn hält)
+func _mass_rate(avg_len: float) -> float:
+	var r := 0.0
+	var motor_bonus := eco.bonus("motor")
+	if eco.state.level("vacuum") > 0:
+		var slots := MassTools.vacuum_slots(eco)
+		var v := float(Balancing.vacuum["pull_speed_m_per_s"]) * eco.factor("vacuum_power") * motor_bonus
+		r += float(ASSUME["sauger_anteil"]) * slots / (avg_len / v + 1.5)
+	else:
+		# ohne Sauger: Wagen und Hand wie im Hof, grob
+		var w := float(Balancing.wagon["pull_speed_m_per_s"]) * eco.factor("motor") * motor_bonus
+		r += 0.5 / (avg_len / maxf(_hand_rate(), 0.1) + float(ASSUME["greifen_s"]))
+		if eco.state.level("wagon") > 0:
+			r += int(Balancing.wagon["slots"]) / (avg_len / w + float(ASSUME["greifen_s"]) + 2.0)
+	var wr := float(Balancing.winch["pull_speed_m_per_s"]) * eco.factor("winch_speed") * motor_bonus
+	r += eco.state.level("winch") / (avg_len / wr + 1.0) * 0.5  # Winden stehen nicht immer am richtigen Haufen
+	var dr := float(Balancing.drone["pull_speed_m_per_s"]) * eco.factor("drone_speed") * motor_bonus
+	r += eco.state.level("drone") / (avg_len / dr + 4.0)
+	return r
+
+
+func _hand_rate() -> float:
+	var mult := eco.factor("grip") * eco.bonus("press")
+	var presses := float(ASSUME["klicks_pro_s"])
+	if eco.state.level("auto_pull") > 0:
+		presses = float(Balancing.upgrades["auto_pull"]["presses_per_second"])
+	var tool: Dictionary = Balancing.hand_wrap
+	return minf(presses * float(tool["pull_per_press_m"]) * mult, float(tool["feed_speed_m_per_s"]) * mult)
+
+
+## Die nächsten `n` freien Ports eines Schranks belegen (Reihenfolge egal für die Rechnung)
+func _plug_section(id: String, n: int) -> void:
+	var sec := RackPlan.section(id)
+	var first := int(sec["first_port"])
+	var left := n
+	for p in range(first, first + int(sec["count"])):
+		if left <= 0:
+			break
+		if not eco.state.has_port(p):
+			rack.plug(p)
+			left -= 1
+	eco.refresh_bonuses()
+
+
+func _barrier_for(id: String) -> Dictionary:
+	for b: Dictionary in Balancing.world["barriers"]:
+		if String(b["road"][0]) == id or (String(b["road"][1]) == id and id == "wohnviertel"):
+			return b
+	return {}
+
+
+## Weg vom Viertel (Mitte) zum Serverraum
+func _way_m(id: String) -> float:
+	var base := Vector2(Balancing.world["backyard"]["center"][0], Balancing.world["backyard"]["center"][1])
+	for d: Dictionary in Balancing.world["districts"]:
+		if d["id"] == id:
+			return Vector2(d["center"][0], d["center"][1]).distance_to(base) * float(ASSUME["weg_faktor"])
+	for l: Dictionary in Balancing.world["landmarks"]:
+		if l["id"] == id:
+			return Vector2(l["pos"][0], l["pos"][1]).distance_to(base) * float(ASSUME["weg_faktor"]) + 60.0
+	return 500.0
+
+
 func _done(cables: Array[CableData]) -> int:
 	var n := 0
 	for c in cables:
@@ -247,10 +356,16 @@ func _finish(c: CableData, way_m: float) -> void:
 		eco.pay_for_cable(c.length_m)
 
 
+## Lauftempo wie im Spiel: Dienst-Boni gedeckelt, Laufschuhe dazu, Summe gedeckelt
+func _walk_factor() -> float:
+	var p: Dictionary = Balancing.player
+	return minf(minf(eco.bonus("walk"), float(p["max_speed_factor"])) * eco.factor("shoes"), float(p["max_total_speed_factor"]))
+
+
 ## Zum Serverraum und zurück
 func _deliver(way_m: float) -> void:
-	var speed := float(Balancing.player["sprint_speed_m_per_s"]) * eco.bonus("walk")
-	var ride := float(Balancing.zipline["speed_m_per_s"])
+	var speed := float(Balancing.player["sprint_speed_m_per_s"]) * _walk_factor()
+	var ride := float(Balancing.zipline["speed_m_per_s"]) * 0.8  # Anfahren und Bremsen
 	var seconds := 2.0 * way_m / speed
 	# Seilbahn: hin zu Fuß bis zur Station, dann fahren (auch zurück)
 	var to_station := float(ASSUME["weg_zur_station_m"]) / speed

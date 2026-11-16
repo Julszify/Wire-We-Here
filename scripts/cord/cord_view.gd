@@ -12,6 +12,8 @@ var _t := 0.0
 var _vel := Vector3.ZERO        # geglättete Fluggeschwindigkeit (für die Neigung)
 var _mood := ""                 # "sulk" nach einem Nein, "happy" nach einer Bestellung
 var _mood_t := 0.0
+## Nach dem Finale: C.O.R.D. schläft (hängt tief, Band aus)
+var sleeping := false
 const SULK_S := 3.0
 const HAPPY_S := 1.2
 
@@ -235,6 +237,12 @@ func _process(delta: float) -> void:
 		pos.z = cos(_t * 37.0) * 0.015
 		rot.y = sin(_t * 9.0) * 0.08
 		rot.x -= 0.12
+	elif sleeping:
+		pos.y -= 0.45
+		rot.x += 0.4
+		bob_speed = 0.6
+		bob_height = 0.02
+		_set_ring(CALM.darkened(0.85))
 	elif _mood == "sulk" and _mood_t < SULK_S:
 		# Beleidigt: sinkt ab, kippt nach vorn, dreht sich weg und schüttelt langsam den Kopf
 		var w := _ease_in_out(_mood_t, SULK_S)
