@@ -9,30 +9,31 @@ Repository: https://github.com/Julszify/Wire-We-Here (öffentlich, Branch `main`
 
 Drei Chefs der fiktiven „Wolkig AG“ ersetzen am Stammtisch die IT-Abteilung durch eine schnell zusammengebastelte KI namens **C.O.R.D.** (Cable Ordering & Repair Daemon). C.O.R.D. bestellt bei jedem defekten Kabel Ersatz, tauscht aber nie etwas aus. Die Kabelberge wachsen, bis die Cloud weltweit ausfällt. Der Spieler ist der gefeuerte IT-Admin, der das Chaos beseitigen soll.
 
-Kernschleife: Kabelende finden → per Hand, Handkurbel oder Motorrolle aufwickeln → Knoten lösen → Geld. Gewöhnliche Kabel bringen Geld, wichtige Kabel gehören an feste Ports im Server-Schrank und reaktivieren Dienste (im fertigen Spiel 2000, im Slice 20).
+Kernschleife: Kabelende finden → per Hand, Handkurbel oder Motorrolle aufwickeln → Knoten lösen → Geld. Gewöhnliche Kabel bringen Geld, wichtige Kabel gehören an feste Ports im Serverraum und reaktivieren Dienste (2000 Ports, 218 Dienste).
 
-## Aktueller Stand: Vertical Slice fertig (`v0.1-vertical-slice`)
+## Aktueller Stand
 
-Der Slice soll eine Frage beantworten: **Macht Ziehen und Aufrollen Spaß?** Er ist vollständig spielbar:
+Der Vertical Slice (`v0.1-vertical-slice`, Frage: **Macht Ziehen und Aufrollen Spaß?**) ist längst zu einer begehbaren Stadt gewachsen. Spielbar ist:
 
-- **Zone „Schubladen-Ebene“** mit ca. 525 Kabeln auf einmal: großer Kabelberg (220), 6 Haufen, 70 Streukabel quer über den Boden (`data/zone.json`)
-- **Spielfigur** in Third-Person; Fadenkreuz wird beim Anvisieren eines Kabelendes zur Hand
-- **Werkzeug-Kette:** per Hand um den Arm wickeln → Handkurbel → Motorrollen (siehe unten)
-- **Knoten:** Kabel stoppen an festen Stellen, 3× E löst sie
-- **Geld** pro Meter mit schwebendem Betrag; **Tablet** (Tab) mit 6 Upgrades
-- **Serverraum** (begehbare Halle im Hinterhof) mit zehn Schränken und 2000 Ports; wichtige Kabel leuchten, tragen ein Etikett und werden zu Knäueln, die man in der Tasche sammelt und im Serverraum einsteckt; Dienste schalten Upgrades frei oder wirken dauerhaft
-- **C.O.R.D.** folgt dem Spieler und stellt die Bestellfalle (ohne „Nein“ fallen 100 Kabel vom Himmel)
+- **Hinterhof** der Wolkig AG als Tutorial-Zone mit ca. 525 Kabeln (`data/zone.json`), Serverraum und Ausstattung
+- **Stadt** (ca. 2 × 2 km, zehn Viertel) mit Gelände, Gebäuden im Spielzeug-Look und rund **195.000 Kabeln** (etwa 100 gewöhnliche je wichtigem); jedes Viertel hat einen Zaun und davor einen Kabelberg als Sperre
+- **Werkzeug-Kette:** per Hand um den Arm → Handkurbel → Motorrollen → Kabeltrommel-Wagen; Rollen lassen sich umstellen
+- **Knoten**, **Geld** pro Meter, **Tablet** (Tab) mit 8 Upgrades
+- **Serverraum** mit zehn Schränken und 2000 Ports; wichtige Kabel werden zu Knäueln, die man in der Tasche sammelt und einsteckt; alle 218 Dienste haben eine Wirkung
+- **Spielfigur** (Tripo3D, Bewegungen per Code) und **C.O.R.D.** mit Bestellfalle (ohne „Nein“ fallen 100 Kabel vom Himmel)
+- **Bewegung:** laufen, rennen, springen, Seilbahn zur Basis, Wegweiser zum Serverraum
 - **Speichern und Laden** als JSON
 
-Noch nicht enthalten und bewusst offen: Koop, Steam-Anbindung, weitere Zonen, Prestige, Story-Zwischensequenzen, finale Grafik, Sound. Die Architektur ist auf Koop vorbereitet (siehe unten).
+Noch nicht enthalten: Koop, Steam-Anbindung, Prestige, Finale im Wolkig-Turm, Story-Zwischensequenzen, Sound. Die Architektur ist auf Koop vorbereitet (siehe unten).
 
 ## Nächste Schritte (Ideen, noch nicht entschieden)
 
-1. **Echten Spieltest auswerten:** Fühlt sich das Wickeln per Hand gut mühsam oder frustrierend an? Ist C.O.R.D.s Takt lustig oder nervig? Die Verlaufs-Rechnung (`tests/balance_sim.tscn`) zeigt nur Zeiten, kein Spielgefühl. Danach Balancing in `data/balancing.json` anpassen.
-2. **Vierte Werkzeug-Stufe** festlegen (Vorschlag: Kabeltrommel-Wagen, den man mitzieht und der mehrere Kabel gleichzeitig aufnimmt). Wichtig für die Stadt: Kurbel und Motorrollen stehen fest, wo sie gekauft wurden; im Wohnviertel wickelt man bisher nur per Hand.
-3. **Balancing:** Werkzeuge sind angeglichen (Hand voll aufgerüstet ca. 10 m/s, Motorrolle ca. 20 m/s, jeweils plus Dienst-Boni). Laut Verlaufs-Rechnung bestimmen jetzt Greifen und Laufwege die Spielzeit, nicht mehr das Wickeln. Geld-Senken fehlen: nach gut 1,5 Stunden ist alles gekauft.
-4. **Optik:** Knäuel am Arm kompakter (wirkt eher wie ein Trichter; die fertigen Knäuel sind schon ordentliche Kabelringe); echte Gebäudemodelle für weitere Viertel; Anzeige (HUD) im Spielzeug-Look.
-5. **Koop vorbereiten:** CableSystem, Economy, ServiceRack und CordLogic laufen später beim Host; Clients bekommen Zustand und senden Absichten.
+1. **Werkzeuge für die Masse:** Bei 20.000 Kabeln je Viertel reicht Kabel für Kabel nicht mehr. Ideen: Kabelsauger (alle Enden im Umkreis), Abräum-Roboter (arbeiten Haufen selbstständig ab), Haufen-Winde (rollt einen Berg nach und nach ab).
+2. **Wichtige Kabel finden:** Suchgerät (warm/kalt) und Anzeige je Viertel („Wohnviertel: 37 von 100“, steht im GDD).
+3. **Balancing:** Mit 1:100 kommt viel mehr Geld herein, Geld-Senken fehlen. Verlaufs-Rechnung auf die neuen Viertel erweitern; echter Spieltest der Sperren (500–700 Kabel, die Hälfte muss weg).
+4. **Finale im Wolkig-Turm:** Die 150 Turm-Kabel liegen vorläufig am Fuß des Turms; laut GDD gehört das Finale nach oben (Aufzug oder Kletterweg zu C.O.R.D.s Server). Dazu Leitern, Aufzüge, Klettern.
+5. **Optik und Ton:** Flimmern dichter Haufen in 50–100 m, Anzeige (HUD) und Tablet im Spielzeug-Look, Sound.
+6. **Koop vorbereiten:** CableSystem, Economy, ServiceRack und CordLogic laufen später beim Host; Clients bekommen Zustand und senden Absichten.
 
 ## Technik
 
@@ -63,7 +64,7 @@ Blender 5.3 liegt unter `/Applications/Blender.app/Contents/MacOS/Blender`. Mode
 
 - **C.O.R.D.:** `assets/models/cord/tripo/cord_tripo.glb` (Tripo3D, eine Textur). `CordView` verkleinert es auf 0,8 m und legt ein eigenes Leuchtband über das Band in der Textur (`TRIPO_BAND_Y`/`TRIPO_BAND_H`), das cyan leuchtet und bei der Bestellfrage rot blinkt. Es neigt sich in Flugrichtung, zappelt bei der Frage, ist nach einem „Nein“ beleidigt (sinkt, dreht sich weg, Band gedimmt) und dreht sich nach einer Bestellung vor Freude (`CordView.react()`). Fehlt die Datei, kommt der Blender-Entwurf:
 - `cord_designs.py` → `assets/models/cord/` (C.O.R.D. = Server-Box; Leuchtteile heißen `CordRing` und blinken per Code)
-- **Spielfigur:** `assets/models/player/tripo/admin_tripo.glb` (in Tripo3D erzeugt, Mixamo-Skelett, ca. 1 m hoch, schaut nach +Z). `player.gd` lädt es unter den Körper (180° gedreht, ×1,75); `PlayerAnimator` (`scripts/player/player_animator.gd`) stellt die Knochen per Code: Gehen und Rennen mit Knien, Hüfte, Oberkörper und Kopf (rückwärts laufen die Beine andersherum), Atmen und Umschauen im Stand, Kopf folgt der Kamera, Wickeln (rechte Hand kreist um den linken Unterarm), Ziehen gegen die Leine, Knoten-Ruck, Kurbeln (Hand folgt dem Griff, `ReelView.handle_point()`), Rolle tragen, Aufheben, Einstecken, Baumeln an der Seilbahn. Kurze Bewegungen löst `world.gd` über `Player.act()` aus. Achtung: Bei diesem Rig hängt der Oberarm fast ganz am Schulter-Knochen, deshalb werden Schulter und Arm gemeinsam ausgerichtet, und die Arme werden nur mäßig abgesenkt (steiler verschwinden sie im Bauch). `arm_transform()` liefert die Lage des linken Unterarm-Knochens für die Kabel-Wicklung. Fehlt die Datei, nimmt `player.gd` die Einzelteile aus `player_designs.py` (`MODEL_PARTS`). Animationen gibt es noch keine; wegen des Mixamo-Skeletts ließen sich Mixamo-Animationen später verwenden.
+- **Spielfigur:** `assets/models/player/tripo/admin_tripo.glb` (in Tripo3D erzeugt, Mixamo-Skelett, ca. 1 m hoch, schaut nach +Z). `player.gd` lädt es unter den Körper (180° gedreht, ×1,75); `PlayerAnimator` (`scripts/player/player_animator.gd`) stellt die Knochen per Code: Gehen und Rennen mit Knien, Hüfte, Oberkörper und Kopf (rückwärts laufen die Beine andersherum), Atmen und Umschauen im Stand, Kopf folgt der Kamera, Wickeln (rechte Hand kreist um den linken Unterarm), Ziehen gegen die Leine, Knoten-Ruck, Kurbeln (Hand folgt dem Griff, `ReelView.handle_point()`), Rolle tragen, Aufheben, Einstecken, Baumeln an der Seilbahn. Kurze Bewegungen löst `world.gd` über `Player.act()` aus. Achtung: Bei diesem Rig hängt der Oberarm fast ganz am Schulter-Knochen, deshalb werden Schulter und Arm gemeinsam ausgerichtet, und die Arme werden nur mäßig abgesenkt (steiler verschwinden sie im Bauch). `arm_transform()` liefert die Lage des linken Unterarm-Knochens für die Kabel-Wicklung. Fehlt die Datei, nimmt `player.gd` die Einzelteile aus `player_designs.py` (`MODEL_PARTS`). Animationsdateien gibt es keine; wegen des Mixamo-Skeletts ließen sich Mixamo-Animationen später verwenden.
 - `player_designs.py` → `assets/models/player/` (Hoodie-Admin aus Einzelteilen, Rückfall-Figur); `player_toy_designs.py` → Entwürfe im Spielzeug-Stil (`assets/models/player/proposals/toy_*`)
 - `plug_lod.py` → `assets/models/cable/plugs_lod.glb` (dieselben Stecker mit ca. 48 Dreiecken für die Blöcke ruhender Kabel)
 - `plug_designs.py` → `assets/models/cable/plugs.glb` (fünf Steckertypen mit Vertex-Farben; `PlugMeshes` schreibt sie als zweite Fläche ins Kabel-Mesh, Typ und Kabeldicke über `cable.plugs` in `balancing.json`)
@@ -88,13 +89,12 @@ Konzept im GDD, Abschnitt „Welt und offene Map“: offene Kleinstadt, ca. 2 ×
 - **Fassaden- und Dachtexturen:** Midjourney-Bilder in `assets/textures/buildings/` (Originale in `tools/textures/midjourney/`). `CityBlockout.FACADE_TEXTURES` legt je Fassadenstil Bild und Kachelgröße in Metern fest (eine Kachel = Fensterachse × Geschoss, `*_ground` = Erdgeschoss, `rolltor` = Hallentor); der Blockout-Shader färbt helle, kaum bunte Stellen mit der Gebäudefarbe, Glas und Holz bleiben. `ROOF_TEXTURES` gibt Bausatz-Dächern eine Textur (Weltkoordinaten, Reihen parallel zum First, mit Dachfarbe eingefärbt, `kit.gdshader`). Fehlt ein Bild, zeichnet der Shader wie bisher selbst.
 - **Aussehen:** `CityLook` (`scripts/world/city_look.gd`) stellt Himmel, Sonne, Dunst, Leuchten und Farben für Hauptszene und Vorschau ein. Shader liegen in `assets/shaders/`: `sky_clouds` (Himmel mit stehenden Wolken), `blockout` (ein Material für die ganze Stadt: Fensterraster, Sockel und Dach auf Gebäuden, Mittellinien und Gehwege auf Straßen; die Art der Fläche steckt im Alpha-Wert der Vertex-Farbe, siehe Kommentar im Shader), `sea` (Wellen). Gebäudefarben je Viertel: `blockout.palette` in `world.json`.
 - **Hauptszene:** `world.gd` baut die Stadt als `CityWorld` und verschiebt sie so, dass der Wolkig-Hinterhof (`backyard` in `world.json`, 130 × 130 m frei) bei (0, 0, 0) liegt. Die bisherige Zone (Haufen, Schrank, Lieferungen in `floor_size_m`) behält dadurch ihre Koordinaten; Spielstände bleiben gültig. Absturz-Schutz wie in der Vorschau.
-- **Kabel in der Stadt:** `CableUnit` (Viertel mit `cables` und Sperren aus `barriers` in `world.json`) hat feste Kabel-ID-Bereiche ab 1.000.000 (je 100.000), der Hinterhof bleibt die immer geladene Zone (IDs ab 0). `world.gd` lädt Einheiten näher als `streaming.load_m` über eine Warteschlange (`cables_per_frame`) und entlädt sie ab `unload_m`, außer ein Kabel hängt an Rolle oder Arm; veränderte Zustände entladener Kabel liegen in `_stored_states` und im Spielstand. Wohnviertel: Haufen auf Kreuzungen, Straßenkabel (`HeapData.Kind.STREET`). Campus hat einen Zaun (`wall`) mit Lücke zum Wohnviertel; dort liegt die Sperre, deren Blockade fällt, wenn `clear_fraction` abgetragen ist. Testoptionen: `--clearbarrier`, `--streamtest`; `--dumpafter` beendet Godot nicht, dafür `--quit-after <frames>` vor dem `--` angeben.
+- **Kabel in der Stadt:** `CableUnit` (Viertel mit `cables` und Sperren aus `barriers` in `world.json`) hat feste Kabel-ID-Bereiche ab 1.000.000 (je 100.000), der Hinterhof bleibt die immer geladene Zone (IDs ab 0). `world.gd` lädt Einheiten näher als `streaming.load_m` (Kabel und Meshes entstehen blockweise in Threads über `CableBatcher.load_async`) und entlädt sie ab `unload_m`, außer ein Kabel hängt an Rolle oder Arm; veränderte Zustände entladener Kabel liegen in `_stored_states` und im Spielstand. Straßenkabel sind eigene Mini-Haufen (`HeapData.Kind.STREET`). Viertel haben einen Zaun (`wall`) mit Lücken (`exits`); in der Lücke liegt die Sperre, deren Blockade fällt, wenn `clear_fraction` abgetragen ist. Testoptionen: `--clearbarrier`, `--streamtest`; `--dumpafter` beendet Godot nicht, dafür `--quit-after <frames>` vor dem `--` angeben.
 - **Kabelmenge 1:100:** Jedes Viertel hat etwa 100 gewöhnliche Kabel je wichtigem (zusammen ca. 195.000 Kabel; der Hinterhof bleibt Tutorial). `cables` in `world.json`: Haufen auf Kreuzungen (`crossing_heaps`), auf Straßenabschnitten (`segment_heaps`), feste große Berge (`extra_heaps`), Straßenkabel. Stadion, Hafen, Krater und Turm haben nur feste Berge (rund ums Stadion, am Kai, im Kraterring, am Wolkig-Turm auf dem Campus mit `section: turm`). Berge über 9 m Radius: Kabel winden sich in kleineren Bereichen (`heap.local_radius_m`). Jedes Viertel hat einen Zaun mit Lücken und davor einen Kabelberg als Sperre (`clear_fraction` 0,5 bei den neuen). `--unitstats` gibt die Zahlen je Einheit aus.
-- **Plan der 2000 wichtigen Kabel:** `important_plan` und `important_cables` je Viertel in `world.json`. `RackPlan` (`scripts/rack/rack_plan.gd`) leitet daraus alles ab: Ports 0–1999 über zehn Schränke, die ersten 20 (Campus) sind Einzel-Dienste, der Rest Reihen à 10 Ports (eine volle Reihe = ein Dienst; zusammen 218 Dienste). Wichtige Kabel liegen bisher im Hinterhof (20 Einzel-Dienste), in der Sperre (`important_section: campus`, 30 Kabel = 3 Reihen) und im Wohnviertel (100 Kabel = 10 Reihen); `CableUnit` verteilt die Ports per Seed auf die Kabel. Die übrigen Viertel haben Schränke, aber noch keine Kabel.
+- **Plan der 2000 wichtigen Kabel:** `important_plan` und `important_cables` je Viertel in `world.json`. `RackPlan` (`scripts/rack/rack_plan.gd`) leitet daraus alles ab: Ports 0–1999 über zehn Schränke, die ersten 20 (Campus) sind Einzel-Dienste, der Rest Reihen à 10 Ports (eine volle Reihe = ein Dienst; zusammen 218 Dienste). Alle 2000 liegen im Spiel: Hinterhof (20 Einzel-Dienste), Sperre vor dem Wohnviertel (`important_section: campus`, 30 Kabel = 3 Reihen), danach je Viertel die Kabel seines Schranks; die Turm-Kabel liegen vorläufig am Fuß des Turms (`cables.section: turm` auf dem Campus). `CableUnit` verteilt die Ports per Seed auf die Kabel.
 - **Altstadt:** Zaun mit Lücke zum Wohnviertel, davor auf der Hauptstraße der zweite Kabelberg (`sperre_altstadt`, `offset_m` positiv = Berg außerhalb, Blockade dahinter in der Altstadt). Kabel auf Kreuzungen und Straßen, dazu ein großer Haufen auf dem Marktplatz (`extra_heaps`); 150 wichtige Kabel für 15 Reihen. Einheiten haben feste Nummern (`unit` in `world.json`), damit Kabel-IDs alter Spielstände gleich bleiben.
 - **Seilbahn zur Basis** (`ziplines` in `world.json`, `scripts/world/zipline.gd`): Strecken aus Punkten [x, z, Höhe über Boden] vom äußeren Ende zur Basis, erster und letzter Punkt sind Stationen. Freigeschaltet durch Dienste mit `special` `zipline_wohnviertel` (Wohnviertel-Reihe „Seilbahn-Leitstand“) bzw. `zipline_altstadt` (Altstadt-Reihe „Stadtwerke-Portal“). E an einer Station fährt; von der Altstadt geht es über `continues` ohne Halt weiter bis zur Basis. Werte in `balancing.json` → `zipline`.
 - **Wegweiser:** Sind Knäuel in der Tasche und der Serverraum mehr als 30 m entfernt, zeigt oben ein Pfeil Richtung und Entfernung (`scripts/ui/waypoint.gd`).
-- **Nächste Schritte laut Bauplan:** Kabel für die übrigen Viertel, Leitern/Aufzüge, Klettern.
 
 ### Werkzeug-Kette und Eingabe
 
@@ -150,26 +150,29 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 
 ```
 /data        balancing.json (Werte), zone.json (Anordnung), services.json (Dienste je Port)
-/scenes      world.tscn (Hauptszene), player.tscn, reel_test.tscn (Rollen-Testszene)
-/scripts     cable/   Bahn, Tube-Mesh, Kabeldaten, Haufen, Zone, CableSystem
+/data        world.json (Stadt, Viertel, Kabel, Sperren, Seilbahnen)
+/scenes      world.tscn (Hauptszene), city_preview.tscn (Stadt-Vorschau), player.tscn, reel_test.tscn
+/scripts     cable/   Bahn, Tube-Mesh, Kabeldaten, Haufen, Zone, CableSystem, Blöcke ruhender Kabel (CableBatch/-Batcher)
+             world/   Stadt-Layout, Gelände, Blockout, Kabel-Einheiten, Seilbahn, Hof-Ausstattung, Spielzeug-Look
              reel/    Aufwickler-Daten (Arm, Kurbel, Motor) und Rollen-Darstellung
              rack/    Serverraum (Port-Plan, Logik, Darstellung), Knäuel
              economy/ Geld und Upgrades
              cord/    C.O.R.D.-Logik und -Figur
              save/    Spielstand
-             player/  Spielfigur, Anvisieren
-             ui/      Fadenkreuz, Tablet, C.O.R.D.-Anzeige, schwebender Text
+             player/  Spielfigur, Animator, Anvisieren
+             ui/      Fadenkreuz, Tablet, C.O.R.D.-Anzeige, Wegweiser, schwebender Text
              core/    Balancing (Autoload), GameState, World
              debug/   Testkameras und -aufbauten
 /tests       logic_test.tscn (automatischer Logik-Test), balance_sim.tscn (Verlaufs-Rechnung)
 /reference   Browser-Prototyp
-/assets      Modelle aus Blender (GLB) und Bodentexturen
+/assets      Modelle (Blender, Tripo3D), Texturen, Shader
+/tools       Blender-Skripte, Original-Texturen (von Godot ignoriert)
 ```
 
 ### Testen
 
 - **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
-- **Verlaufs-Rechnung:** `godot --headless res://tests/balance_sim.tscn` spielt Hinterhof, Sperre und Wohnviertel mit einem Modell-Spieler durch (Annahmen oben im Skript) und gibt aus, wann welcher Kauf und welcher Dienst kommt. Ersetzt keinen echten Spieltest.
+- **Verlaufs-Rechnung:** `godot --headless res://tests/balance_sim.tscn` spielt Hinterhof, Sperre, Wohnviertel und Altstadt mit einem Modell-Spieler durch (die neuen Viertel noch nicht) (Annahmen oben im Skript) und gibt aus, wann welcher Kauf und welcher Dienst kommt. Ersetzt keinen echten Spieltest.
 - **Testoptionen** für die Hauptszene (nach `--`): `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` / `--dumpafter=<frames>` (Zustand ausgeben), `--grab`, `--pull=<m>`, `--buy=<ids>`, `--hang`, `--order`, `--ask`, `--room` / `--room=in` (vor bzw. in den Serverraum), `--plugports=<von>-<bis>`, `--fillbag=<n>`, `--deliver`, `--jump`, `--snooze`, `--wagon` / `--wagon=fill`, `--carryreel`, `--zipline=<Strecken-ID>` / `--zipline=<ID>,ride`, `--closeup` (Kamera nah an der Figur), `--teleport=x,z` (wird zuerst ausgeführt, Kabel dort sofort geladen), `--perf` (alle 2 s Bildrate, Dreiecke, Detailstufen, Rechenzeit), `--unitstats`, `--anim=<walk|run|back|strain|crank|tug|reach|pickup|wind|sulk|happy>` (Bewegung vorführen, Kamera mittig), `--rigdump` (Knochen der Figur ausgeben) usw.; vollständige Liste in `world.gd` → `_apply_test_args`. Für Testläufe immer `--nosave` verwenden, sonst wird der echte Spielstand geladen.
 - **Bilder rendern:** `godot --write-movie <pfad>.png --quit-after 3 -- --nosave ...`
 
@@ -208,3 +211,6 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 - ✅ Spielzeug-Look (Toon-Schattierung, Umrisslinien) und Gebäude-Bausatz für alle Viertel
 - ✅ Rollen umstellen, Kabeltrommel-Wagen, Wegweiser, Altstadt mit Sperre und 15 Diensten, Seilbahn zur Basis
 - ✅ Springen; Serverraum mit 2000 Ports statt Schrank; Tasche für Knäuel; wichtige Kabel in Sperre und Wohnviertel; Wirkung für alle 20 Einzel-Dienste und 13 Reihen; Wohnhäuser und Serverraum aus Blender; Verlaufs-Rechnung
+- ✅ Figur und C.O.R.D. aus Tripo3D, Bewegungen der Figur per Code (PlayerAnimator), C.O.R.D. reagiert
+- ✅ Boden-, Fassaden- und Dachtexturen aus Midjourney
+- ✅ Kabel für alle Viertel im Verhältnis 1:100 (ca. 195.000), Blöcke ruhender Kabel mit Detailstufen und Threads, Zäune und Sperren für alle Viertel, Wirkung für alle 198 Reihen

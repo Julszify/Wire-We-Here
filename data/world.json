@@ -472,7 +472,6 @@
 	"streaming": {
 		"load_m": 150,
 		"unload_m": 220,
-		"cables_per_frame": 30,
 		"_kommentar": "Einheiten (Viertel, Sperren) laden, wenn der Spieler näher als load_m an ihrem Rand ist, und entladen ab unload_m"
 	}
 }
