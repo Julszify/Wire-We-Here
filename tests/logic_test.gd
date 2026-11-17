@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_auto_reels()
 	_test_finale_gate()
 	_test_money_sinks()
+	_test_rope()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -158,6 +159,30 @@ func _test_economy() -> void:
 	eco.buy("extra_reel")
 	_check(eco.cost("extra_reel") > c1, "Motorrolle wird teurer")
 	eco.queue_free()
+
+
+## Verbindungsstück als Seil: bleibt bei wanderndem Ende, Stößen und Wechsel locker/straff stabil
+func _test_rope() -> void:
+	var r := CableRope.new()
+	var worst := 0.0
+	var finite := true
+	var taut_err := 0.0
+	for i in 600:
+		var t := i / 60.0
+		var anchor := Vector3(0, 0.3, 0)
+		var end := Vector3(4.0 + sin(t * 2.0) * 1.5, 1.2 + sin(t * 5.0) * 0.3, cos(t * 1.3))
+		if i % 120 == 60:
+			r.kick(Vector3(0, 5, 0))
+		var tension := 1.0 if (i / 90) % 2 == 0 else 0.0
+		var pts := r.step(anchor, end, 0.02, 0.7, tension, Vector3.RIGHT, 0.3, 1.0 / 60.0)
+		for p in pts:
+			finite = finite and p.is_finite()
+			var d := p.distance_to(Geometry3D.get_closest_point_to_segment(p, anchor, end))
+			worst = maxf(worst, d)
+			if tension > 0.5 and i % 90 > 60:
+				taut_err = maxf(taut_err, d)
+	_check(finite and worst < 2.5, "Seil bleibt stabil (größte Abweichung %.2f m)" % worst)
+	_check(taut_err < 0.6, "Straffes Seil liegt fast gerade (%.2f m)" % taut_err)
 
 
 ## Serverraum-Ausbau, Ruf (neuer Auftrag) und Kosmetik

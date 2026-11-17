@@ -278,7 +278,16 @@
 		"tension_up_s": 0.08,
 		"tension_down_s": 0.45,
 		"motor_tension": 0.7,
-		"knot_jitter_m": 0.03
+		"knot_jitter_m": 0.03,
+		"_kommentar_seil": "Verbindungsstück als weiches Seil (CableRope): rope_nodes Knoten, rope_slack = Überlänge im lockeren Zustand, rope_damping = wie lange es nachschwingt (näher an 1 = länger), rope_gravity in m/s², rope_straighten = wie stark es beim Ziehen zur Geraden wird, knot_kick = Ruck am Knoten; whip_m = ab so viel Restlänge löst sich das Ende aus dem Haufen und schlägt nach",
+		"rope_nodes": 14,
+		"rope_slack": 0.14,
+		"rope_damping": 0.94,
+		"rope_gravity": 14.0,
+		"rope_iterations": 6,
+		"rope_straighten": 0.35,
+		"knot_kick": 5.0,
+		"whip_m": 1.6
 	},
 	"knot": {
 		"untie_presses": 3,

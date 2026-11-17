@@ -76,6 +76,35 @@ static func append_ends(plug_id: String, pts: PackedVector3Array, roll: float, o
 		uvs.append(uv)
 
 
+static var _meshes: Dictionary = {}  # Steckertyp -> ArrayMesh (für eigene Stecker-Nodes aktiver Kabel)
+
+
+## Ein Stecker als eigenes Mesh (Ursprung am Kabelende, zeigt nach -Z); null, wenn es den Typ nicht gibt
+static func mesh_of(plug_id: String) -> ArrayMesh:
+	_load()
+	if _meshes.has(plug_id):
+		return _meshes[plug_id]
+	if not _arrays.has(plug_id):
+		return null
+	var src: Array = _arrays[plug_id]
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = src[0]
+	arrays[Mesh.ARRAY_NORMAL] = src[1]
+	arrays[Mesh.ARRAY_COLOR] = src[2]
+	arrays[Mesh.ARRAY_INDEX] = src[3]
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_meshes[plug_id] = m
+	return m
+
+
+## Lage der beiden Stecker an den Enden von `pts` (für eigene Stecker-Nodes)
+static func end_transforms(pts: PackedVector3Array, roll: float) -> Array[Transform3D]:
+	var n := pts.size()
+	return [_end_transform(pts[0], pts[0] - pts[1], roll), _end_transform(pts[n - 1], pts[n - 1] - pts[n - 2], roll + 1.3)]
+
+
 ## Modell auf dem Hauptthread laden (vor append_ends in Threads)
 static func preload_model() -> void:
 	_load()

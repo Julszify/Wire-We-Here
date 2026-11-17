@@ -20,7 +20,9 @@ static func build_on_reel(cable: CableData, reel_pos: Vector3, scale: float = 1.
 	var anchor := cable.path.points[0]
 	var feed_angle := atan2(anchor.z - reel_pos.z, anchor.x - reel_pos.x)
 	# Tangential: an dieser Stelle zeigt die Wicklung in Richtung Haufen
-	var coil := coil_points(reel_pos, cable.progress() * coil_length(cable), feed_angle - PI * 0.5, scale, cable.radius())
+	# Kleine Trommeln (Sauger, Drohne, Wagen) zeigen nur eine kurze Wicklung: man sieht sie kaum, spart viele Punkte
+	var visual := coil_length(cable) * clampf(scale, 0.25, 1.0)
+	var coil := coil_points(reel_pos, cable.progress() * visual, feed_angle - PI * 0.5, scale, cable.radius())
 	var coil_pts: PackedVector3Array = coil["points"]
 	var c: Dictionary = Balancing.connector
 	var rise := float(c.get("rise_reel_m", 0.7)) * scale + 0.3
@@ -71,17 +73,35 @@ static func coil_length(cable: CableData) -> float:
 static func _assemble(cable: CableData, coil_pts: PackedVector3Array, lk: Dictionary, ground_y: float, rise: float) -> PackedVector3Array:
 	var heap_pts := cable.path.points
 	var n := heap_pts.size() - 1
-	var k := maxi(1, roundi((1.0 - cable.progress()) * n))
-
-	var pts := PackedVector3Array()
-	for i in range(k, -1, -1):
-		pts.append(heap_pts[i])
-
 	var c: Dictionary = Balancing.connector
-	var tension := clampf(float(lk.get("tension", 0.0)), 0.0, 1.0)
-	var jitter := float(lk.get("jitter", 0.0))
 	var time := float(lk.get("time", 0.0))
 	var anchor := heap_pts[0]
+
+	# 1. Rest im Haufen, stufenlos: das hintere Ende gleitet zwischen den Bahnpunkten nach vorn
+	var kf := maxf((1.0 - cable.progress()) * n, 1.0)
+	var k := mini(floori(kf), n)
+	var frac := kf - k
+	var heap := PackedVector3Array()
+	if k < n and frac > 0.001:
+		heap.append(heap_pts[k].lerp(heap_pts[k + 1], frac))
+	for i in range(k, -1, -1):
+		heap.append(heap_pts[i])
+	# Kurz vor Schluss löst sich das Ende aus dem Haufen: hebt sich, rutscht zum Anker und schlägt nach
+	var left_m := (1.0 - cable.progress()) * cable.path.length
+	var whip_m := float(c.get("whip_m", 1.6))
+	if left_m < whip_m and heap.size() > 1:
+		var f := 1.0 - left_m / whip_m
+		var last := heap.size() - 1
+		for j in last:
+			var w := 1.0 - float(j) / last  # 1 am losen Ende, 0 am Anker
+			var p := heap[j].lerp(anchor + Vector3.UP * 0.25, f * w * 0.6)
+			p.y += f * w * 0.35 + sin(time * 15.0 + w * 5.0) * 0.1 * f * w
+			heap[j] = p
+	var pts := heap
+
+	# 2. Verbindungsstück
+	var tension := clampf(float(lk.get("tension", 0.0)), 0.0, 1.0)
+	var jitter := float(lk.get("jitter", 0.0))
 	var coil_end := coil_pts[coil_pts.size() - 1]
 	var flat := Vector2(coil_end.x - anchor.x, coil_end.z - anchor.z)
 	var dist := flat.length()
@@ -91,30 +111,66 @@ static func _assemble(cable: CableData, coil_pts: PackedVector3Array, lk: Dictio
 	# Schlängeln: Stärke wächst mit der Länge, Richtung aus dem Seed (jedes Kabel liegt anders)
 	var meander := minf(float(c.get("meander", 0.08)) * dist, 0.6) * (1.0 - tension)
 	var wave := 1.0 if posmod(cable.rng_seed, 2) == 0 else -1.0
-	var samples := clampi(int(dist / 0.2), 8, 60)
-	for i in range(1, samples):
-		var t := float(i) / samples
-		# Locker: am Boden entlang, kurz vor dem Ziel in einem weichen Bogen hoch
-		var slack := anchor.lerp(coil_end, t)
-		slack += side * wave * meander * sin(t * PI) * (1.0 - t)
-		var left := (1.0 - t) * dist
-		var ground_line := lerpf(anchor.y, lie, minf(t * 4.0, 1.0))
-		if left < rise:
-			var u := 1.0 - left / maxf(rise, 0.001)
-			slack.y = lerpf(ground_line, coil_end.y, u * u * (3.0 - 2.0 * u))
-		else:
-			slack.y = ground_line
-		var taut := anchor.lerp(coil_end, t)
-		var p := slack.lerp(taut, tension * tension * (3.0 - 2.0 * tension))
+	var rope: CableRope = lk.get("rope")
+	var mid := PackedVector3Array()
+	if rope:
+		# Weiches Seil: schwingt nach, strafft sich mit Schwung, liegt am Boden
+		var nodes := rope.step(anchor, coil_end, lie, rise, tension, side * wave, meander, float(lk.get("delta", 0.016)))
+		var ctrl := PackedVector3Array([anchor])
+		ctrl.append_array(nodes)
+		ctrl.append(coil_end)
+		mid = _smooth(ctrl, 3)
+		mid = mid.slice(1, mid.size() - 1)
+	else:
+		var samples := clampi(int(dist / 0.2), 8, 60)
+		for i in range(1, samples):
+			var t := float(i) / samples
+			# Locker: am Boden entlang, kurz vor dem Ziel in einem weichen Bogen hoch
+			var slack := anchor.lerp(coil_end, t)
+			slack += side * wave * meander * sin(t * PI) * (1.0 - t)
+			var left := (1.0 - t) * dist
+			var ground_line := lerpf(anchor.y, lie, minf(t * 4.0, 1.0))
+			if left < rise:
+				var u := 1.0 - left / maxf(rise, 0.001)
+				slack.y = lerpf(ground_line, coil_end.y, u * u * (3.0 - 2.0 * u))
+			else:
+				slack.y = ground_line
+			var taut := anchor.lerp(coil_end, t)
+			mid.append(slack.lerp(taut, tension * tension * (3.0 - 2.0 * tension)))
+	var m := mid.size()
+	for i in m:
+		var t := float(i + 1) / (m + 1)
+		var p := mid[i]
 		if jitter > 0.0:
 			var amp := float(c.get("knot_jitter_m", 0.025)) * jitter * sin(t * PI)
 			p += side * amp * sin(time * 47.0 + t * 11.0) + Vector3.UP * amp * 0.6 * sin(time * 39.0 + t * 7.0)
-		p.y = maxf(p.y, lie)
+		if not rope:
+			p.y = maxf(p.y, lie)
 		pts.append(p)
 
+	# 3. Wicklung
 	for i in range(coil_pts.size() - 1, -1, -1):
 		pts.append(coil_pts[i])
 	return pts
+
+
+## Weiche Kurve durch Stützpunkte (Catmull-Rom), `sub` Zwischenpunkte je Abschnitt
+static func _smooth(ctrl: PackedVector3Array, sub: int) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var n := ctrl.size()
+	for i in n - 1:
+		var p0 := ctrl[maxi(i - 1, 0)]
+		var p1 := ctrl[i]
+		var p2 := ctrl[i + 1]
+		var p3 := ctrl[mini(i + 2, n - 1)]
+		for s in sub:
+			var t := float(s) / sub
+			var t2 := t * t
+			var t3 := t2 * t
+			out.append(0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+				+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3))
+	out.append(ctrl[n - 1])
+	return out
 
 
 ## Helix um die Trommel. Das äußere Ende liegt immer bei `end_angle` (Richtung Haufen),

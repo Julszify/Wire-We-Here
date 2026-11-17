@@ -168,6 +168,7 @@ func _ready() -> void:
 	_batcher.name = "CableBatches"
 	add_child(_batcher)
 	_batcher.camera = _player.camera
+	CableView.camera = _player.camera
 	_tools = MassTools.new()
 	_tools.name = "MassTools"
 	_tools.world = self
@@ -369,11 +370,16 @@ func _process(delta: float) -> void:
 	t_mark = _prof_add("ziele", t_mark)
 
 	# Eingehängte Kabel jeden Frame neu formen (Figur bewegt sich, Rollen drehen)
+	t_mark = Time.get_ticks_usec()
 	for reel: ReelData in _system.reels.values():
 		var cable := _system.cable_on(reel)
 		if cable == null:
 			continue
 		var view: CableView = _views[cable.id]
+		# Weit entfernte Kabel nur jedes dritte Bild neu formen (versetzt je Kabel)
+		if reel.kind != ReelData.Kind.ARM and reel.position.distance_squared_to(_player.camera.global_position) > 900.0 \
+				and (Engine.get_process_frames() + cable.id) % 3 != 0:
+			continue
 		# Straff, solange gezogen wird (Tastendruck wird abgearbeitet, Motor läuft); locker sonst
 		var pulling := 0.0
 		if reel.pending_m > 0.0:
@@ -392,6 +398,7 @@ func _process(delta: float) -> void:
 			if _reel_views.has(reel.id):
 				_reel_views[reel.id].set_phase(phase)
 
+	t_mark = _prof_add("kabelformen", t_mark)
 	if _authority:
 		_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
 	_player.carrying = _carried_reel != null
@@ -2470,12 +2477,17 @@ func _apply_test_args() -> void:
 				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 				int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0),
 				Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), _system.cables.size(),
-				_batcher.batch_count()], " ", _batcher.stats(), " us/bild: ",
+				_batcher.batch_count()], " ", _batcher.stats(), " formen/bild=%.1f punkte/kabel=%d" % [
+				CableView.stat_builds / maxf(_prof_frames, 1.0), CableView.stat_points / maxi(CableView.stat_builds, 1)],
+				" form/duenn/roehre/stecker=%s" % str(CableView.stat_us.map(func(v: int) -> int: return v / maxi(_prof_frames, 1))), " us/bild: ",
 				", ".join(_prof.keys().map(func(k: String) -> String: return "%s=%d" % [k, int(_prof[k]) / maxi(_prof_frames, 1)])),
 				" batcher=%d" % (_batcher.prof_us / maxi(_prof_frames, 1)))
 			_prof.clear()
 			_batcher.prof_us = 0
-			_prof_frames = 0)
+			_prof_frames = 0
+			CableView.stat_builds = 0
+			CableView.stat_points = 0
+			CableView.stat_us = [0, 0, 0, 0])
 	if opts.has("dumpafter"):
 		_dump_after = int(opts["dumpafter"])
 	if opts.has("dump"):
