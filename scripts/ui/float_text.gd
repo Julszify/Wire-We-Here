@@ -8,6 +8,7 @@ static func spawn(parent: Node, pos: Vector3, text_value: String, color := Color
 	t.text = text_value
 	t.modulate = color
 	t.outline_modulate = Color(0, 0, 0, 0.8)
+	t.font = UiTheme.font()
 	t.font_size = 72
 	t.outline_size = 14
 	t.pixel_size = 0.004

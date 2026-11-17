@@ -3,6 +3,9 @@ extends Node3D
 ## Darstellung des Kabeltrommel-Wagens: Ladefläche, vier Räder, Deichsel. Die Trommeln sind eigene
 ## ReelViews (Kind.WAGON), die die Hauptszene auf die Plätze setzt.
 
+## Lack (Kosmetik): gilt für den nächsten Wagen; den vorhandenen stellt set_paint um
+static var paint := Color(0.96, 0.55, 0.15)
+var _body_mat: StandardMaterial3D
 var data: WagonData
 var _wheels: Array[Node3D] = []
 var _roll := 0.0
@@ -16,7 +19,8 @@ func setup(wagon: WagonData) -> void:
 	var n := int(w.get("slots", 3))
 	var length := n * float(w.get("slot_spacing_m", 1.2)) + 0.4
 	var bed := float(w.get("bed_height_m", 0.62))
-	var body := _mat(Color(0.96, 0.55, 0.15))
+	var body := _mat(paint)
+	_body_mat = body
 	var dark := _mat(Color(0.18, 0.2, 0.24))
 	_box(Vector3(1.25, 0.18, length), Vector3(0, bed - 0.09, 0), body)
 	for sgn in [-1.0, 1.0]:
@@ -79,3 +83,8 @@ static func _mat(c: Color) -> StandardMaterial3D:
 	m.albedo_color = c
 	m.roughness = 0.5
 	return m
+
+
+func set_paint(color: Color) -> void:
+	if _body_mat:
+		_body_mat.albedo_color = color

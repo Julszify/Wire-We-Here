@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_unit_important()
 	_test_auto_reels()
 	_test_finale_gate()
+	_test_money_sinks()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -157,6 +158,48 @@ func _test_economy() -> void:
 	eco.buy("extra_reel")
 	_check(eco.cost("extra_reel") > c1, "Motorrolle wird teurer")
 	eco.queue_free()
+
+
+## Serverraum-Ausbau, Ruf (neuer Auftrag) und Kosmetik
+func _test_money_sinks() -> void:
+	var eco := Economy.new()
+	add_child(eco)
+	_check(Economy.format_short(250000.0) == "250 Tsd. €" and Economy.format_short(1500000.0) == "1,5 Mio. €",
+		"Kurzformat: %s, %s" % [Economy.format_short(250000.0), Economy.format_short(1500000.0)])
+	# Ausbau: Kaffeeecke Stufe 2 -> Handzug ×1,15², Kabelmanagement Stufe 1 -> Tasche +2
+	eco.state.upgrades["room_coffee"] = 2
+	eco.state.upgrades["room_cables"] = 1
+	eco.refresh_bonuses()
+	_check(is_equal_approx(eco.bonus("press"), 1.15 * 1.15), "Kaffeeecke wirkt je Stufe (%.3f)" % eco.bonus("press"))
+	_check(eco.bag_capacity() == int(Balancing.bag.get("capacity", 3)) + 2, "Kabelmanagement vergrößert die Tasche")
+	# Ruf: erst nach dem Finale, √(Mio. €) Punkte
+	eco.state.total_earned = 100e6
+	_check(eco.reputation_gain() == 10 and not eco.can_prestige(), "Ruf 10 bei 100 Mio. €, aber erst nach dem Finale")
+	eco.state.finale_done = true
+	_check(eco.can_prestige(), "Neuer Auftrag nach dem Finale")
+	# Kosmetik: kaufen kostet, anlegen eines gekauften Stücks nicht
+	eco.state.money = 300000.0
+	_check(eco.wear_cosmetic("hoodie_feuerwehrrot") and eco.state.money < 60000.0, "Hoodie gekauft")
+	_check(not eco.wear_cosmetic("hoodie_gold"), "Zu teuer: nicht gekauft")
+	_check(eco.wear_cosmetic("hoodie_standard") and eco.wear_cosmetic("hoodie_feuerwehrrot") and eco.state.money > 40000.0,
+		"Gekauftes wieder anlegen kostet nichts")
+	var meta := eco.prestige_meta()
+	var st := GameState.new()
+	st.load_dict({ "meta": meta, "money": 5.0 })
+	_check(st.reputation == 10 and st.prestige_count == 1 and st.cosmetics.has("hoodie_feuerwehrrot")
+		and String(st.looks.get("hoodie", "")) == "hoodie_feuerwehrrot" and st.level("room_coffee") == 0,
+		"Neuer Auftrag behält Ruf und Kosmetik, nicht den Ausbau")
+	var eco2 := Economy.new()
+	add_child(eco2)
+	eco2.state = st
+	eco2.refresh_bonuses()
+	_check(is_equal_approx(eco2.bonus("money"), 1.0 + 0.1 * 10) and eco2.bonus("order_count") > 1.0,
+		"Ruf gibt Geld-Bonus, C.O.R.D. bestellt mehr")
+	var back := GameState.new()
+	back.load_dict(st.to_dict())
+	_check(back.reputation == 10 and back.cosmetics.size() == 1, "Ruf und Kosmetik im Spielstand")
+	eco.queue_free()
+	eco2.queue_free()
 
 
 func _test_determinism() -> void:

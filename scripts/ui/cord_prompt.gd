@@ -8,38 +8,48 @@ var _total := 1.0
 
 
 func _ready() -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.05, 0.05, 0.92)
-	style.border_color = Color(1.0, 0.25, 0.2)
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(18)
+	# Spielzeug-Look: helle Karte mit dickem rotem Rand, Balken als rote Pille
+	var style := UiTheme.box(UiTheme.PAPER, UiTheme.RED, 26, 6, 10, 18)
+	style.border_width_bottom = 12
 	add_theme_stylebox_override("panel", style)
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	position.y = 110
-	custom_minimum_size = Vector2(620, 0)
+	custom_minimum_size = Vector2(640, 0)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 8)
 	add_child(box)
 	var who := Label.new()
-	who.text = "C.O.R.D."
-	who.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
-	who.add_theme_font_size_override("font_size", 18)
+	who.text = "C.O.R.D. fragt:"
+	UiTheme.style_label(who, 18, UiTheme.RED)
 	box.add_child(who)
 	_text = Label.new()
 	_text.text = "Defektes Kabel erkannt. Ersatz bestellen?"
-	_text.add_theme_font_size_override("font_size", 26)
+	UiTheme.style_label(_text, 26, UiTheme.INK)
 	box.add_child(_text)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	var key := Label.new()
+	key.text = "N"
+	UiTheme.style_label(key, 22, Color.WHITE)
+	var cap := UiTheme.box(UiTheme.RED, UiTheme.RED.darkened(0.35), 12, 0, 0, 4)
+	cap.border_width_bottom = 5
+	cap.border_color = UiTheme.RED.darkened(0.35)
+	cap.content_margin_left = 14
+	cap.content_margin_right = 14
+	key.add_theme_stylebox_override("normal", cap)
+	row.add_child(key)
 	var keys := Label.new()
-	keys.text = "N: Nein!     (nichts tun = bestellen)"
-	keys.add_theme_font_size_override("font_size", 20)
-	keys.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
-	box.add_child(keys)
+	keys.text = "Nein!   (nichts tun = bestellen)"
+	UiTheme.style_label(keys, 20, UiTheme.INK_SOFT)
+	row.add_child(keys)
 	_bar = ProgressBar.new()
 	_bar.show_percentage = false
-	_bar.custom_minimum_size = Vector2(0, 14)
+	_bar.custom_minimum_size = Vector2(0, 16)
+	_bar.add_theme_stylebox_override("background", UiTheme.box(UiTheme.PAPER_DIM.darkened(0.06), Color(0, 0, 0, 0), 8, 0, 0, 0))
+	_bar.add_theme_stylebox_override("fill", UiTheme.box(UiTheme.RED, Color(0, 0, 0, 0), 8, 0, 0, 0))
 	box.add_child(_bar)
 	visible = false
 
@@ -51,7 +61,8 @@ func show_question(total_time: float) -> void:
 	visible = true
 	# Zentrieren, nachdem die Größe feststeht
 	await get_tree().process_frame
-	position.x = (get_viewport_rect().size.x - size.x) * 0.5
+	if is_inside_tree():
+		position.x = (get_viewport_rect().size.x - size.x) * 0.5
 
 
 func update_time(left: float) -> void:

@@ -20,6 +20,8 @@ var pending_m: float = 0.0
 var owner_id: int = 0
 ## Wird gerade von einem Spieler getragen (Handkurbel oder Motorrolle umstellen); nicht gespeichert
 var carried := false
+## Wer sie trägt (Peer-ID), solange carried
+var carrier_id := 0
 ## Tempo-Faktor aus Upgrades dieser Werkzeug-Art (Sauger, Winde, Drohne); von außen gesetzt
 var speed_factor := 1.0
 ## Wie lange das Kabel schon am Knoten hängt (für selbstständiges Lösen); nicht gespeichert

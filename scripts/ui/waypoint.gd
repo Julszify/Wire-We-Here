@@ -34,10 +34,14 @@ func _draw() -> void:
 	var side := dir.orthogonal()
 	var tip := c + dir * 18.0
 	var pts := PackedVector2Array([tip, c - dir * 12.0 + side * 12.0, c - dir * 5.0, c - dir * 12.0 - side * 12.0])
-	draw_colored_polygon(PackedVector2Array([tip + dir * 2.0, c - dir * 14.0 + side * 14.5, c - dir * 6.0, c - dir * 14.0 - side * 14.5]), Color(0, 0, 0, 0.6))
-	draw_colored_polygon(pts, Color(0.55, 1.0, 0.7))
-	var font := get_theme_default_font()
+	# Runde Plakette mit Pfeil, darunter Ziel und Entfernung als Pille
+	draw_circle(c + Vector2(0, 3), 27.0, Color(0.05, 0.08, 0.15, 0.3))
+	draw_circle(c, 26.0, UiTheme.GREEN_DARK)
+	draw_circle(c + Vector2(0, -2), 24.0, UiTheme.GREEN)
+	draw_colored_polygon(pts, Color.WHITE)
+	var font := UiTheme.font()
 	var text := "%s · %d m" % [label, roundi(_dist)]
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-	draw_string_outline(font, Vector2((size.x - w) * 0.5, 64), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 6, Color(0, 0, 0, 0.8))
-	draw_string(font, Vector2((size.x - w) * 0.5, 64), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.75, 1.0, 0.8))
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x
+	var pill := Rect2((size.x - w) * 0.5 - 14.0, 50.0, w + 28.0, 30.0)
+	draw_style_box(UiTheme.hud_box(Color(0.1, 0.13, 0.22, 0.72), 15), pill)
+	draw_string(font, Vector2((size.x - w) * 0.5, 71), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color.WHITE)

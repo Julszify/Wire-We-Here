@@ -2,7 +2,9 @@
 
 *Arbeitstitel, alternativ „Wire We Here?“*
 
-Ein 3D-Incremental-Game mit offener Welt im Spielzeug-Look, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für immer bessere Werkzeuge: vom Wickeln um den eigenen Unterarm bis zu einer Staffel Abräum-Drohnen. Wichtige Kabel werden zu Knäueln, die du im Serverraum einsteckst. So kommen nach und nach die 218 Cloud-Dienste der Welt zurück, bis du ganz oben im Wolkig-Turm C.O.R.D. abschalten kannst.
+Ein 3D-Incremental-Game mit offener Welt im Spielzeug-Look, gebaut mit Godot 4.7. Du ziehst Kabel aus riesigen Kabelbergen, wickelst sie auf, löst Knoten und verdienst damit Geld für immer bessere Werkzeuge: vom Wickeln um den eigenen Unterarm bis zu einer Staffel Abräum-Drohnen. Wichtige Kabel werden zu Knäueln, die du im Serverraum einsteckst. So kommen nach und nach die 218 Cloud-Dienste der Welt zurück, bis du ganz oben im Wolkig-Turm C.O.R.D. abschalten kannst. Allein oder im Koop mit bis zu vier Leuten.
+
+![Startmenü mit Kabelhaufen und C.O.R.D.](docs/screenshot_startmenue.jpg)
 
 ![Wolkig-Hinterhof mit Kabelhaufen und Serverraum](docs/screenshot_hinterhof.jpg)
 
@@ -34,9 +36,16 @@ C.O.R.D. bestellt bei jedem defekten Kabel Ersatz, tauscht aber nie etwas aus. D
 | 6 | Haufen-Winden | Werden aufgestellt und arbeiten einen Haufen von selbst ab, auch wenn du weg bist |
 | 7 | Abräum-Drohnen | Fliegen von Haufen zu Haufen, holen wichtige Kabel zuerst und bringen die Knäuel selbst in den Serverraum |
 
-**Upgrades im Tablet** (29 Einträge): Festerer Griff, Dauerzug, Stärkere Motoren, Kupferhändler, Größere Tasche, Laufschuhe, Kabel-Detektor mit Peilantenne, für den Sauger Saugkraft, Breitere Düse, Zyklon-Kammer und Dauerbetrieb, Windenmotor, Drohnen-Turbo. Manche Upgrades schaltet erst ein bestimmter Dienst frei.
+**Tablet** (Tab) mit vier Reitern: Werkzeuge, Serverraum, Kosmetik und Auftrag.
+
+**Upgrades** (29 Einträge): Festerer Griff, Dauerzug, Stärkere Motoren, Kupferhändler, Größere Tasche, Laufschuhe, Kabel-Detektor mit Peilantenne, für den Sauger Saugkraft, Breitere Düse, Zyklon-Kammer und Dauerbetrieb, Windenmotor, Drohnen-Turbo. Manche Upgrades schaltet erst ein bestimmter Dienst frei.
 
 **Wichtige Kabel finden:** Oben links steht, wie viele wichtige Kabel im aktuellen Viertel schon eingesteckt sind. Der Kabel-Detektor pulsiert schneller und wird rot, je näher das nächste wichtige Kabel ist; die Peilantenne zeigt zusätzlich Richtung und Entfernung.
+
+**Wohin mit dem Geld im späten Spiel:**
+- **Serverraum ausbauen:** Neonbeleuchtung, Kühlung, Kabelmanagement, Leitstand und Kaffeeecke. Jede Stufe sieht man im Raum, und jede gibt einen dauerhaften Bonus.
+- **Kosmetik:** neue Farben für Hoodie, Hose, Kopfhörer und Schuhe, Lack und Leuchtband für C.O.R.D., Lack für Drohnen und Wagen, dazu Effekte wie Funken, Konfetti, Sterne oder Regenbogen, wenn ein Kabel fertig wird.
+- **Neuer Auftrag:** Nach dem Finale fängt alles von vorn an. Dafür gibt es Ruf, und jeder Ruf-Punkt bringt dauerhaft mehr Geld und schnelleres Ziehen. Kosmetik und Ruf bleiben, C.O.R.D. bestellt mit jedem Auftrag eifriger.
 
 **C.O.R.D.** schwebt dir hinterher und fragt regelmäßig, ob er nachbestellen soll. Wer nicht rechtzeitig „Nein“ sagt, bekommt 100 neue Kabel vom Himmel. Nach einem „Nein“ ist er beleidigt, nach einer Bestellung dreht er sich vor Freude.
 
@@ -59,11 +68,23 @@ Zwischen den Vierteln liegt das **Umland**: Häuser und Scheunen an den Landstra
 
 **Finale:** Sind alle anderen Schränke voll, fährt der Aufzug im Wolkig-Turm. Auf Etage 40 und auf dem Dach liegen die letzten 150 wichtigen Kabel und C.O.R.D.s Kern. Sind alle 2000 Ports belegt, schaltest du ihn ab. Danach geht das Spiel frei weiter.
 
-Laut Verlaufs-Rechnung dauert ein Durchgang etwa fünf Stunden.
+Laut Verlaufs-Rechnung dauert ein Durchgang etwa fünf Stunden, ein zweiter Auftrag mit Ruf etwa vier.
+
+**Koop für 2–4 Spieler:**
+- **Verbinden:** Einer hostet, die anderen treten per IP-Adresse bei.
+- **Gemeinsam:** Kasse, Upgrades, Ports, Werkzeuge und Finale.
+- **Pro Spieler:** eigener Arm, eigene Tasche, eigener Kabelsauger und eigenes Aussehen. Mitspieler sieht man als Figur mit Namen darüber.
+- **Nur beim Host:** Er speichert und entscheidet über einen neuen Auftrag. Die anderen laden dann mit.
 
 ![Umland mit Lieferzentrum, Vororten, Alleen und dem Wolkig-Turm im Hintergrund](docs/screenshot_umland.jpg)
 
 ![Luftbild der Stadt mit allen Vierteln](docs/screenshot_luftbild.jpg)
+
+![Koop: der Host als Mitspieler „Admin“, daneben die gerade gekaufte Handkurbel](docs/screenshot_koop.jpg)
+
+![Ausgebauter Serverraum mit Kaffeeecke, Leitstand und Neonleisten](docs/screenshot_serverraum_ausbau.jpg)
+
+![Tablet im Spielzeug-Look, Reiter Kosmetik](docs/screenshot_tablet_kosmetik.jpg)
 
 ## Stand
 
@@ -80,9 +101,12 @@ Das Spiel ist in Entwicklung. Der komplette Spielverlauf vom Intro bis zum Abspa
 | Story | Intro mit Stammtisch, „Drei Monate später“ und Anruf; Finale mit C.O.R.D.s Kern und Abspann |
 | Stadt | Gelände, Bodentexturen, Straßen, ca. 1.100 Gebäude mit eigenem Fassadenstil je Viertel, Dächer, Aufbauten, Schilder; Umland mit Bäumen, Laternen und Ausstattung |
 | Look | Spielzeug-Look mit Toon-Schattierung und Umrisslinien, Himmel mit Wolken, Meer mit Wellen |
+| Spätes Spiel | Serverraum-Ausbau in fünf Linien, Kosmetik für Figur, C.O.R.D., Drohnen und Wagen, neuer Auftrag mit Ruf |
+| Oberfläche | Startmenü, Einstellungen, Tablet und Anzeige im Spielzeug-Look |
+| Koop | 2–4 Spieler über IP (ENet), der Host rechnet das Spiel |
 | Speichern | Spielstand als JSON, automatisch alle 30 s |
 
-**Geplant:** Geld-Senken fürs späte Spiel (Prestige, Ausbau des Serverraums, Kosmetik), weitere Story-Szenen (Chefs in der Stadt, Party im Finale), Klettern und Leitern, Ton und Musik, Koop für 2–4 Spieler, Steam.
+**Geplant:** Steam (Lobbys, Freunde einladen), weitere Story-Szenen (Chefs in der Stadt, Party im Finale), Klettern und Leitern, Ton und Musik, eigene runde Schrift.
 
 ![Kabel um den Unterarm wickeln, daneben C.O.R.D.](docs/screenshot_wickeln.jpg)
 
@@ -100,11 +124,19 @@ Das Spiel ist in Entwicklung. Der komplette Spielverlauf vom Intro bis zum Abspa
 
 1. [Godot 4.7](https://godotengine.org/download) installieren.
 2. Dieses Repository klonen und den Ordner in Godot als Projekt öffnen.
-3. F5 drücken.
+3. F5 drücken. Es startet das Startmenü.
 
-Beim ersten Start spielt das Intro (Leertaste, Enter oder Esc überspringen). Nach einer Änderung an `data/world.json` erzeugt das Spiel Höhen- und Bodenkarte der Stadt neu (etwa 15 s). Danach liegen sie zwischengespeichert in `user://` und laden in unter einer Sekunde.
+Unter „Einstellungen“ lassen sich Mausempfindlichkeit, Vollbild, Grafikstufe und Lautstärke einstellen. Gespeichert wird in `user://settings.cfg`.
 
-Der Spielstand liegt in `user://savegame.json` (macOS: `~/Library/Application Support/Godot/app_userdata/Knot My Problem/`). „Neues Spiel“ im Tablet löscht ihn.
+Bei einem neuen Spiel läuft zuerst das Intro (Leertaste, Enter oder Esc überspringen). Nach einer Änderung an `data/world.json` erzeugt das Spiel Höhen- und Bodenkarte der Stadt neu (etwa 15 s). Danach liegen sie zwischengespeichert in `user://` und laden in unter einer Sekunde.
+
+Der Spielstand liegt in `user://savegame.json` (macOS: `~/Library/Application Support/Godot/app_userdata/Knot My Problem/`). „Neues Spiel“ im Menü oder im Tablet löscht ihn.
+
+**Mehrspieler:**
+1. Der Host wählt im Startmenü „Mehrspieler“ und dann „Spiel hosten“. Es läuft sein eigener Spielstand.
+2. Die anderen tragen seine IP-Adresse ein und klicken „Beitreten“.
+3. Im lokalen Netz reicht das. Übers Internet muss der Host den Port 24680 (UDP) am Router freigeben.
+4. Zum Ausprobieren auf einem Rechner das Spiel zweimal starten und mit `127.0.0.1` beitreten.
 
 ## Steuerung
 
@@ -125,10 +157,11 @@ Der Spielstand liegt in `user://savegame.json` (macOS: `~/Library/Application Su
 - **Engine:** Godot 4.7 mit GDScript. Szenen und Daten sind Textdateien.
 - **Kabel ohne Seilphysik:** Jedes Kabel ist eine feste Kurve (Catmull-Rom, gleichmäßig nach Bogenlänge abgetastet), entlang der es beim Ziehen gleitet. Das ist günstig für hunderttausende Kabel, stabil, und der Zustand eines Kabels besteht nur aus wenigen Werten. Zwischen Haufen und Rolle spannt sich ein Verbindungsstück, das am Knoten zittert; auf der Rolle liegt das Kabel Lage für Lage.
 - **Viele Kabel auf einmal:** Ruhende Kabel liegen in Blöcken zu je 256 in einem Mesh. Die CPU legt nur Mittellinien ab, ein Shader formt daraus die Röhren; es gibt drei Detailstufen. Kabel und Meshes entstehen in Threads, Viertel werden nach Entfernung geladen und entladen, Kabelenden liegen in einem Raster für schnelles Anvisieren.
-- **Deterministisch:** Zufall nur über Seeds. Haufen, Kabelformen und wichtige Kabel entstehen beim Laden neu; gespeichert wird nur, was sich verändert hat. Das ist auch die Grundlage für Koop.
+- **Deterministisch:** Zufall nur über Seeds. Haufen, Kabelformen und wichtige Kabel entstehen beim Laden neu; gespeichert wird nur, was sich verändert hat. Das ist auch die Grundlage für den Koop.
+- **Koop:** Der Host rechnet das ganze Spiel. Die Clients bauen dieselbe Stadt aus denselben Seeds, schicken nur Absichten (greifen, ziehen, kaufen …) und bekommen den Zustand: zehnmal pro Sekunde Rollen und Kabel, dazu Ereignisse wie fertige Kabel, Knäuel und Geld. Beim Beitreten bekommen sie den kompletten Spielstand. Der Host führt die Absichten eines Mitspielers mit dessen Spieler-Kontext aus, deshalb läuft im Koop derselbe Code wie allein (`scripts/net/`, `scripts/core/world.gd`).
 - **Stadt:** Gelände mit [Terrain3D](https://github.com/TokisanGames/Terrain3D), erzeugt aus `data/world.json`; Straßen, Gebäude und Umland entstehen beim Start aus denselben Daten. Ein Shader legt je Viertel eine Fassadentextur auf die Gebäude und färbt Putz und Blech in der Gebäudefarbe; ein Bausatz aus Blender liefert Dächer, Aufbauten und Schilder.
 - **Figuren ohne Animationsdateien:** Admin und Chefs haben ein Mixamo-Skelett, dessen Knochen per Code gestellt werden (`scripts/player/player_animator.gd`): Gehen, Rennen, Atmen, Wickeln, Kurbeln, Tragen, Gestikulieren, Lachen.
-- **Look:** Toon-Schattierung für alle Materialien und Umrisslinien als Nachbearbeitung vor der Kamera (`scripts/world/toon_look.gd`, `assets/shaders/`).
+- **Look:** Toon-Schattierung für alle Materialien und Umrisslinien als Nachbearbeitung vor der Kamera (`scripts/world/toon_look.gd`, `assets/shaders/`). Alle Farben und Formen der Oberfläche stehen an einer Stelle (`scripts/ui/ui_theme.gd`). Die Kosmetik färbt die Figur per Shader um und erkennt die Teile an Farbton und Höhe am Körper (`assets/shaders/outfit.gdshader`).
 - **Modelle und Bilder:** Figuren, Bäume, Büsche, Laternen und Kneipen-Ausstattung stammen aus Tripo3D; `tools/blender/import_tripo_props.py` reduziert Polygone und Texturen beim Übernehmen. Stecker, Wohnhäuser, Serverraum und Gebäude-Bausatz entstehen per Python-Skript in Blender (`tools/blender/`). Boden-, Fassaden- und Dachtexturen sowie der Bierdeckel sind mit Midjourney erzeugt (Originale in `tools/textures/midjourney/`).
 - **Serverraum:** 2000 Ports in zehn Schränken. Die ersten 20 sind Einzel-Dienste, der Rest bildet Reihen à 10 Ports; eine volle Reihe ist ein Dienst (`scripts/rack/rack_plan.gd`, `data/services.json`).
 - **Balancing:** alle Werte in `data/balancing.json`, nicht im Code. `tests/balance_sim.tscn` rechnet den ganzen Spielverlauf bis zum Finale durch.
@@ -138,7 +171,7 @@ Der Spielstand liegt in `user://savegame.json` (macOS: `~/Library/Application Su
 ```
 data/       balancing.json (alle Werte), zone.json (Hinterhof), world.json (Stadt, Viertel, Kabel, Sperren,
             Seilbahnen, Umland, Turm), services.json (Dienste je Port)
-scenes/     world.tscn (Hauptszene), city_preview.tscn (Stadt-Vorschau), player.tscn
+scenes/     main_menu.tscn (Startmenü), world.tscn (Spielwelt), city_preview.tscn (Stadt-Vorschau), player.tscn
 scripts/    cable/    Kabelbahnen, Röhren-Mesh, Haufen, Stecker, Blöcke ruhender Kabel, CableSystem
             world/    Stadt-Layout, Gelände, Blockout und Umland, Kabel-Einheiten, Seilbahn, Turm-Finale, Ausstattung
             reel/     Aufwickler (Arm, Kurbel, Motor, Wagen, Sauger, Winde, Drohne)
@@ -147,9 +180,10 @@ scripts/    cable/    Kabelbahnen, Röhren-Mesh, Haufen, Stecker, Blöcke ruhend
             cord/     C.O.R.D.-Logik und -Figur
             story/    Intro-Szene, Chefs
             player/   Spielfigur, Animator, Anvisieren
-            ui/       HUD, Tablet, Detektor, Wegweiser, Abspann
+            ui/       Theme, Startmenü, HUD, Tablet, Detektor, Wegweiser, Effekte, Abspann
+            net/      Mehrspieler (Net-Autoload, Spieler-Kontext)
             save/     Spielstand
-            core/     Balancing, GameState, Werkzeuge für die Masse, World
+            core/     Balancing, Einstellungen, GameState, Werkzeuge für die Masse, World
             debug/    Testszenen und Werkzeuge
 assets/     Modelle (GLB), Shader, Boden-, Gebäude- und Story-Texturen
 tools/      Blender-Skripte für Modelle, Original-Bilder der Texturen (von Godot ignoriert)
@@ -182,6 +216,15 @@ godot res://scenes/world.tscn -- --nosave --teleport=930,645 --perf
 ```
 
 Die vollständige Liste steht in `scripts/core/world.gd` unter `_apply_test_args`. Für Testläufe immer `--nosave` angeben, sonst wird der echte Spielstand geladen und überschrieben.
+
+Koop mit zwei Instanzen auf einem Rechner (der Client greift, zieht und löst Knoten übers Netz und kauft eine Handkurbel):
+
+```bash
+godot --headless res://scenes/world.tscn -- --nosave --host --runfor=75
+godot --headless res://scenes/main_menu.tscn -- --nosave --autojoin=127.0.0.1 --network --runfor=40
+```
+
+Den zweiten Befehl erst etwa 15 Sekunden nach dem ersten starten, wenn der Host die Stadt aufgebaut hat.
 
 Die Stadt-Vorschau zeigt die Stadt ohne Kabel, zum Beispiel als Luftbild:
 

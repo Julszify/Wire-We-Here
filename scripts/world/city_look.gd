@@ -51,10 +51,13 @@ static func setup_sun(sun: DirectionalLight3D) -> void:
 	sun.rotation = Vector3(deg_to_rad(-48), deg_to_rad(-38), 0)
 	sun.light_color = Color(1.0, 0.95, 0.86)
 	sun.light_energy = 1.35
-	sun.shadow_enabled = true
+	# Schatten je Grafikstufe (Settings): niedrig keine, mittel kürzer mit 2 Stufen, hoch 160 m mit 4 Stufen
+	var shadow_m: float = Settings.shadow_distance()
+	sun.shadow_enabled = shadow_m > 0.0
 	sun.light_angular_distance = 0.8
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = 160.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if shadow_m > 120.0 \
+		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = maxf(shadow_m, 1.0)
 	sun.directional_shadow_blend_splits = true
 	sun.shadow_bias = 0.04
 	sun.shadow_normal_bias = 1.2

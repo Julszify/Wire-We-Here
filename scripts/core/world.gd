@@ -7,7 +7,7 @@ const ZONE_CENTER := Vector3.ZERO
 
 const PLAYER_ID := 0
 
-@onready var _player: Player = $Player
+@onready var _local_player: Player = $Player
 @onready var _hud: CanvasLayer = $HUD
 @onready var _crosshair: Crosshair = $HUD/Crosshair
 @onready var _hint: Label = $HUD/Hint
@@ -23,33 +23,30 @@ var _rack: ServiceRack
 var _room: ServerRoomView
 var _props: YardProps
 # Werkzeug zum Mitnehmen, Seilbahn, Wegweiser
-var _carried_reel: ReelData            # gerade getragene Handkurbel oder Motorrolle
 var _test_anim := ""                   # Testoption --anim: vorgeführte Bewegung
-var _cranking_reel: ReelData           # Handkurbel, an der zuletzt gedreht wurde (Hand folgt dem Griff)
 var _wagon: WagonData
 var _wagon_view: WagonView
 var _wagon_confirm_t := 0.0            # zweites E zum Ankoppeln trotz eingehängter Kabel
 var _ziplines: Dictionary = {}         # Strecken-ID -> Zipline
 var _target_station: Array = []        # [Zipline, 0 = äußeres Ende / 1 = Basis-Seite] in Reichweite
-var _ride: Dictionary = {}             # laufende Seilbahnfahrt: { line, s, dir }
 var _trolley: MeshInstance3D
 var _waypoint: Waypoint
 var _tablet: Tablet
 var _zone: ZoneData
-var _arm_reel: ReelData
 var _views: Dictionary = {}       # Kabel-ID -> CableView
 var _reel_views: Dictionary = {}  # Rollen-ID -> ReelView
 var _knot_markers: Dictionary = {}  # Kabel-ID -> MeshInstance3D
 var _items: Dictionary = {}       # Knäuel-ID -> CoilItem
 var _item_views: Dictionary = {}  # Knäuel-ID -> CoilItemView
-var _bag: Array[CoilItem] = []    # Knäuel in der Tasche (in der Reihenfolge, in der sie hineinkamen)
 var _fading: Array[CableView] = []
 var _next_cable_id := 0
 var _next_reel_id := 1
 var _next_item_id := 0
 var _done_count := 0
 var _message := ""
+var _toast: Label  # Meldungen als helle Sprechblase über dem Hinweis
 var _message_t := 0.0
+static var _test_newjob_done := false  # --newjob nur einmal, nicht nach dem Neuladen
 var _time := 0.0
 
 # Was gerade anvisiert ist
@@ -99,7 +96,61 @@ var _blockers: Dictionary = {}        # Einheit-ID -> StaticBody3D (Sperre noch 
 var _stream_t := 0.0
 
 
+# --- Mehrspieler: Figuren ----------------------------------------------------
+## Eigene Figur und alle Mitspieler; `_actor` ist die Figur, für die gerade gehandelt wird. Der Host führt
+## Absichten von Mitspielern aus, indem er `_actor` kurz auf deren Kontext setzt (`_act_as`); der übrige Code
+## arbeitet über die Eigenschaften unten (_player, _arm_reel, _bag …) immer mit dem aktuellen `_actor`.
+var _me: PlayerCtx
+var _actor: PlayerCtx
+var _players: Dictionary = {}       # Peer-ID -> PlayerCtx
+var _authority := true              # Host oder Einzelspieler: rechnet die Spiellogik
+var _net_t := 0.0                   # Takt für Zustands-Nachrichten
+var _pstate_t := 0.0
+var _econ_dirty := false
+var _items_dirty := false
+var _missing_since: Dictionary = {} # Client: Kabel-ID -> Zeit, seit der Host es nicht mehr als eingehängt meldet
+var _replaying := false             # Client wendet Host-Zustand an: keine eigenen Meldungen
+var _remote_arm_next := 950_000     # Host: IDs für die Arme der Mitspieler
+var _wagon_driver: PlayerCtx        # wem der Wagen folgt
+
+var _player: Player:
+	get:
+		return _actor.node if _actor else _local_player
+var _arm_reel: ReelData:
+	get:
+		return _actor.arm_reel if _actor else null
+	set(value):
+		_actor.arm_reel = value
+var _bag: Array[CoilItem]:
+	get:
+		return _actor.bag
+var _carried_reel: ReelData:
+	get:
+		return _actor.carried_reel
+	set(value):
+		_actor.carried_reel = value
+var _cranking_reel: ReelData:
+	get:
+		return _actor.cranking_reel
+	set(value):
+		_actor.cranking_reel = value
+var _ride: Dictionary:
+	get:
+		return _actor.ride
+	set(value):
+		_actor.ride = value
+
+
 func _ready() -> void:
+	Net.world = self
+	_authority = not Net.is_client()
+	_me = PlayerCtx.new()
+	_me.id = Net.local_id()
+	_me.name = Net.player_name(_me.id) if Net.is_online() else String(Settings.player_name)
+	_me.node = _local_player
+	_actor = _me
+	_wagon_driver = _me
+	_players[_me.id] = _me
 	($WorldEnvironment as WorldEnvironment).environment = CityLook.environment()
 	CityLook.setup_sun($Sun)
 	_build_city()
@@ -109,6 +160,7 @@ func _ready() -> void:
 	_tower.build(_city)
 	ToonLook.install(self, _player.camera)
 	_system = CableSystem.new()
+	_system.authority = _authority
 	add_child(_system)
 	_system.cable_completed.connect(_on_cable_completed)
 	_system.cable_hooked.connect(_on_cable_hooked)
@@ -119,6 +171,7 @@ func _ready() -> void:
 	_tools = MassTools.new()
 	_tools.name = "MassTools"
 	_tools.world = self
+	_tools.authority = _authority
 	add_child(_tools)
 	_system.cable_released.connect(_on_cable_released)
 	_system.knot_hit.connect(_on_knot_hit)
@@ -128,6 +181,7 @@ func _ready() -> void:
 	_economy = Economy.new()
 	add_child(_economy)
 	_economy.upgrade_bought.connect(_on_upgrade_bought)
+	_economy.look_changed.connect(func(_slot: String, _item: String) -> void: _apply_looks())
 
 	_rack = ServiceRack.new(_economy.state)
 	add_child(_rack)
@@ -135,17 +189,22 @@ func _ready() -> void:
 	_build_server_room()
 
 	_tablet = Tablet.new()
+	_style_hud()
 	_hud.add_child(_tablet)
 	_tablet.setup(_economy, _rack)
 	_tablet.visible = false
 	_tablet.closed.connect(_close_tablet)
-	_tablet.snooze_requested.connect(_on_snooze_requested)
-	_tablet.drones_recall_requested.connect(func() -> void:
-		_tools.recall_drones(_player.global_position)
-		_show_message("Die Drohnen arbeiten ab jetzt hier (Umkreis %d m)." % int(Balancing.drone.get("work_radius_m", 45.0))))
+	_tablet.snooze_requested.connect(func() -> void: _request("snooze"))
+	_tablet.drones_recall_requested.connect(func() -> void: _request("recall"))
+	_tablet.buy_requested.connect(func(id: String) -> void: _request("buy", { "id": id }))
+	_tablet.wear_requested.connect(func(id: String) -> void: _request("wear", { "id": id }))
+	_tablet.menu_requested.connect(_back_to_menu)
+	_tablet.host_only_locked = Net.is_client()
+	_tablet.own_look = func(slot: String) -> String: return _look_of(_me, slot)
 
-	_arm_reel = ReelData.new(0, ReelData.Kind.ARM)
-	_arm_reel.owner_id = PLAYER_ID
+	# Eigener Arm; als Client ein Platzhalter, bis der Host den echten Arm meldet
+	_arm_reel = ReelData.new(PLAYER_ID if _authority else -1, ReelData.Kind.ARM)
+	_arm_reel.owner_id = _me.id
 	_system.add_reel(_arm_reel)
 
 	_player.interact_pressed.connect(_on_interact)
@@ -165,11 +224,19 @@ func _ready() -> void:
 	_detector.camera = _player.camera
 	_detector.visible = false
 	# Spielstand laden, falls vorhanden (außer bei "Neues Spiel" oder --nosave)
-	_saving_enabled = not OS.get_cmdline_user_args().has("--nosave")
+	_saving_enabled = not OS.get_cmdline_user_args().has("--nosave") and _authority
 	var save := {}
-	if _saving_enabled and not SaveGame.force_new:
+	if Net.is_client():
+		save = Net.join_snapshot  # Spielstand des Hosts
+		_me.looks = Settings.looks.duplicate()
+	elif _saving_enabled and not SaveGame.force_new:
 		save = SaveGame.read()
 	SaveGame.force_new = false
+	# Neuer Auftrag: Ruf und Kosmetik aus dem letzten Auftrag übernehmen
+	var new_job := save.is_empty() and not SaveGame.carry_meta.is_empty()
+	if new_job:
+		_economy.state.load_meta(SaveGame.carry_meta)
+		SaveGame.carry_meta = {}
 	var zs: Dictionary = save.get("zone", {})
 
 	var start: Array = Balancing.zone.get("player_start", [0, 0, 10])
@@ -193,6 +260,7 @@ func _ready() -> void:
 	_cord_prompt = CordPrompt.new()
 	_hud.add_child(_cord_prompt)
 	_tablet.new_game_requested.connect(_new_game)
+	_tablet.new_job_requested.connect(_start_new_job)
 
 	_build_ziplines()
 	_units = CableUnit.build_all(_city)
@@ -202,26 +270,38 @@ func _ready() -> void:
 	_stream_update(true)
 
 	_refresh_finale(false)
+	_apply_looks()
 	# Intro beim neuen Spiel (erster Start oder „Neues Spiel“); in Testläufen mit --nosave nur mit --intro
 	var args := OS.get_cmdline_user_args()
 	var intro_arg := ""
 	for a in args:
 		if a.begins_with("--intro"):
 			intro_arg = a
-	if save.is_empty() and (_saving_enabled or intro_arg != ""):
+	if save.is_empty() and not new_job and _authority and (_saving_enabled or intro_arg != ""):
 		_play_intro(int(intro_arg.get_slice("=", 1)) if intro_arg.contains("=") else 0)
-	if save.is_empty():
+	if new_job:
+		var st := _economy.state
+		_show_message("Auftrag Nr. %d: Die Chefs haben C.O.R.D. aus einer Sicherung neu gestartet … Ruf %d: +%d %% Geld, +%d %% Tempo." % [
+			st.prestige_count + 1, st.reputation, roundi(float(Balancing.prestige.get("money_per_point", 0.1)) * st.reputation * 100.0),
+			roundi(float(Balancing.prestige.get("speed_per_point", 0.05)) * st.reputation * 100.0)])
+		_message_t = 10.0
+		_save_game(false)
+	elif save.is_empty():
 		_show_message("Der Serverraum steht hinter dir. Wichtige Kabel leuchten – ihre Knäuel gehören dort in die Schränke.")
+	if not _authority:
+		_cord.enabled = false
+		_show_message("Verbunden mit %s. Viel Spaß beim gemeinsamen Aufräumen!" % Net.player_name(1))
 	# Nur zum automatischen Testen, siehe _apply_test_args
 	_apply_test_args()
+	_net_ready()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("decline"):
-		_cord.decline()
-	elif event.is_action_pressed("quicksave"):
+		_request("decline")
+	elif event.is_action_pressed("quicksave") and _authority:
 		_save_game(true)
-	elif event.is_action_pressed("quickload"):
+	elif event.is_action_pressed("quickload") and _authority:
 		if SaveGame.exists():
 			get_tree().reload_current_scene()
 		else:
@@ -264,11 +344,24 @@ func _process(delta: float) -> void:
 	var t_start := Time.get_ticks_usec()
 	_prof_frames += 1
 	_time += delta
+	# Arm, Tasche und getragene Rolle jeder Figur (eigene und Mitspieler)
+	for ctx: PlayerCtx in _players.values():
+		_actor = ctx
+		if _arm_reel:
+			_arm_reel.position = _player.arm_transform().origin
+		if ctx != _me:
+			_player.holding = _arm_reel != null and not _arm_reel.is_free()
+			_player.carrying = _carried_reel != null
+		for i in _bag.size():
+			if _item_views.has(_bag[i].id):
+				_item_views[_bag[i].id].carry_at(_player.back_transform(i))
+		_update_carried_reel()
+	_actor = _me
 	var arm := _player.arm_transform()
-	_arm_reel.position = arm.origin
 	# Leine nur, solange ein Kabel aus dem Haufen am Arm hängt
 	var on_arm := _system.cable_on(_arm_reel)
 	_player.tethered = on_arm != null
+	_player.holding = on_arm != null
 	if on_arm:
 		_player.tether_anchor = on_arm.path.points[0]
 	var t_mark := Time.get_ticks_usec()
@@ -289,7 +382,8 @@ func _process(delta: float) -> void:
 			pulling = float(Balancing.connector.get("motor_tension", 0.7))
 		view.update_tension(pulling, cable.is_stuck(), delta)
 		if reel.kind == ReelData.Kind.ARM:
-			view.show_on_arm(arm, _player.global_position.y)
+			var owner: PlayerCtx = _players.get(reel.owner_id, _me)
+			view.show_on_arm(owner.node.arm_transform(), owner.node.global_position.y)
 		else:
 			var ground := _wagon.position.y if (_wagon and _wagon.owns(reel)) else reel.position.y
 			if not _reel_views.has(reel.id):
@@ -298,10 +392,8 @@ func _process(delta: float) -> void:
 			if _reel_views.has(reel.id):
 				_reel_views[reel.id].set_phase(phase)
 
-	for i in _bag.size():
-		_item_views[_bag[i].id].carry_at(_player.back_transform(i))
-	_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
-	_update_carried_reel()
+	if _authority:
+		_economy.state.snooze_cooldown = maxf(_economy.state.snooze_cooldown - delta, 0.0)
 	_player.carrying = _carried_reel != null
 	if _test_anim != "":
 		_run_test_anim()
@@ -311,6 +403,7 @@ func _process(delta: float) -> void:
 	_tools.update(delta, _economy)
 	_update_detector(delta)
 	_update_ride(delta)
+	_net_tick(delta)
 	_wagon_confirm_t = maxf(_wagon_confirm_t - delta, 0.0)
 	var far := _player.global_position.distance_to(ServerRoomView.door_point()) > 30.0
 	_waypoint.visible = not _bag.is_empty() and far and _ride.is_empty()
@@ -347,7 +440,7 @@ func _process(delta: float) -> void:
 			print("ZUSTAND ", _summary())
 
 	_autosave_t += delta
-	if _autosave_t >= float(Balancing.save.get("autosave_s", 30.0)):
+	if _authority and _autosave_t >= float(Balancing.save.get("autosave_s", 30.0)):
 		_autosave_t = 0.0
 		_save_game(false)
 
@@ -367,7 +460,54 @@ func _bag_full() -> bool:
 	return _bag.size() >= _economy.bag_capacity()
 
 
+## E gedrückt: Absicht mit allem, was gerade anvisiert ist
 func _on_interact() -> void:
+	if not _ride.is_empty():
+		return
+	_request("interact", _target_args())
+
+
+## Anvisiertes als IDs (für die Absicht an den Host)
+func _target_args() -> Dictionary:
+	return { "end": _target_end.id if _target_end else -1, "tail": _target_tail,
+		"knot": _target_knot.id if _target_knot else -1, "reel": _target_reel.id if _target_reel else -1,
+		"item": _target_item.id if _target_item else -1, "rack": _target_rack, "stop": _target_stop,
+		"core": _target_core, "station": [(_target_station[0] as Zipline).id, _target_station[1]] if not _target_station.is_empty() else [] }
+
+
+## Absicht „E“ der aktuellen Figur (`_actor`) ausführen; Ziele kommen als IDs und werden geprüft
+func _interact_with(args: Dictionary) -> void:
+	var saved := [_target_end, _target_tail, _target_knot, _target_reel, _target_item, _target_rack, _target_stop,
+		_target_core, _target_station]
+	var pos := _player.global_position
+	var reach := float(Balancing.player["reach_m"]) + 3.0
+	var c: CableData = _system.cables.get(int(args.get("end", -1)))
+	_target_end = c if c and c.state == CableData.State.HEAP and not _landing.has(c.id) \
+		and (c.path.points[0].distance_to(pos) < reach or c.path.points[c.path.points.size() - 1].distance_to(pos) < reach) else null
+	_target_tail = bool(args.get("tail", false))
+	var k: CableData = _system.cables.get(int(args.get("knot", -1)))
+	_target_knot = k if k and k.state == CableData.State.HOOKED else null
+	_target_reel = _system.reels.get(int(args.get("reel", -1)))
+	var it: CoilItem = _items.get(int(args.get("item", -1)))
+	_target_item = it if it and it.carried_by == -1 else null
+	_target_rack = bool(args.get("rack", false)) and pos.distance_to(ServerRoomView.center()) < 14.0
+	_target_stop = int(args.get("stop", -1))
+	_target_core = bool(args.get("core", false))
+	var st: Array = args.get("station", [])
+	_target_station = [_ziplines[st[0]], int(st[1])] if st.size() == 2 and _ziplines.has(st[0]) else []
+	_interact_core()
+	_target_end = saved[0]
+	_target_tail = saved[1]
+	_target_knot = saved[2]
+	_target_reel = saved[3]
+	_target_item = saved[4]
+	_target_rack = saved[5]
+	_target_stop = saved[6]
+	_target_core = saved[7]
+	_target_station = saved[8]
+
+
+func _interact_core() -> void:
 	if not _ride.is_empty():
 		return
 	var held := _system.cable_on(_arm_reel)
@@ -407,11 +547,17 @@ func _on_interact() -> void:
 	# 4c. Seilbahn
 	# 4d. Aufzug im Wolkig-Turm und C.O.R.D.s Kern
 	elif _target_stop >= 0:
-		_ride_elevator(_target_stop, held != null)
+		if _actor == _me:
+			_ride_elevator(_target_stop, held != null)
+		else:
+			Net.send_event("elevator", { "from": _target_stop, "holding": held != null }, _actor.id)
 	elif _target_core:
 		_use_core()
 	elif not held and not _target_station.is_empty():
-		_start_ride(_target_station[0], _target_station[1])
+		if _actor == _me:
+			_start_ride(_target_station[0], _target_station[1])
+		else:
+			Net.send_event("ride", { "line": (_target_station[0] as Zipline).id, "station": _target_station[1] }, _actor.id)
 	# 5. Knäuel vom Boden aufheben
 	elif _target_item:
 		_pick_up(_target_item)
@@ -428,6 +574,15 @@ func _on_interact() -> void:
 
 
 func _on_pull() -> void:
+	if not _authority and _arm_reel.is_free():
+		# Kurbeln sofort zeigen, gezogen wird beim Host
+		var near := CableTargeting.nearest_reel(_system.reels.values(), _player.global_position, ReelData.Kind.HAND)
+		if near and not near.is_free() and _reel_views.has(near.id):
+			_player.crank(_reel_views[near.id].handle_point(), near.position)
+	_request("pull")
+
+
+func _pull_core() -> void:
 	if not _arm_reel.is_free():
 		_system.press(_arm_reel)
 		return
@@ -440,6 +595,10 @@ func _on_pull() -> void:
 
 
 func _on_release() -> void:
+	_request("release")
+
+
+func _release_core() -> void:
 	if _carried_reel:
 		_put_down_reel()
 	elif not _arm_reel.is_free():
@@ -478,7 +637,26 @@ func _on_cable_released(cable: CableData, reel: ReelData) -> void:
 
 
 func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
+	# Arm und Sauger gehören einer Figur: deren Tasche, deren Meldungen
+	var owner: PlayerCtx = _players.get(reel.owner_id, _me) \
+		if reel.kind == ReelData.Kind.ARM or reel.kind == ReelData.Kind.VACUUM else _me
+	var paid_before := _economy.state.total_earned
+	_act_as(owner, func() -> void: _complete_cable(cable, reel))
+	if Net.is_host():
+		var at := (owner.node.global_position + Vector3(0, 2.1, 0)) \
+			if reel.kind == ReelData.Kind.ARM or reel.kind == ReelData.Kind.VACUUM else reel.position + Vector3(0, 1.6, 0)
+		Net.send_event("done", { "id": cable.id, "reel": reel.id, "imp": cable.is_important(),
+			"pay": _economy.state.total_earned - paid_before, "p": at })
+		_items_dirty = _items_dirty or cable.is_important()
+
+
+func _complete_cable(cable: CableData, reel: ReelData) -> void:
 	var view: CableView = _views[cable.id]
+	var fx := _look_fx()
+	if fx != "" and reel.position.distance_to(_player.global_position) < 40.0:
+		var at := (_player.global_position + Vector3(0, 1.4, 0)) if reel == _arm_reel or reel.kind == ReelData.Kind.VACUUM \
+			else reel.position + Vector3(0, 1.0, 0)
+		CelebrationFx.spawn(self, at, fx, 1.0 if reel == _arm_reel else 0.5)
 	_remove_knot_marker(cable.id)
 	_views.erase(cable.id)
 	_system.remove_cable(cable.id)
@@ -542,17 +720,18 @@ func _on_cable_completed(cable: CableData, reel: ReelData) -> void:
 		_update_blockers()
 	if _yard_cable_count() == 0:
 		_spawn_zone(_zone.rng_seed + 1, null, _next_cable_id)
-		_show_message("Alles aufgeräumt – aber C.O.R.D. hat nachbestellt …")
+		Net.send_event("zone", { "seed": _zone.rng_seed, "ports": Array(_zone_ports), "first": _zone_first_id })
+		_announce("Alles aufgeräumt – aber C.O.R.D. hat nachbestellt …")
 
 
 func _on_knot_hit(cable: CableData, reel: ReelData) -> void:
 	_add_knot_marker(cable)
 	if reel.is_automatic():
 		return  # Sauger, Winde und Drohne lösen Knoten selbst
-	if reel == _arm_reel:
-		_show_message("Knoten! E drücken, um ihn zu lösen.")
+	if reel.kind == ReelData.Kind.ARM:
+		_act_as(_players.get(reel.owner_id, _me), func() -> void: _show_message("Knoten! E drücken, um ihn zu lösen."))
 	else:
-		_show_message("Knoten an einer Rolle! Hingehen, Knoten anvisieren und E drücken.")
+		_announce("Knoten an einer Rolle! Hingehen, Knoten anvisieren und E drücken.")
 
 
 func _on_knot_progress(_cable: CableData, presses: int, needed: int) -> void:
@@ -585,17 +764,25 @@ func _on_upgrade_bought(upgrade_id: String, _level: int) -> void:
 				_tools.drone_anchor = _player.global_position
 			_show_message("Abräum-Drohne gestartet! Sie arbeitet im Umkreis von %d m. Im Tablet: Drohnen zu mir rufen." % int(Balancing.drone.get("work_radius_m", 45.0)))
 		"wagon":
+			_wagon_driver = _actor
 			_spawn_wagon(null)
 			_show_message("Kabeltrommel-Wagen da! Er folgt dir. Kabel daran einhängen: er parkt und zieht drei Kabel gleichzeitig.")
 		_:
-			_show_message("%s gekauft!" % _economy.upgrade_name(upgrade_id))
+			if Balancing.room_order.has(upgrade_id):
+				_show_message("Serverraum ausgebaut: %s (Stufe %d)." % [_economy.upgrade_name(upgrade_id), _level])
+			else:
+				_show_message("%s gekauft!" % _economy.upgrade_name(upgrade_id))
 	_apply_upgrades()
+	_econ_dirty = true
+	if Balancing.room_order.has(upgrade_id):
+		_room.refresh(_economy.state)
 
 
 func _on_service_activated(service_id: int, service_name: String, unlocks: String) -> void:
 	var def := RackPlan.service_def(service_id)
 	var at := _room.port_position(RackPlan.service_ports(service_id)[0]) + Vector3(0, 0.4, 0)
-	FloatText.spawn(self, at, "%s online!" % service_name, Color(0.4, 1.0, 0.5))
+	_float(at, "%s online!" % service_name, Color(0.4, 1.0, 0.5))
+	_econ_dirty = true
 	var payout := float(def.get("payout", 0.0))
 	if payout > 0.0:
 		_economy.state.money += payout
@@ -605,11 +792,11 @@ func _on_service_activated(service_id: int, service_name: String, unlocks: Strin
 	_refresh_ziplines()
 	_refresh_finale(true)
 	if unlocks != "":
-		_show_message("Dienst „%s“ läuft wieder – neu im Tablet: %s" % [service_name, _economy.upgrade_name(unlocks)])
+		_announce("Dienst „%s“ läuft wieder – neu im Tablet: %s" % [service_name, _economy.upgrade_name(unlocks)])
 	elif def.has("effect"):
-		_show_message("Dienst „%s“ läuft wieder. %s." % [service_name, String(def["effect"])])
+		_announce("Dienst „%s“ läuft wieder. %s." % [service_name, String(def["effect"])])
 	else:
-		_show_message("Dienst „%s“ läuft wieder." % service_name)
+		_announce("Dienst „%s“ läuft wieder." % service_name)
 
 
 func _on_snooze_requested() -> void:
@@ -620,7 +807,8 @@ func _on_snooze_requested() -> void:
 	_cord_view.set_asking(false)
 	_cord_prompt.visible = false
 	_tablet.refresh()
-	_show_message("C.O.R.D.: „Fahre herunter … Updates werden installiert.“ (5 Minuten Ruhe)")
+	_econ_dirty = true
+	_announce("C.O.R.D.: „Fahre herunter … Updates werden installiert.“ (5 Minuten Ruhe)")
 
 
 func _on_order_requested(answer_time: float) -> void:
@@ -632,7 +820,8 @@ func _on_order_declined() -> void:
 	_cord_view.set_asking(false)
 	_cord_view.react("declined")
 	_cord_prompt.visible = false
-	_show_message("C.O.R.D.: „Bestellung storniert. Ich merke mir das.“")
+	Net.send_event("cord", { "k": "declined" })
+	_announce("C.O.R.D.: „Bestellung storniert. Ich merke mir das.“")
 
 
 func _on_order_placed(count: int) -> void:
@@ -640,7 +829,8 @@ func _on_order_placed(count: int) -> void:
 	_cord_view.react("placed")
 	_cord_prompt.visible = false
 	_spawn_order(count)
-	_show_message("C.O.R.D.: „Ersatz bestellt: %d Kabel. Gern geschehen!“" % count)
+	Net.send_event("cord", { "k": "placed" })
+	_announce("C.O.R.D.: „Ersatz bestellt: %d Kabel. Gern geschehen!“" % count)
 
 
 # --- Hilfen ---------------------------------------------------------------
@@ -675,6 +865,8 @@ func _add_order_heap(heap: HeapData, first_id: int, animate: bool) -> void:
 			_landing[cable.id] = -stagger * float(i) / maxf(heap.cable_count, 1)
 		i += 1
 	_next_cable_id = maxi(_next_cable_id, first_id + heap.cable_count)
+	if animate and Net.is_host():
+		Net.send_event("order", { "heap": heap.to_dict(), "first": first_id })
 
 
 ## Fall-Animation der gelieferten Kabel; erst nach der Landung greifbar.
@@ -756,14 +948,40 @@ func _apply_upgrades() -> void:
 		_cord.count_factor = _economy.bonus("order_count")
 
 
+## Kosmetik aus dem Zustand auf Figur, C.O.R.D., Drohnen und Wagen übertragen
+func _apply_looks() -> void:
+	for ctx: PlayerCtx in _players.values():
+		var outfit := {}
+		for part: String in PLAYER_SLOTS:
+			var def := Economy.cosmetic_def(_look_of(ctx, part))
+			if def.has("color"):
+				outfit[part] = Color.html(String(def["color"]))
+		ctx.node.set_outfit(outfit)
+	if _cord_view:
+		_cord_view.set_band(_economy.look_color("cord_band", CordView.CALM))
+		_cord_view.set_paint(_economy.look_color("cord_paint", Color.WHITE))
+	DroneView.paint = _economy.look_color("drone_paint", Color(0.98, 0.78, 0.15))
+	for d: Dictionary in _tools.drones:
+		(d["view"] as DroneView).set_paint(DroneView.paint)
+	WagonView.paint = _economy.look_color("wagon_paint", Color(0.96, 0.55, 0.15))
+	if _wagon_view:
+		_wagon_view.set_paint(WagonView.paint)
+
+
+## Effekt aus der Kosmetik (leer = keiner)
+func _look_fx() -> String:
+	return String(Economy.cosmetic_def(_economy.look("fx")).get("fx", ""))
+
+
 ## Geländehöhe an einer Stelle (Hinterhof = 0)
 func _ground_y(pos: Vector3) -> float:
 	return _ground_spot(pos).y
 
 
 func _put_in_bag(item: CoilItem) -> void:
-	item.carried_by = PLAYER_ID
+	item.carried_by = _actor.id
 	_bag.append(item)
+	_items_dirty = true
 	_item_views[item.id].set_carried(true)
 
 
@@ -788,8 +1006,12 @@ func _plug_items(items: Array, label_at: Vector3) -> void:
 		_bag.erase(item)
 	_room.refresh(_economy.state)
 	_tablet.refresh()
+	_items_dirty = true
+	_econ_dirty = true
 	if plugged > 1:
-		FloatText.spawn(self, label_at, "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
+		_float(label_at, "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
+	if plugged > 0:
+		_fx(label_at, _look_fx(), clampf(plugged / 3.0, 1.0, 3.0))
 
 
 func _pick_up(item: CoilItem) -> void:
@@ -808,6 +1030,7 @@ func _drop_from_bag() -> void:
 	item.position.y = _ground_y(item.position)
 	_item_views[item.id].set_carried(false)
 	_item_views[item.id].lie_at(item.position)
+	_items_dirty = true
 
 
 func _update_targets() -> void:
@@ -968,7 +1191,10 @@ func _stream_update(now: bool) -> void:
 	var cfg: Dictionary = _city.layout.raw().get("streaming", {})
 	var load_m := float(cfg.get("load_m", 150.0))
 	var unload_m := float(cfg.get("unload_m", 220.0))
-	var points: Array[Vector3] = [_player.global_position]
+	var points: Array[Vector3] = []
+	for ctx: PlayerCtx in _players.values():
+		if _authority or ctx == _me:
+			points.append(ctx.node.global_position)
 	if _tools:
 		points.append_array(_tools.stream_points())  # Drohnen-Einsatzort und Winden halten ihre Kabel geladen
 	for u in _units:
@@ -1100,7 +1326,8 @@ func _update_blockers() -> void:
 		if cleared and _blockers.has(u.id):
 			_blockers[u.id].queue_free()
 			_blockers.erase(u.id)
-			_show_message("%s abgetragen – der Weg ist frei!" % u.name)
+			if _authority:
+				_announce("%s abgetragen – der Weg ist frei!" % u.name)
 		elif not cleared and not _blockers.has(u.id):
 			var body := StaticBody3D.new()
 			body.name = "Blocker_%s" % u.id
@@ -1209,12 +1436,76 @@ func _update_hud() -> void:
 			"  (wichtig)" if c.is_important() else "", "  – KNOTEN!" if c.is_stuck() else ""]
 	for key: String in busy:
 		line += "\n%s: %d Kabel" % [key if key != "Drohne" else "Drohnen", busy[key]]
-	if _message_t > 0.0:
-		line += "\n" + _message
 	_status.text = line
+	_status.reset_size()  # Hintergrund passt sich dem Text an
+	_toast.visible = _message_t > 0.0 and _message != ""
+	if _toast.visible:
+		_toast.text = _message
+		_toast.modulate.a = clampf(_message_t / 0.4, 0.0, 1.0)
+		# Kurze Meldung in einer Zeile, lange umbrechen (höchstens 900 px breit)
+		var w := UiTheme.font().get_string_size(_message, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 46.0
+		_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if w > 900.0 else TextServer.AUTOWRAP_OFF
+		_toast.custom_minimum_size.x = minf(w, 900.0)
+		_toast.reset_size()
+		_toast.position.x = (_hud_width() - _toast.size.x) * 0.5
+	_hint.visible = _hint.text != ""
+	_hint.reset_size()
+	_hint.position.x = (_hud_width() - _hint.size.x) * 0.5
 
 	_money.text = Economy.format_money(_economy.state.money)
-	_shop.text = "Tab: Tablet (Upgrades)"
+	_shop.text = "Tab  Tablet"
+	# Pillen oben rechts so breit wie ihr Text, rechtsbündig
+	for l: Label in [_money, _shop]:
+		l.reset_size()
+		l.position.x = _hud_width() - 20.0 - l.size.x
+
+
+## Anzeige im Spielzeug-Look (UiTheme): Statuskarte oben links, Geld als gelbe Pille, Hinweis unten,
+## Meldungen als helle Sprechblase darüber
+func _style_hud() -> void:
+	UiTheme.style_hud_label(_status, 18)
+	_status.add_theme_stylebox_override("normal", UiTheme.hud_box())
+	_status.add_theme_constant_override("line_spacing", 2)
+	_status.size = Vector2.ZERO
+	UiTheme.style_label(_money, 30, UiTheme.INK)
+	var pill := UiTheme.box(UiTheme.YELLOW, UiTheme.YELLOW_DARK, 26, 0, 6, 8)
+	pill.border_width_bottom = 6
+	pill.border_color = UiTheme.YELLOW_DARK
+	pill.content_margin_left = 22
+	pill.content_margin_right = 22
+	_money.add_theme_stylebox_override("normal", pill)
+	_money.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	UiTheme.style_label(_shop, 16, Color.WHITE)
+	var key := UiTheme.box(UiTheme.BLUE, UiTheme.BLUE_DARK, 14, 0, 4, 6)
+	key.border_width_bottom = 4
+	key.border_color = UiTheme.BLUE_DARK
+	key.content_margin_left = 14
+	key.content_margin_right = 14
+	_shop.add_theme_stylebox_override("normal", key)
+	_shop.offset_top = 78
+	UiTheme.style_label(_hint, 20, Color.WHITE)
+	_hint.add_theme_stylebox_override("normal", UiTheme.hud_box(Color(0.1, 0.13, 0.22, 0.72), 22))
+	_hint.anchor_left = 0.0
+	_hint.anchor_right = 0.0
+	_hint.grow_horizontal = Control.GROW_DIRECTION_END
+	_toast = Label.new()
+	UiTheme.style_label(_toast, 19, UiTheme.INK)
+	var bubble := UiTheme.box(UiTheme.PAPER, UiTheme.BLUE, 20, 3, 6, 12)
+	bubble.content_margin_left = 20
+	bubble.content_margin_right = 20
+	_toast.add_theme_stylebox_override("normal", bubble)
+	_toast.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_toast.offset_top = -150
+	_toast.offset_bottom = -110
+	_toast.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_toast.visible = false
+	_hud.add_child(_toast)
+
+
+func _hud_width() -> float:
+	return get_viewport().get_visible_rect().size.x if is_inside_tree() else 1600.0
 
 
 ## Kabel-Detektor: nächstes wichtiges Kabelende im Haufen suchen (einige Male pro Sekunde)
@@ -1281,7 +1572,13 @@ func _heap_count() -> int:
 	return n
 
 
+## Meldung an die Figur, für die gerade gehandelt wird (Mitspieler bekommen sie übers Netz)
 func _show_message(text: String) -> void:
+	if _replaying:
+		return
+	if _actor != null and _actor != _me:
+		Net.send_event("msg", { "t": text }, _actor.id)
+		return
 	_message = text
 	_message_t = 4.0
 
@@ -1386,6 +1683,8 @@ func _use_core() -> void:
 		return
 	_economy.state.finale_done = true
 	_refresh_finale(false)
+	_econ_dirty = true
+	Net.send_event("finale")
 	_show_finale_screen()
 
 
@@ -1424,6 +1723,7 @@ func _ground_spot(p: Vector3) -> Vector3:
 
 func _pick_up_reel(reel: ReelData) -> void:
 	reel.carried = true
+	reel.carrier_id = _actor.id
 	_carried_reel = reel
 	_reel_views[reel.id].set_carried(true)
 	_show_message("%s aufgehoben – E oder Q stellt sie wieder ab." % _reel_name(reel))
@@ -1481,6 +1781,24 @@ func _spawn_wagon(saved: Variant) -> void:
 func _update_wagon(delta: float) -> void:
 	if _wagon == null:
 		return
+	if not _authority:
+		# Client: Lage kommt vom Host, hier nur Plätze und Trommeln nachziehen
+		_wagon.update_slots()
+		for slot in _wagon.slots:
+			if _reel_views.has(slot.id):
+				_reel_views[slot.id].global_position = slot.position
+				_reel_views[slot.id].rotation.y = _wagon.yaw
+		_wagon_view.refresh()
+		return
+	# Der Wagen folgt der Figur, die ihn zuletzt angekoppelt hat
+	var driver: PlayerCtx = _wagon_driver if _wagon_driver and _players.has(_wagon_driver.id) else _me
+	var before := _actor
+	_actor = driver
+	_update_wagon_core(delta)
+	_actor = before
+
+
+func _update_wagon_core(delta: float) -> void:
 	var w: Dictionary = Balancing.wagon
 	var me := _player.global_position
 	var dist := Vector2(me.x - _wagon.position.x, me.z - _wagon.position.z).length()
@@ -1522,6 +1840,7 @@ func _toggle_wagon() -> void:
 	_wagon_confirm_t = 0.0
 	_wagon.parked = false
 	_wagon.set_meta("auto", false)
+	_wagon_driver = _actor
 	_show_message("Wagen angekoppelt – er folgt dir.")
 
 
@@ -1724,7 +2043,8 @@ func _apply_save(d: Dictionary) -> void:
 			if cable.is_stuck():
 				_add_knot_marker(cable)
 
-	for idd: Dictionary in d.get("items", []):
+	# Client: Knäuel und Taschen meldet der Host gleich danach einzeln
+	for idd: Dictionary in (d.get("items", []) if _authority else []):
 		var item := CoilItem.from_dict(idd)
 		_items[item.id] = item
 		var iv := CoilItemView.new()
@@ -1756,8 +2076,21 @@ func _apply_save(d: Dictionary) -> void:
 	_show_message("Spielstand geladen (%s)." % String(d.get("saved_at", "")).replace("T", " "))
 
 
+## Neuer Auftrag (Prestige): alles zurück auf Anfang, Ruf und Kosmetik bleiben
+func _start_new_job() -> void:
+	if not _economy.can_prestige():
+		return
+	SaveGame.carry_meta = _economy.prestige_meta()
+	if _saving_enabled:  # mit --nosave den echten Spielstand nicht anfassen
+		SaveGame.delete()
+	SaveGame.force_new = true
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	get_tree().reload_current_scene()
+
+
 func _new_game() -> void:
-	SaveGame.delete()
+	if _saving_enabled:  # mit --nosave den echten Spielstand nicht anfassen
+		SaveGame.delete()
 	SaveGame.force_new = true
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	get_tree().reload_current_scene()
@@ -1786,6 +2119,8 @@ func _summary() -> String:
 	var extra := "wagen=%s rolle_getragen=%s fahrt=%s " % [
 		("geparkt" if _wagon.parked else "folgt") + ":%d/%d" % [_wagon.free_slots(), _wagon.slots.size()] if _wagon else "-",
 		str(_carried_reel != null), ("%s@%.0f" % [(_ride["line"] as Zipline).id, float(_ride["s"])]) if not _ride.is_empty() else "-"]
+	extra += "auftrag=%d ruf=%d looks=%s " % [_economy.state.prestige_count + 1, _economy.state.reputation,
+		JSON.stringify(_economy.state.looks)]
 	return extra + ("fps=%d boden=%.1f unter=%s " % [Engine.get_frames_per_second(), _city.ground_height(gp.x, gp.z), under]) + "wichtig=%d dienste=%d einheiten=%s sperren=%d geld=%.2f ports=%s upgrades=%s kabel=%d rollen=%d haengt=%s knaeuel=%d getragen=%s fertig=%d lieferungen=%d cord=%s/%.2f pos=%s" % [
 		important, _rack.active_services(), str(loaded), _blockers.size(),
 		_economy.state.money, str(_economy.state.active_ports) if _economy.state.active_ports.size() <= 24 else "%d Ports" % _economy.state.active_ports.size(), JSON.stringify(_economy.state.upgrades), _system.cables.size(),
@@ -1795,6 +2130,62 @@ func _summary() -> String:
 
 ## Testoptionen, z. B.:
 ## godot -- --money=50 --buy=crank,extra_reel --grab --important --noknots --pull=40 --hang --plug --tablet --orbit=-120
+## Testoption --network: als Client übers Netz ein Kabel greifen und 40-mal ziehen (prüft Absichten und Zustand)
+func _test_network(important := false) -> void:
+	await get_tree().create_timer(3.0).timeout
+	var best: CableData = null
+	var best_d := INF
+	if important:
+		# Zum nächsten wichtigen Kabel gehen (Figur daneben stellen)
+		for c: CableData in _system.important.values():
+			var d := c.path.points[0].distance_to(_local_player.global_position)
+			if c.state == CableData.State.HEAP and d < best_d:
+				best_d = d
+				best = c
+		if best:
+			_local_player.global_position = best.path.points[0] + Vector3(0.6, 0.3, 0.6)
+			await get_tree().create_timer(0.6).timeout
+			best_d = 0.8
+	for c: CableData in ([] if important else _system.cables_near(_local_player.global_position, 6.0)):
+		if c.state == CableData.State.HEAP:
+			var d := c.path.points[0].distance_to(_local_player.global_position)
+			if d < best_d:
+				best_d = d
+				best = c
+	if best == null:
+		print("NETZTEST: kein Kabel in Reichweite")
+		return
+	print("NETZTEST: greife Kabel %d (%.1f m)" % [best.id, best_d])
+	_request("interact", { "end": best.id, "tail": false, "knot": -1, "reel": -1, "item": -1, "rack": false,
+		"stop": -1, "core": false, "station": [] })
+	await get_tree().create_timer(0.5).timeout
+	# Ziehen bzw. Knoten lösen, bis das Kabel fertig ist (höchstens 120 Schritte)
+	for k in 120:
+		await get_tree().create_timer(0.12).timeout
+		var held := _system.cable_on(_arm_reel)
+		if held == null and _removed_ids.has(best.id):
+			break
+		if held and held.is_stuck():
+			_request("interact", { "end": -1, "knot": held.id, "reel": -1, "item": -1, "stop": -1, "station": [] })
+		else:
+			_request("pull")
+	await get_tree().create_timer(1.0).timeout
+	print("NETZTEST: Kabel %d fertig: %s, Geld %.2f, Mitspieler %d" % [best.id, str(_removed_ids.has(best.id)),
+		_economy.state.money, _players.size()])
+	if important:
+		print("NETZTEST: Tasche %d, Knäuel gesamt %d" % [_bag.size(), _items.size()])
+		_local_player.global_position = ServerRoomView.center() + Vector3(0, 0.1, 2.0)
+		await get_tree().create_timer(0.8).timeout
+		_request("interact", { "end": -1, "knot": -1, "reel": -1, "item": -1, "rack": true, "stop": -1, "station": [] })
+		await get_tree().create_timer(1.5).timeout
+		print("NETZTEST: nach Einstecken: Tasche %d, Ports %s" % [_bag.size(), str(_economy.state.active_ports)])
+		return
+	_request("buy", { "id": "crank" })
+	await get_tree().create_timer(1.5).timeout
+	print("NETZTEST: nach Kauf: Handkurbel Stufe %d, Rollen %d, Geld %.2f" % [_economy.state.level("crank"),
+		_system.reels.size(), _economy.state.money])
+
+
 ## Testoption --anim: Bewegungen regelmäßig auslösen
 func _run_test_anim() -> void:
 	var f := _player.facing()
@@ -1905,8 +2296,40 @@ func _apply_test_args() -> void:
 		_player.global_position = (ServerRoomView.center() + Vector3(0, 0.05, -2.0)) if opts["room"] == "in" \
 			else ServerRoomView.door_point() + Vector3(0, 0.05, -4.0)
 		_player.look_toward(ServerRoomView.center() + Vector3(0, 0, 4.0))
+	if opts.has("newjobafter") and not _test_newjob_done:
+		# Test: nach so vielen Sekunden einen neuen Auftrag annehmen (Mehrspieler: Clients laden mit)
+		_test_newjob_done = true
+		get_tree().create_timer(float(opts["newjobafter"])).timeout.connect(func() -> void:
+			_economy.state.finale_done = true
+			_economy.state.total_earned = 1e8
+			_start_new_job())
+	if opts.has("newjob") and not _test_newjob_done:
+		# --newjob[=<Mio. €>]: Finale geschafft, so viel verdient, neuen Auftrag annehmen (Szene lädt neu)
+		_test_newjob_done = true
+		_economy.state.finale_done = true
+		_economy.state.total_earned = float(opts["newjob"]) * 1e6 if String(opts["newjob"]).is_valid_float() else 1e8
+		_start_new_job.call_deferred()
+		return
+	if opts.has("look"):
+		# --look=hoodie_pink,shoes_weiss,fx_confetti: Kosmetik kaufen und anlegen
+		for id in String(opts["look"]).split(","):
+			var def := Economy.cosmetic_def(id)
+			_economy.state.money += float(def.get("cost", 0.0))
+			if not _economy.wear_cosmetic(id):
+				push_warning("Kosmetik %s unbekannt" % id)
+	if opts.has("roomview"):
+		# Blick im Serverraum zur Vorderwand (Kaffeeecke, Leitstand) bzw. --roomview=back zu den Schränken
+		var c := ServerRoomView.center()
+		if opts["roomview"] == "back":
+			_player.global_position = c + Vector3(0, 0.05, 0.5)
+			_player.look_toward(c + Vector3(0, 0, 6.0))
+		else:
+			_player.global_position = c + Vector3(0, 0.05, 2.5)
+			_player.look_toward(c + Vector3(0, 0, -6.0))
 	if opts.has("tablet"):
 		_open_tablet()
+		if String(opts["tablet"]).is_valid_int():
+			_tablet.show_tab(int(opts["tablet"]))  # --tablet=<0..3>: Reiter
 	if opts.has("ask"):
 		_cord.ask_now()
 	if opts.has("order"):
@@ -1943,6 +2366,17 @@ func _apply_test_args() -> void:
 		var back: CableData = _system.cables.get(c.id)
 		print("STREAMTEST gespeichert=%s im_spielstand=%s zurueck=%s gezogen=%.1f knoten=%d" % [
 			stored, in_save, back != null, back.pulled_m if back else -1.0, back.knots_solved if back else -1])
+	if opts.has("runfor"):
+		# Nach so vielen Sekunden (echte Zeit) Zustand ausgeben und beenden (Netz-Tests ohne Bild-Takt)
+		get_tree().create_timer(float(opts["runfor"]), true, false, true).timeout.connect(func() -> void:
+			print("ZUSTAND ", _summary())
+			if opts.has("shot"):
+				get_viewport().get_texture().get_image().save_png(String(opts["shot"]))
+			get_tree().quit())
+	if opts.has("host") and not Net.is_online():
+		Net.host(Settings.port)  # Test: gleich als Host starten
+	if opts.has("network"):
+		_test_network(String(opts["network"]) == "important")
 	if opts.has("fillbag"):
 		# So viele wichtige Kabel fertig aufrollen, wie angegeben (z. B. --fillbag=5): Tasche füllt sich, Rest fällt zu Boden
 		for k in int(opts["fillbag"]):
@@ -2050,3 +2484,609 @@ func _apply_test_args() -> void:
 		_saving_enabled = true
 		_save_game(false)
 		get_tree().quit()
+
+
+# --- Mehrspieler ----------------------------------------------------------------
+## Der Host (bzw. Einzelspieler) rechnet alles; Clients schicken Absichten (`_request`) und übernehmen den
+## Zustand (`net_snapshot`, `net_event`). Figuren-Lage schickt jeder selbst (`net_player_state`).
+
+const PUPPET_SCENE := preload("res://scenes/player.tscn")
+const MENU_SCENE := "res://scenes/main_menu.tscn"
+## Kosmetik-Plätze, die jede Figur für sich hat (der Rest gilt für alle)
+const PLAYER_SLOTS := ["hoodie", "pants", "headphones", "shoes"]
+var _net_drones: Array[DroneView] = []  # Client: Drohnen nur zur Anzeige
+
+
+## Absicht der eigenen Figur: offline und als Host gleich ausführen, als Client an den Host schicken
+func _request(kind: String, args: Dictionary = {}) -> void:
+	if _authority:
+		_do_intent(_me, kind, args)
+	else:
+		Net.send_intent(kind, args)
+
+
+## Für eine Figur handeln: `_actor` zeigt währenddessen auf ihren Kontext
+func _act_as(ctx: PlayerCtx, fn: Callable) -> void:
+	var before := _actor
+	_actor = ctx
+	fn.call()
+	_actor = before
+
+
+func _do_intent(ctx: PlayerCtx, kind: String, args: Dictionary) -> void:
+	_act_as(ctx, _intent_core.bind(ctx, kind, args))
+
+
+func _intent_core(ctx: PlayerCtx, kind: String, args: Dictionary) -> void:
+	if OS.get_cmdline_user_args().has("--netlog"):
+		var held := _system.cable_on(_arm_reel)
+		print("ABSICHT %d %s %s am Arm: %s" % [ctx.id, kind, str(args.get("knot", "")), ("%d %.2f k%d p%d" % [held.id, held.pulled_m, held.knots_solved, held.knot_presses]) if held else "-"])
+	match kind:
+		"interact":
+			_interact_with(args)
+		"pull":
+			_pull_core()
+		"release":
+			_release_core()
+		"buy":
+			var id := String(args.get("id", ""))
+			if Balancing.upgrades.has(id) and _economy.buy(id):
+				if ctx != _me:
+					_announce_others("%s kauft %s." % [ctx.name, _economy.upgrade_name(id)], ctx.id)
+				_econ_dirty = true
+		"wear":
+			_wear(ctx, String(args.get("id", "")))
+		"decline":
+			_cord.decline()
+		"snooze":
+			_on_snooze_requested()
+		"recall":
+			_tools.recall_drones(_player.global_position)
+			_show_message("Die Drohnen arbeiten ab jetzt hier (Umkreis %d m)." % int(Balancing.drone.get("work_radius_m", 45.0)))
+
+
+## Kosmetik anlegen (und vorher aus der gemeinsamen Kasse kaufen); Figur-Teile gehören der Figur
+func _wear(ctx: PlayerCtx, id: String) -> void:
+	var def := Economy.cosmetic_def(id)
+	if def.is_empty():
+		return
+	var slot := String(def["slot"])
+	if ctx.id == 1 or not PLAYER_SLOTS.has(slot):
+		_economy.wear_cosmetic(id)
+	else:
+		if not _economy.owns_cosmetic(id):
+			var price := float(def.get("cost", 0.0))
+			if _economy.state.money < price - 1e-6:
+				return
+			_economy.state.money -= price
+			_economy.state.cosmetics.append(id)
+			_economy.money_changed.emit(_economy.state.money)
+		ctx.looks[slot] = id
+		Net.send_event("looks", { "id": ctx.id, "looks": ctx.looks })
+		_apply_looks()
+	_econ_dirty = true
+
+
+## Angelegtes Stück einer Figur ("" = Grundausstattung)
+func _look_of(ctx: PlayerCtx, slot: String) -> String:
+	if PLAYER_SLOTS.has(slot) and ctx.id != 1:
+		return String(ctx.looks.get(slot, ""))
+	return _economy.look(slot)
+
+
+## Meldung an alle (eigene Anzeige und Mitspieler)
+func _announce(text: String) -> void:
+	var before := _actor
+	_actor = _me
+	_show_message(text)
+	_actor = before
+	Net.send_event("msg", { "t": text })
+
+
+## Meldung an alle außer einem Spieler
+func _announce_others(text: String, except_id: int) -> void:
+	if except_id != _me.id:
+		var before := _actor
+		_actor = _me
+		_show_message(text)
+		_actor = before
+	for pid: int in Net.peers:
+		if pid != 1 and pid != except_id:
+			Net.send_event("msg", { "t": text }, pid)
+
+
+## Schwebender Text bei allen
+func _float(pos: Vector3, text: String, color := Color(1.0, 0.9, 0.3)) -> void:
+	FloatText.spawn(self, pos, text, color)
+	Net.send_event("float", { "p": pos, "t": text, "c": color })
+
+
+## Effekt aus der Kosmetik bei allen
+func _fx(pos: Vector3, kind: String, amount := 1.0) -> void:
+	if kind == "":
+		return
+	CelebrationFx.spawn(self, pos, kind, amount)
+	Net.send_event("fx", { "p": pos, "k": kind, "a": amount })
+
+
+func _net_ready() -> void:
+	if Net.is_client():
+		_local_player.global_position += Vector3(1.5, 0.3, 1.5)  # nicht in der Figur des Hosts landen
+		Net.send_intent("entered", { "looks": _me.looks })
+	elif Net.is_host() and Net.peers.size() > 1:
+		Net.send_welcome(0)  # neu geladen (z. B. neuer Auftrag): alle Clients laden mit
+
+
+func _exit_tree() -> void:
+	if Net.world == self:
+		Net.world = null
+
+
+## Zurück ins Hauptmenü (speichert vorher, Mehrspieler endet)
+func _back_to_menu() -> void:
+	if _authority:
+		_save_game(false)
+	Net.leave()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+func net_back_to_menu() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+## Client: Host hat neuen Spielstand geschickt (neuer Auftrag, Laden): Welt neu aufbauen
+func net_reload_world() -> void:
+	get_tree().reload_current_scene()
+
+
+## Host: Spielstand für einen beitretenden Client
+func net_snapshot_for_join() -> Dictionary:
+	return _collect_save()
+
+
+# ---- Figuren ----
+
+func _make_puppet(id: int, name_value: String) -> Player:
+	var p: Player = PUPPET_SCENE.instantiate()
+	p.remote = true
+	p.name = "Mitspieler_%d" % id
+	add_child(p)
+	p.global_position = _local_player.global_position + Vector3(2, 0, 2)
+	var label := Label3D.new()
+	label.text = name_value
+	label.font = UiTheme.font()
+	label.font_size = 64
+	label.outline_size = 14
+	label.pixel_size = 0.005
+	label.modulate = Color(1.0, 0.95, 0.6)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.position = Vector3(0, 2.25, 0)
+	p.add_child(label)
+	return p
+
+
+func _add_player(id: int, name_value: String) -> PlayerCtx:
+	if _players.has(id):
+		return _players[id]
+	var ctx := PlayerCtx.new()
+	ctx.id = id
+	ctx.name = name_value
+	ctx.node = _make_puppet(id, name_value)
+	if _authority:
+		var arm := ReelData.new(_remote_arm_next, ReelData.Kind.ARM)
+		_remote_arm_next += 1
+		arm.owner_id = id
+		_system.add_reel(arm)
+		ctx.arm_reel = arm
+	_players[id] = ctx
+	if _authority:
+		_tools.sync(_economy)
+	_apply_looks()
+	return ctx
+
+
+## Host: Mitspieler ist weg (Verbindung getrennt): Kabel los, Knäuel und Rolle ablegen
+func net_player_left(id: int, name_value: String) -> void:
+	var ctx: PlayerCtx = _players.get(id)
+	if ctx == null:
+		return
+	if _authority:
+		_act_as(ctx, _drop_everything)
+		for r in ctx.vacuum_reels:
+			if not r.is_free():
+				_system.release(r)
+			_system.remove_reel(r.id)
+		if ctx.arm_reel:
+			_system.remove_reel(ctx.arm_reel.id)
+		_items_dirty = true
+		Net.send_event("left", { "id": id, "name": name_value })
+		_announce("%s hat das Spiel verlassen." % name_value)
+	_remove_player(id)
+
+
+## Figur, für die gerade gehandelt wird: Kabel los, Knäuel und Rolle ablegen
+func _drop_everything() -> void:
+	if _arm_reel and not _arm_reel.is_free():
+		_system.release(_arm_reel)
+	while not _bag.is_empty():
+		_drop_from_bag()
+	if _carried_reel:
+		_put_down_reel()
+
+
+func _remove_player(id: int) -> void:
+	var ctx: PlayerCtx = _players.get(id)
+	if ctx == null or ctx == _me:
+		return
+	if _wagon_driver == ctx:
+		_wagon_driver = _me
+	_tools.forget_player(id)
+	ctx.node.queue_free()
+	_players.erase(id)
+
+
+## Lage und Haltung einer anderen Figur
+func net_player_state(id: int, st: Array) -> void:
+	var ctx: PlayerCtx = _players.get(id)
+	if ctx == null:
+		if _authority or not Net.peers.has(id):
+			return  # Host legt Mitspieler erst bei „entered“ an
+		ctx = _add_player(id, Net.player_name(id))
+	ctx.node.apply_net_state(st)
+	if st.size() > 13:
+		ctx.vacuum_want = bool(st[13])
+
+
+# ---- Host: Absichten ----
+
+func net_intent(id: int, kind: String, args: Dictionary) -> void:
+	if kind == "entered":
+		var ctx := _add_player(id, Net.player_name(id))
+		# Aussehen übernehmen, soweit die Stücke gekauft sind
+		for slot: String in (args.get("looks", {}) as Dictionary):
+			var item := String(args["looks"][slot])
+			if PLAYER_SLOTS.has(slot) and _economy.owns_cosmetic(item):
+				ctx.looks[slot] = item
+		_apply_looks()
+		Net.send_event("joined", { "id": id, "name": ctx.name })
+		for other: PlayerCtx in _players.values():
+			Net.send_event("looks", { "id": other.id, "looks": other.looks if other.id != 1 else {} })
+		_items_dirty = true
+		_econ_dirty = true
+		_announce_others("%s spielt jetzt mit." % ctx.name, id)
+		Net.send_event("msg", { "t": "Willkommen! Gemeinsame Kasse, gemeinsame Ports – Tab öffnet das Tablet." }, id)
+		return
+	var ctx: PlayerCtx = _players.get(id)
+	if ctx:
+		_do_intent(ctx, kind, args)
+
+
+# ---- Host: Zustand verschicken ----
+
+func _net_tick(delta: float) -> void:
+	if not Net.is_online():
+		return
+	_pstate_t -= delta
+	if _pstate_t <= 0.0:
+		_pstate_t = 0.05
+		var st := _local_player.net_state()
+		st.append(_me.vacuum_want)
+		Net.send_player_state(st)
+	if not Net.is_host() or Net.peers.size() < 2:
+		return
+	_net_t -= delta
+	if _net_t > 0.0:
+		return
+	_net_t = 0.1
+	Net.send_snapshot(_snapshot_data())
+	if _items_dirty:
+		_items_dirty = false
+		Net.send_event("items", { "list": _items_list() })
+	if _econ_dirty:
+		_econ_dirty = false
+		Net.send_event("econ", _economy.state.to_dict())
+
+
+func _snapshot_data() -> Dictionary:
+	var reels := []
+	var hooked := []
+	for r: ReelData in _system.reels.values():
+		reels.append([r.id, int(r.kind), r.position.x, r.position.y, r.position.z, r.owner_id, r.cable_id,
+			r.carrier_id if r.carried else 0])
+		var c := _system.cable_on(r)
+		if c:
+			hooked.append([c.id, r.id, c.pulled_m, c.knots_solved, c.knot_presses, c.reversed])
+	var drones := []
+	for d: Dictionary in _tools.drones:
+		var p: Vector3 = d["pos"]
+		drones.append([p.x, p.y, p.z, String(d["state"])])
+	var wagon := []
+	if _wagon:
+		wagon = [_wagon.position.x, _wagon.position.y, _wagon.position.z, _wagon.yaw, _wagon.parked]
+		for slot in _wagon.slots:
+			wagon.append(slot.id)
+	return { "reels": reels, "hooked": hooked, "drones": drones, "wagon": wagon,
+		"money": _economy.state.money, "earned": _economy.state.total_earned, "snooze": _economy.state.snooze_cooldown,
+		"cord": [int(_cord.phase), _cord.time_left], "done": _done_count }
+
+
+## Knäuel: zuerst die Taschen (in ihrer Reihenfolge), dann der Rest
+func _items_list() -> Array:
+	var out := []
+	var seen := {}
+	for ctx: PlayerCtx in _players.values():
+		for item in ctx.bag:
+			out.append([item.id, item.port_id, item.position.x, item.position.y, item.position.z, ctx.id])
+			seen[item.id] = true
+	for item: CoilItem in _items.values():
+		if not seen.has(item.id):
+			out.append([item.id, item.port_id, item.position.x, item.position.y, item.position.z, item.carried_by])
+	return out
+
+
+# ---- Client: Zustand übernehmen ----
+
+func net_snapshot(d: Dictionary) -> void:
+	if _authority:
+		return
+	_replaying = true
+	var now := Time.get_ticks_msec() / 1000.0
+	# Aufwickler: anlegen, verschieben, entfernen
+	var seen := {}
+	for ctx: PlayerCtx in _players.values():
+		if ctx != _me:
+			ctx.carried_reel = null
+	for e: Array in d.get("reels", []):
+		var id := int(e[0])
+		var kind := int(e[1]) as ReelData.Kind
+		var owner := int(e[5])
+		var pos := Vector3(e[2], e[3], e[4])
+		seen[id] = true
+		var r: ReelData = _system.reels.get(id)
+		if r == null:
+			if kind == ReelData.Kind.ARM and owner == _me.id:
+				_system.remove_reel(_me.arm_reel.id)
+				r = ReelData.new(id, kind)
+				r.owner_id = owner
+				_system.add_reel(r)
+				_me.arm_reel = r
+			else:
+				r = ReelData.new(id, kind, pos)
+				r.owner_id = owner
+				if kind in [ReelData.Kind.HAND, ReelData.Kind.MOTOR, ReelData.Kind.WINCH, ReelData.Kind.WAGON]:
+					_add_reel(r)
+				else:
+					_system.add_reel(r)
+		if kind == ReelData.Kind.ARM and owner != _me.id and _players.has(owner):
+			(_players[owner] as PlayerCtx).arm_reel = r
+		if kind == ReelData.Kind.VACUUM and owner == _me.id and not _me.vacuum_reels.has(r):
+			_me.vacuum_reels.append(r)
+		var carrier := int(e[7])
+		if r.carried != (carrier != 0) and _reel_views.has(r.id):
+			_reel_views[r.id].set_carried(carrier != 0)
+		r.carried = carrier != 0
+		r.carrier_id = carrier
+		if r.carried and _players.has(carrier):
+			(_players[carrier] as PlayerCtx).carried_reel = r
+		var local := kind == ReelData.Kind.ARM or (kind == ReelData.Kind.VACUUM and owner == _me.id) or r.carried \
+			or kind == ReelData.Kind.WAGON
+		if not local:
+			r.position = pos
+			if _reel_views.has(r.id):
+				_reel_views[r.id].global_position = pos
+	_me.carried_reel = null
+	for e: Array in d.get("reels", []):
+		if int(e[7]) == _me.id:
+			_me.carried_reel = _system.reels.get(int(e[0]))
+	for id: int in _system.reels.keys():
+		if not seen.has(id) and id != _me.arm_reel.id:
+			var r: ReelData = _system.reels[id]
+			if not r.is_free():
+				_system.release(r)
+			_system.remove_reel(id)
+			_me.vacuum_reels.erase(r)
+			if _reel_views.has(id):
+				_reel_views[id].queue_free()
+				_reel_views.erase(id)
+	# Eingehängte Kabel
+	var desired := {}
+	for e: Array in d.get("hooked", []):
+		var cid := int(e[0])
+		desired[cid] = true
+		var c: CableData = _system.cables.get(cid)
+		var reel: ReelData = _system.reels.get(int(e[1]))
+		if c == null or reel == null:
+			continue
+		if c.state != CableData.State.HOOKED and c.reversed != bool(e[5]):
+			c.reverse()
+		_system.force_hook(c, reel)
+		c.pulled_m = float(e[2])
+		c.knots_solved = int(e[3])
+		c.knot_presses = int(e[4])
+		if c.is_stuck():
+			_add_knot_marker(c)
+		else:
+			_remove_knot_marker(cid)
+		_missing_since.erase(cid)
+	for c in _system.hooked_cables():
+		if desired.has(c.id):
+			continue
+		var since := float(_missing_since.get(c.id, now))
+		_missing_since[c.id] = since
+		if now - since > 0.6:
+			_missing_since.erase(c.id)
+			var reel := _system.reel_of(c)
+			if reel:
+				_system.release(reel)
+	# Wagen
+	var w: Array = d.get("wagon", [])
+	if not w.is_empty():
+		if _wagon == null:
+			_spawn_wagon({ "slots": w.slice(5), "position": [w[0], w[1], w[2]], "yaw": w[3], "parked": w[4] })
+		_wagon.position = Vector3(w[0], w[1], w[2])
+		_wagon.yaw = float(w[3])
+		_wagon.parked = bool(w[4])
+	# Drohnen
+	var dl: Array = d.get("drones", [])
+	while _net_drones.size() < dl.size():
+		var v := DroneView.new()
+		add_child(v)
+		_net_drones.append(v)
+	for i in dl.size():
+		var e: Array = dl[i]
+		_net_drones[i].global_position = _net_drones[i].global_position.lerp(Vector3(e[0], e[1], e[2]), 0.6) \
+			if _net_drones[i].global_position != Vector3.ZERO else Vector3(e[0], e[1], e[2])
+		var st := String(e[3])
+		_net_drones[i].set_mode("work" if st == "pull" else ("deliver" if st == "deliver" else "fly"))
+	# Geld, C.O.R.D.
+	_economy.state.money = float(d.get("money", 0.0))
+	_economy.state.total_earned = float(d.get("earned", 0.0))
+	_economy.state.snooze_cooldown = float(d.get("snooze", 0.0))
+	_done_count = int(d.get("done", _done_count))
+	var cord: Array = d.get("cord", [0, 0.0])
+	if int(cord[0]) == CordLogic.Phase.ASKING:
+		if not _cord_prompt.visible:
+			_cord_view.set_asking(true, "Ersatz bestellen?")
+			_cord_prompt.show_question(float(cord[1]))
+		_cord_prompt.update_time(float(cord[1]))
+	elif _cord_prompt.visible:
+		_cord_view.set_asking(false)
+		_cord_prompt.visible = false
+	_replaying = false
+
+
+func net_event(kind: String, a: Dictionary) -> void:
+	match kind:
+		"msg":
+			_message = String(a.get("t", ""))
+			_message_t = 4.0
+		"float":
+			FloatText.spawn(self, a["p"], String(a["t"]), a.get("c", Color(1.0, 0.9, 0.3)))
+		"fx":
+			CelebrationFx.spawn(self, a["p"], String(a["k"]), float(a.get("a", 1.0)))
+		"elevator":
+			_ride_elevator(int(a["from"]), bool(a["holding"]))
+		"ride":
+			if _ziplines.has(a["line"]):
+				_start_ride(_ziplines[a["line"]], int(a["station"]))
+		"done":
+			_client_cable_done(a)
+		"items":
+			_client_items(a.get("list", []))
+		"econ":
+			_economy.state.load_dict(a)
+			_apply_upgrades()
+			_room.refresh(_economy.state)
+			_refresh_ziplines()
+			_refresh_finale(false)
+			_apply_looks()
+			_economy.money_changed.emit(_economy.state.money)
+		"zone":
+			var ports: Array[int] = []
+			for p in a.get("ports", []):
+				ports.append(int(p))
+			_spawn_zone(int(a["seed"]), ports, int(a["first"]))
+		"order":
+			_add_order_heap(HeapData.from_dict(a["heap"]), int(a["first"]), true)
+		"cord":
+			match String(a.get("k", "")):
+				"declined":
+					_cord_view.react("declined")
+				"placed":
+					_cord_view.react("placed")
+		"finale":
+			_show_finale_screen()
+		"looks":
+			var id := int(a["id"])
+			var looks: Dictionary = a.get("looks", {})
+			if id == _me.id:
+				_me.looks = looks.duplicate()
+				Settings.looks = looks.duplicate()
+				Settings.save_settings()
+			elif _players.has(id):
+				(_players[id] as PlayerCtx).looks = looks.duplicate()
+			_apply_looks()
+			_tablet.refresh()
+		"joined":
+			if int(a["id"]) != _me.id:
+				_add_player(int(a["id"]), String(a["name"]))
+		"left":
+			_remove_player(int(a["id"]))
+			_items_dirty = false
+		"blockers":
+			_update_blockers()
+
+
+## Client: ein Kabel ist beim Host fertig geworden
+func _client_cable_done(a: Dictionary) -> void:
+	var cid := int(a["id"])
+	_removed_ids[cid] = true
+	_done_count += 1
+	var c: CableData = _system.cables.get(cid)
+	var reel: ReelData = _system.reels.get(int(a.get("reel", -1)))
+	if reel and reel.cable_id == cid:
+		reel.cable_id = -1
+	_remove_knot_marker(cid)
+	_missing_since.erase(cid)
+	var view: CableView = _views.get(cid)
+	if view:
+		_views.erase(cid)
+		if bool(a.get("imp", false)) or c == null:
+			view.queue_free()
+		else:
+			if reel and reel.kind == ReelData.Kind.ARM and _players.has(reel.owner_id):
+				view.show_on_arm((_players[reel.owner_id] as PlayerCtx).node.arm_transform())
+			elif reel:
+				view.show_on_reel(reel.position, ReelView.scale_of(reel))
+			_fading.append(view)
+	_batcher.set_hidden(cid, true)
+	if c:
+		_system.remove_cable(cid)
+	var at := Vector3(a.get("p", Vector3.ZERO))
+	if float(a.get("pay", 0.0)) > 0.0 and at.distance_to(_local_player.global_position) < 30.0:
+		FloatText.spawn(self, at, "+" + Economy.format_money(float(a["pay"])))
+	if at.distance_to(_local_player.global_position) < 40.0:
+		CelebrationFx.spawn(self, at, _look_fx(), 0.5)
+	var unit := _unit_of(cid)
+	if unit and unit.barrier:
+		_update_blockers()
+
+
+## Client: Knäuel so, wie der Host sie meldet (am Boden, in Taschen, an Drohnen)
+func _client_items(list: Array) -> void:
+	var seen := {}
+	for ctx: PlayerCtx in _players.values():
+		ctx.bag.clear()
+	for e: Array in list:
+		var id := int(e[0])
+		seen[id] = true
+		var item: CoilItem = _items.get(id)
+		if item == null:
+			item = CoilItem.new()
+			item.id = id
+			item.port_id = int(e[1])
+			_items[id] = item
+			var iv := CoilItemView.new()
+			add_child(iv)
+			iv.setup(item)
+			_item_views[id] = iv
+		item.position = Vector3(e[2], e[3], e[4])
+		item.carried_by = int(e[5])
+		var view: CoilItemView = _item_views[id]
+		view.visible = item.carried_by > -100
+		if _players.has(item.carried_by):
+			(_players[item.carried_by] as PlayerCtx).bag.append(item)
+			view.set_carried(true)
+		else:
+			view.set_carried(false)
+			view.lie_at(item.position)
+	for id: int in _items.keys():
+		if not seen.has(id):
+			_items.erase(id)
+			if _item_views.has(id):
+				_item_views[id].queue_free()
+				_item_views.erase(id)
+	_room.refresh(_economy.state)

@@ -85,17 +85,32 @@ var debug_speed := 0.0
 var debug_strain := false
 var debug_no_look := false
 
+## Mitspieler-Figur: keine Eingabe, keine Kamera, keine Physik; Lage und Haltung kommen aus dem Netz
+var remote := false
+var _net_pos := Vector3.ZERO
+var _net_vel := Vector3.ZERO
+var _net_body_yaw := 0.0
+var _net_t := 0.0
+
 
 func _ready() -> void:
 	_spring.add_excluded_object(get_rid())
 	if not _apply_rig():
 		_apply_model()
 	_update_arm_pose()
+	if remote:
+		camera.current = false
+		camera.queue_free()
+		collision_layer = 0
+		collision_mask = 0
+		input_enabled = false
+		_net_pos = global_position
+		return
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not input_enabled:
+	if not input_enabled or remote:
 		return
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		# Erster Klick fängt die Maus wieder ein und zählt nicht als Zug
@@ -107,9 +122,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		return
 	if event is InputEventMouseMotion:
-		var sens: float = Balancing.player["mouse_sensitivity"]
+		var sens: float = float(Balancing.player["mouse_sensitivity"]) * Settings.mouse_factor
 		_yaw.rotation.y -= event.relative.x * sens
-		_pitch.rotation.x = clampf(_pitch.rotation.x - event.relative.y * sens, deg_to_rad(-75), deg_to_rad(35))
+		var dy: float = -event.relative.y if Settings.invert_y else event.relative.y
+		_pitch.rotation.x = clampf(_pitch.rotation.x - dy * sens, deg_to_rad(-75), deg_to_rad(35))
 	elif event.is_action_pressed("jump", false):
 		jump()
 	elif event.is_action_pressed("pull", false):
@@ -126,6 +142,9 @@ var riding := false
 
 
 func _physics_process(delta: float) -> void:
+	if remote:
+		_remote_step(delta)
+		return
 	if riding:
 		at_tether_limit = false
 		_animate_walk(delta, 0.0, 1.0)
@@ -188,6 +207,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if remote:
+		return
 	# Dauerzug: gehaltene Zieh-Taste löst regelmäßig Züge aus
 	var holding_key := input_enabled and auto_pull_rate > 0.0 \
 		and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and Input.is_action_pressed("pull")
@@ -201,6 +222,57 @@ func _process(delta: float) -> void:
 		_auto_pull_t -= interval
 		pull_pressed.emit()
 		_wiggle_arm()
+
+
+# ---------------------------------------------------------------- Mehrspieler
+
+## Zustand der eigenen Figur fürs Netz: Lage, Tempo, Blick, Haltung
+func net_state() -> Array:
+	var flags := (1 if riding else 0) | (2 if holding else 0) | (4 if carrying else 0) | (8 if tool_hold else 0) \
+		| (16 if at_tether_limit else 0) | (32 if _crank_t > 0.0 else 0)
+	return [global_position.x, global_position.y, global_position.z, velocity.x, velocity.y, velocity.z,
+		_body.rotation.y, _yaw.rotation.y, _pitch.rotation.x, flags, crank_point.x, crank_point.y, crank_point.z]
+
+
+## Mitspieler: neuen Zustand übernehmen (gleitet in _remote_step dorthin)
+func apply_net_state(st: Array) -> void:
+	if st.size() < 10:
+		return
+	_net_pos = Vector3(st[0], st[1], st[2])
+	_net_vel = Vector3(st[3], st[4], st[5])
+	_net_body_yaw = float(st[6])
+	_yaw.rotation.y = float(st[7])
+	_pitch.rotation.x = float(st[8])
+	var flags := int(st[9])
+	riding = flags & 1 != 0
+	holding = flags & 2 != 0
+	carrying = flags & 4 != 0
+	tool_hold = flags & 8 != 0
+	at_tether_limit = flags & 16 != 0
+	if flags & 32 != 0 and st.size() >= 13:
+		crank_point = Vector3(st[10], st[11], st[12])
+		_crank_t = 0.3
+		_crank_center = crank_point
+	_net_t = 0.0
+	if global_position.distance_to(_net_pos) > 12.0:
+		global_position = _net_pos  # zu weit weg (z. B. Aufzug): springen statt gleiten
+
+
+## Wo die Figur gerade hinsoll (Host: Position eines Mitspielers für Abstands-Prüfungen)
+func net_position() -> Vector3:
+	return _net_pos
+
+
+func _remote_step(delta: float) -> void:
+	_net_t += delta
+	# Kurz vorausrechnen, dann weich hinterher
+	var target := _net_pos + _net_vel * minf(_net_t, 0.15)
+	global_position = global_position.lerp(target, 1.0 - exp(-14.0 * delta))
+	_body.rotation.y = lerp_angle(_body.rotation.y, _net_body_yaw, 1.0 - exp(-14.0 * delta))
+	var ground_speed := Vector2(_net_vel.x, _net_vel.z).length()
+	if Vector3(_net_vel.x, 0.0, _net_vel.z).dot(facing()) < -0.3 * ground_speed:
+		ground_speed = -ground_speed
+	_animate_walk(delta, 0.0 if riding else ground_speed, float(Balancing.player["walk_speed_m_per_s"]))
 
 
 ## Sprung auslösen (wie ein Druck auf die Sprungtaste; auch für Tests)
@@ -298,7 +370,7 @@ func _update_animator(delta: float, speed: float) -> void:
 	_anim.walk_speed = float(p["walk_speed_m_per_s"]) * speed_factor
 	_anim.sprint_speed = float(p["sprint_speed_m_per_s"]) * speed_factor
 	_anim.speed = speed
-	_anim.on_floor = is_on_floor() or riding
+	_anim.on_floor = is_on_floor() or riding or remote
 	var yaw := _body.rotation.y
 	_anim.turn_rate = wrapf(yaw - _last_body_yaw, -PI, PI) / maxf(delta, 1e-4)
 	_last_body_yaw = yaw
@@ -403,6 +475,46 @@ func _apply_rig() -> bool:
 	_last_body_yaw = _body.rotation.y
 	_anim.update(0.0)
 	return true
+
+
+## Kosmetik: Farben für "hoodie", "pants", "headphones", "shoes" (fehlender Schlüssel = Grundfarbe).
+## Nur beim Tripo-Modell; ohne Farben bekommt die Figur wieder ihr eigenes Material.
+const OUTFIT_SHADER := "res://assets/shaders/outfit.gdshader"
+var _outfit_mats: Array[ShaderMaterial] = []
+
+
+func set_outfit(colors: Dictionary) -> void:
+	if _rig == null:
+		return
+	var meshes := _rig.find_children("*", "MeshInstance3D", true, false)
+	if colors.is_empty():
+		for mi: MeshInstance3D in meshes:
+			for i in mi.mesh.get_surface_count():
+				mi.set_surface_override_material(i, null)
+		_outfit_mats.clear()
+		return
+	if _outfit_mats.is_empty():
+		var shader := load(OUTFIT_SHADER) as Shader
+		for mi: MeshInstance3D in meshes:
+			var box := mi.mesh.get_aabb()
+			for i in mi.mesh.get_surface_count():
+				var src := mi.get_active_material(i) as BaseMaterial3D
+				var m := ShaderMaterial.new()
+				m.shader = shader
+				if src:
+					m.set_shader_parameter("albedo_tex", src.albedo_texture)
+					if src.normal_enabled and src.normal_texture:
+						m.set_shader_parameter("normal_tex", src.normal_texture)
+						m.set_shader_parameter("use_normal", true)
+					m.set_shader_parameter("roughness", src.roughness)
+				m.set_shader_parameter("y_min", box.position.y)
+				m.set_shader_parameter("y_max", box.end.y)
+				mi.set_surface_override_material(i, m)
+				_outfit_mats.append(m)
+	for m in _outfit_mats:
+		for part in ["hoodie", "pants", "headphones", "shoes"]:
+			var c: Color = colors.get(part, Color(0, 0, 0, 0))
+			m.set_shader_parameter(part + "_color", c)
 
 
 func _apply_model() -> void:

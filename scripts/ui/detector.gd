@@ -15,7 +15,7 @@ var _t := 0.0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	offset_left = -230
+	offset_left = -300
 	offset_right = -20
 	offset_top = -190
 	offset_bottom = -90
@@ -44,7 +44,9 @@ func _draw() -> void:
 	var hot := Color(1.0, 0.25, 0.2)
 	var col := cold.lerp(warm, clampf(s * 2.0, 0.0, 1.0)).lerp(hot, clampf(s * 2.0 - 1.0, 0.0, 1.0))
 	var pulse := 0.5 + 0.5 * sin(_t * TAU)
-	draw_circle(c, 34.0, Color(0, 0, 0, 0.55))
+	draw_circle(c, 40.0, Color(0.05, 0.08, 0.15, 0.3))  # Schatten
+	draw_circle(c + Vector2(0, -3), 37.0, UiTheme.PAPER)
+	draw_circle(c, 34.0, Color(0.1, 0.13, 0.22, 0.85))
 	draw_circle(c, 14.0 + 16.0 * pulse * (0.3 + 0.7 * s), Color(col, 0.35 + 0.4 * s))
 	draw_circle(c, 10.0, col)
 	draw_arc(c, 34.0, 0.0, TAU, 40, Color(col, 0.9), 3.0)
@@ -58,12 +60,12 @@ func _draw() -> void:
 	var text := "Detektor: " + word
 	if show_arrow and has_target:
 		text += "\n%d m" % roundi(distance)
-	var font := get_theme_default_font()
+	var font := UiTheme.font()
 	var lines := text.split("\n")
 	for i in lines.size():
-		var at := Vector2(92, 44 + i * 22)
-		draw_string_outline(font, at, lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0, 0, 0, 0.8))
-		draw_string(font, at, lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col.lightened(0.3))
+		var at := Vector2(94, 46 + i * 24)
+		draw_string_outline(font, at, lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 7, Color(0.08, 0.1, 0.18))
+		draw_string(font, at, lines[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col.lightened(0.35))
 	if show_arrow and has_target and camera:
 		# Pfeil um den Kreis herum, in Richtung des Kabels (relativ zur Blickrichtung)
 		var to := target - camera.global_position

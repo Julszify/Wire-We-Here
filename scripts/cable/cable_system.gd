@@ -21,6 +21,8 @@ var press_multiplier: float = 1.0
 var motor_multiplier: float = 1.0
 ## Dienst-Bonus: so viele Drücke weniger (negativ) oder mehr pro Knoten
 var untie_delta: int = 0
+## Nur der Host (bzw. Einzelspieler) zieht und löst Knoten; Clients übernehmen den Zustand vom Host
+var authority := true
 
 
 ## Raster der Kabelenden (Zelle -> Kabel), damit das Anvisieren bei zehntausenden Kabeln schnell bleibt
@@ -196,7 +198,30 @@ func pull(reel: ReelData, meters: float) -> float:
 	return applied
 
 
+## Client: Kabel so an einen Aufwickler hängen, wie der Host es meldet (auch von einem anderen weg)
+func force_hook(cable: CableData, reel: ReelData) -> void:
+	if cable.state == CableData.State.HOOKED and cable.reel_id == reel.id and reel.cable_id == cable.id:
+		return
+	var old := reel_of(cable)
+	if old and old.cable_id == cable.id:
+		old.cable_id = -1
+	var other := cable_on(reel)
+	if other and other != cable:
+		other.reel_id = -1
+		other.state = CableData.State.HEAP
+	cable.state = CableData.State.HOOKED
+	cable.reel_id = reel.id
+	reel.cable_id = cable.id
+	cable_hooked.emit(cable, reel)
+
+
+func remove_reel(reel_id: int) -> void:
+	reels.erase(reel_id)
+
+
 func _process(delta: float) -> void:
+	if not authority:
+		return
 	for reel: ReelData in reels.values():
 		if reel.is_free():
 			continue

@@ -22,13 +22,12 @@ func setup(cables_done: int, earned: float) -> void:
 	var title := Label.new()
 	title.text = "Die Cloud ist wieder da."
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
-	title.add_theme_color_override("font_color", Color(0.6, 0.95, 1.0))
+	UiTheme.style_hud_label(title, 46, Color(0.6, 0.95, 1.0))
 	box.add_child(title)
 	var text := Label.new()
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	text.add_theme_font_size_override("font_size", 20)
+	UiTheme.style_label(text, 20, Color(0.92, 0.95, 1.0), false)
 	text.text = ("Mit einem letzten Klick geht C.O.R.D.s Kern aus. Das rote Leuchten erlischt, irgendwo unten in der Stadt " +
 		"verstummt ein Lieferwagen mitten in der Bestellung.\n\n" +
 		"Alle 2000 Ports sind belegt, alle 218 Dienste laufen. Die Wolkig AG ist wieder online – und die drei Chefs " +
@@ -37,20 +36,20 @@ func setup(cables_done: int, earned: float) -> void:
 	box.add_child(text)
 	var stats := Label.new()
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stats.add_theme_font_size_override("font_size", 18)
-	stats.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
+	UiTheme.style_label(stats, 19, UiTheme.YELLOW)
 	stats.text = "Aufgerollte Kabel: %d   ·   Verdient: %s" % [cables_done, Economy.format_money(earned)]
 	box.add_child(stats)
 	var hint := Label.new()
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 16)
-	hint.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
-	hint.text = "Danke fürs Spielen! Die Stadt bleibt offen – es liegen noch genug Kabel herum."
+	UiTheme.style_label(hint, 17, Color(0.78, 0.82, 0.9), false)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = "Danke fürs Spielen! Die Stadt bleibt offen – es liegen noch genug Kabel herum.\n" + \
+		"Oder im Tablet unter „Auftrag“ einen neuen Auftrag annehmen: alles von vorn, mit Ruf als dauerhaftem Bonus."
 	box.add_child(hint)
 	var button := Button.new()
 	button.text = "Weiterspielen"
 	button.custom_minimum_size = Vector2(240, 48)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	button.add_theme_font_size_override("font_size", 20)
+	UiTheme.style_button(button, UiTheme.GREEN, UiTheme.GREEN_DARK, Color.WHITE, 20)
 	button.pressed.connect(func() -> void: closed.emit())
 	box.add_child(button)

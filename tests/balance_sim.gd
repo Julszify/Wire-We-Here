@@ -55,6 +55,14 @@ func _ready() -> void:
 	rng.seed = 1
 	eco = Economy.new()
 	add_child(eco)
+	# Zweiter Auftrag durchrechnen: -- --ruf=<Punkte> [--auftrag=<Nr>] (Nr. 2 = erster neuer Auftrag)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--ruf="):
+			eco.state.reputation = int(arg.get_slice("=", 1))
+			eco.state.prestige_count = maxi(eco.state.prestige_count, 1)
+		elif arg.begins_with("--auftrag="):
+			eco.state.prestige_count = int(arg.get_slice("=", 1)) - 1
+	eco.refresh_bonuses()
 	rack = ServiceRack.new(eco.state)
 	rack.service_activated.connect(_on_service)
 	next_ask = float(Balancing.cord["first_ask_s"])
@@ -393,7 +401,7 @@ func _on_service(service: int, service_name: String, unlocks: String) -> void:
 func _shop() -> void:
 	while true:
 		var best := ""
-		for id: String in Balancing.tablet_order:
+		for id: String in Balancing.tablet_order + Balancing.room_order:
 			if eco.can_buy(id) and (best == "" or eco.cost(id) < eco.cost(best)):
 				best = id
 		if best == "":

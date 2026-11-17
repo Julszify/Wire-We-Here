@@ -7,14 +7,15 @@ extends Node
 
 var world: Node  # world.gd (Zugriff auf System, Spieler, Knäuel, Serverraum)
 
-var vacuum_reels: Array[ReelData] = []
-var vacuum_active := false
+## Nur der Host (bzw. Einzelspieler) entscheidet, was eingehängt wird; Clients zeigen nur an
+var authority := true
 ## Nur für Tests (--vacuum): Sauger an, als würde Linksklick gehalten
 var force_vacuum := false
 var _vacuum_t := 0.0
-## Dauerbetrieb (Upgrade vacuum_auto): Linksklick schaltet an und aus
+## Dauerbetrieb (Upgrade vacuum_auto): Linksklick schaltet an und aus (eigene Figur)
 var vacuum_on := false
-var _vacuum_fx: MeshInstance3D
+## Sauger-Kegel je Spieler (Peer-ID -> MeshInstance3D)
+var _cones: Dictionary = {}
 
 ## Drohnen: { reel, view, pos, state, target, tail, goal, cargo, think_t }
 var drones: Array[Dictionary] = []
@@ -28,8 +29,20 @@ var _claimed_items: Dictionary = {}  # Knäuel-ID -> true
 var _next_tool_reel_id := 900_000
 
 
-func _ready() -> void:
-	_vacuum_fx = MeshInstance3D.new()
+## Sauger-Plätze der eigenen Figur
+var vacuum_reels: Array[ReelData]:
+	get:
+		return world._me.vacuum_reels if world and world._me else ([] as Array[ReelData])
+## Saugt die eigene Figur gerade?
+var vacuum_active: bool:
+	get:
+		return world._me.vacuum_active if world and world._me else false
+
+
+func _cone(id: int) -> MeshInstance3D:
+	if _cones.has(id):
+		return _cones[id]
+	var fx := MeshInstance3D.new()
 	var cone := CylinderMesh.new()
 	cone.top_radius = 0.12
 	cone.bottom_radius = 1.0
@@ -37,35 +50,47 @@ func _ready() -> void:
 	cone.radial_segments = 20
 	cone.cap_top = false
 	cone.cap_bottom = false
-	_vacuum_fx.mesh = cone
+	fx.mesh = cone
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(0.45, 0.95, 1.0, 0.16)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_vacuum_fx.material_override = m
-	_vacuum_fx.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_vacuum_fx.visible = false
-	add_child(_vacuum_fx)
+	fx.material_override = m
+	fx.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fx.visible = false
+	add_child(fx)
+	_cones[id] = fx
+	return fx
+
+
+## Spieler verlässt das Spiel: Kegel weg (die Sauger-Plätze räumt world.gd ab)
+func forget_player(id: int) -> void:
+	if _cones.has(id):
+		_cones[id].queue_free()
+		_cones.erase(id)
 
 
 # ---------------------------------------------------------------- Upgrades
 
 ## Aufwickler und Drohnen passend zu den gekauften Stufen anlegen; Tempo-Faktoren setzen
 func sync(eco: Economy) -> void:
+	if not authority:
+		return
 	var system: CableSystem = world._system
 	var motor_bonus := eco.bonus("motor")
-	# Kabelsauger: so viele Plätze wie Düse erlaubt
+	# Kabelsauger: jede Figur hat so viele Plätze, wie die Düse erlaubt
 	if eco.state.level("vacuum") > 0:
-		var cfg: Dictionary = Balancing.vacuum
 		var want := vacuum_slots(eco)
-		while vacuum_reels.size() < want:
-			var r := ReelData.new(_next_tool_reel_id, ReelData.Kind.VACUUM)
-			_next_tool_reel_id += 1
-			system.add_reel(r)
-			vacuum_reels.append(r)
-		for r in vacuum_reels:
-			r.speed_factor = eco.factor("vacuum_power") * motor_bonus
+		for ctx: PlayerCtx in (world._players as Dictionary).values():
+			while ctx.vacuum_reels.size() < want:
+				var r := ReelData.new(_next_tool_reel_id, ReelData.Kind.VACUUM)
+				r.owner_id = ctx.id
+				_next_tool_reel_id += 1
+				system.add_reel(r)
+				ctx.vacuum_reels.append(r)
+			for r in ctx.vacuum_reels:
+				r.speed_factor = eco.factor("vacuum_power") * motor_bonus
 	for r: ReelData in system.reels.values():
 		if r.kind == ReelData.Kind.WINCH:
 			r.speed_factor = eco.factor("winch_speed") * motor_bonus
@@ -109,7 +134,16 @@ func stream_points() -> Array[Vector3]:
 # ---------------------------------------------------------------- jedes Bild
 
 func update(delta: float, eco: Economy) -> void:
-	_update_vacuum(delta, eco)
+	_update_local_vacuum(eco)
+	for ctx: PlayerCtx in (world._players as Dictionary).values():
+		_update_vacuum(ctx, eco)
+	if not authority:
+		return
+	_vacuum_t -= delta
+	if _vacuum_t <= 0.0:
+		_vacuum_t = float(Balancing.vacuum.get("grab_interval_s", 0.12))
+		for ctx: PlayerCtx in (world._players as Dictionary).values():
+			_vacuum_grab(ctx, eco)
 	_winch_t -= delta
 	if _winch_t <= 0.0:
 		_winch_t = float(Balancing.winch.get("grab_interval_s", 0.4))
@@ -118,44 +152,63 @@ func update(delta: float, eco: Economy) -> void:
 		_update_drone(drones[i], i, delta, eco)
 
 
-## Kabelsauger: Linksklick halten bei freiem Arm. Alle Plätze folgen der Düse vor der Figur.
-func _update_vacuum(delta: float, eco: Economy) -> void:
-	var player: Player = world._player
-	var nozzle := player.global_position + player.facing() * 0.75 + Vector3(0, 1.05, 0)
-	for r in vacuum_reels:
-		r.position = nozzle
+## Eigene Figur: will sie saugen? (Linksklick halten bzw. Dauerbetrieb an/aus)
+func _update_local_vacuum(eco: Economy) -> void:
+	var me: PlayerCtx = world._me
+	var player: Player = me.node
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	var free: bool = not vacuum_reels.is_empty() and player.input_enabled and world._arm_reel.is_free() \
-		and world._carried_reel == null and (world._ride as Dictionary).is_empty() and not world._crank_in_reach()
-	var holding_click := force_vacuum
+	var has_vacuum := eco.state.level("vacuum") > 0
+	var free: bool = has_vacuum and player.input_enabled and _ctx_free(me) and not world._crank_in_reach()
+	var want := force_vacuum
 	if eco.state.level("vacuum_auto") > 0:
 		if free and captured and Input.is_action_just_pressed("pull"):
 			vacuum_on = not vacuum_on
 			world._show_message("Kabelsauger läuft." if vacuum_on else "Kabelsauger aus.")
-		holding_click = holding_click or vacuum_on
+		want = want or vacuum_on
 	else:
 		vacuum_on = false
-		holding_click = holding_click or (captured and Input.is_action_pressed("pull"))
-	vacuum_active = free and holding_click
-	player.tool_hold = vacuum_active
-	var radius := vacuum_radius(eco)
-	var center := player.global_position + player.facing() * float(Balancing.vacuum.get("reach_ahead_m", 2.2))
-	_vacuum_fx.visible = vacuum_active
-	if vacuum_active:
+		want = want or (captured and Input.is_action_pressed("pull"))
+	me.vacuum_want = free and want
+
+
+## Arm frei, nichts getragen, nicht an der Seilbahn
+static func _ctx_free(ctx: PlayerCtx) -> bool:
+	return ctx.arm_reel != null and ctx.arm_reel.is_free() and ctx.carried_reel == null and ctx.ride.is_empty() \
+		and not ctx.node.riding
+
+
+## Sauger einer Figur: Plätze folgen der Düse, Kegel zeigen, solange gesaugt wird
+func _update_vacuum(ctx: PlayerCtx, eco: Economy) -> void:
+	var player: Player = ctx.node
+	if player == null:
+		return
+	var nozzle := player.global_position + player.facing() * 0.75 + Vector3(0, 1.05, 0)
+	for r in ctx.vacuum_reels:
+		r.position = nozzle
+	ctx.vacuum_active = ctx.vacuum_want and eco.state.level("vacuum") > 0 and _ctx_free(ctx)
+	player.tool_hold = ctx.vacuum_active
+	var fx := _cone(ctx.id)
+	fx.visible = ctx.vacuum_active
+	if ctx.vacuum_active:
 		# Kegel von der Düse zur Saugmitte, leicht pulsierend
+		var radius := vacuum_radius(eco)
+		var center := player.global_position + player.facing() * float(Balancing.vacuum.get("reach_ahead_m", 2.2))
 		var to := center + Vector3(0, 0.2, 0) - nozzle
 		var len := to.length()
 		var basis := Basis.looking_at(to.normalized(), Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
 		var pulse := 1.0 + 0.06 * sin(Time.get_ticks_msec() / 60.0)
-		_vacuum_fx.global_transform = Transform3D(basis.scaled(Vector3(radius * 0.8 * pulse, len, radius * 0.8 * pulse)),
+		fx.global_transform = Transform3D(basis.scaled(Vector3(radius * 0.8 * pulse, len, radius * 0.8 * pulse)),
 			nozzle + to * 0.5)
-	if not vacuum_active:
+
+
+## Host: freie Sauger-Plätze greifen die nächsten Kabelenden vor der Figur
+func _vacuum_grab(ctx: PlayerCtx, eco: Economy) -> void:
+	if not ctx.vacuum_active:
 		return
-	_vacuum_t -= delta
-	if _vacuum_t > 0.0:
-		return
-	_vacuum_t = float(Balancing.vacuum.get("grab_interval_s", 0.12))
-	for r in vacuum_reels:
+	var player: Player = ctx.node
+	var radius := vacuum_radius(eco)
+	var center := player.global_position + player.facing() * float(Balancing.vacuum.get("reach_ahead_m", 2.2))
+	for r in ctx.vacuum_reels:
 		if not r.is_free():
 			continue
 		var pick := _nearest_end(center, radius, 2.5)
@@ -374,6 +427,7 @@ func _drone_arrive(d: Dictionary, _index: int) -> void:
 			var item: CoilItem = (world._items as Dictionary).get(iid)
 			if item and item.carried_by == -1:
 				item.carried_by = -100  # trägt eine Drohne (im Spielstand: liegt dort, wo die Drohne war)
+				world._items_dirty = true
 				(d["cargo"] as Array).append(item)
 				var iv: CoilItemView = world._item_views.get(iid)
 				if iv:

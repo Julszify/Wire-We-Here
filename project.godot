@@ -12,12 +12,14 @@ config_version=5
 
 config/name="Knot My Problem"
 config/description="Vertical Slice: Kabel ziehen, Knoten lösen, aufrollen."
-run/main_scene="res://scenes/world.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
 Balancing="*res://scripts/core/balancing.gd"
+Settings="*res://scripts/core/settings.gd"
+Net="*res://scripts/net/net.gd"
 
 [display]
 

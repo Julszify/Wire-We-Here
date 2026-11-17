@@ -18,7 +18,8 @@ Der Vertical Slice (`v0.1-vertical-slice`, Frage: **Macht Ziehen und Aufrollen S
 - **Hinterhof** der Wolkig AG als Tutorial-Zone mit ca. 525 Kabeln (`data/zone.json`), Serverraum und Ausstattung
 - **Stadt** (ca. 2 × 2 km, zehn Viertel) mit Gelände, Gebäuden im Spielzeug-Look und rund **195.000 Kabeln** (etwa 100 gewöhnliche je wichtigem); jedes Viertel hat einen Zaun und davor einen Kabelberg als Sperre
 - **Werkzeug-Kette:** per Hand um den Arm → Handkurbel → Motorrollen → Kabeltrommel-Wagen → Kabelsauger → Haufen-Winden → Abräum-Drohnen; Rollen und Winden lassen sich umstellen
-- **Knoten**, **Geld** pro Meter, **Tablet** (Tab) mit 15 Upgrades
+- **Knoten**, **Geld** pro Meter, **Tablet** (Tab) im Spielzeug-Look mit vier Reitern: Werkzeuge (29 Upgrades), Serverraum (Ausbau), Kosmetik, Auftrag
+- **Geld-Senken fürs späte Spiel:** Serverraum-Ausbau (fünf Linien, sichtbar im Raum, mit Boni), Kosmetik (Farben für Figur, C.O.R.D., Drohnen, Wagen; Effekte), **Neuer Auftrag** (Prestige nach dem Finale: alles zurück, Ruf als dauerhafter Bonus)
 - **Serverraum** mit zehn Schränken und 2000 Ports; wichtige Kabel werden zu Knäueln, die man in der Tasche sammelt und einsteckt; alle 218 Dienste haben eine Wirkung
 - **Spielfigur** (Tripo3D, Bewegungen per Code) und **C.O.R.D.** mit Bestellfalle (ohne „Nein“ fallen 100 Kabel vom Himmel)
 - **Bewegung:** laufen, rennen, springen, Seilbahn zur Basis, Wegweiser zum Serverraum
@@ -29,23 +30,26 @@ Der Vertical Slice (`v0.1-vertical-slice`, Frage: **Macht Ziehen und Aufrollen S
 
 - **Intro** beim neuen Spiel (`scripts/story/intro_scene.gd`): Stammtisch im „Goldenen Router“ (die drei Chefs bauen C.O.R.D. per Bierdeckel-Prompt), „Drei Monate später“ über den Kabelbergen am Turm, Anruf beim Admin („Knot my problem.“); überspringbar
 
-Noch nicht enthalten: Koop, Steam-Anbindung, Prestige, weitere Story-Szenen (Chefs in der Stadt, Party und Pointe im Finale), Sound. Die Architektur ist auf Koop vorbereitet (siehe unten).
+- **Startmenü** (`scenes/main_menu.tscn`, Hauptszene des Projekts): Weiterspielen, Neues Spiel, Mehrspieler, Einstellungen, Beenden; Hintergrund mit Kabelhaufen und C.O.R.D.
+- **Mehrspieler (Koop, 2–4)** über IP und Port (ENet): Host rechnet alles, Clients schicken Absichten; gemeinsame Kasse, Ports, Werkzeuge, Finale und neuer Auftrag
+
+Noch nicht enthalten: Steam-Anbindung (Lobbys, Einladungen), weitere Story-Szenen (Chefs in der Stadt, Party und Pointe im Finale), Sound.
 
 ## Nächste Schritte (Ideen, noch nicht entschieden)
 
 1. **Spieltest der neuen Werkzeuge und des Finales:** Laut Verlaufs-Rechnung dauert das ganze Spiel ca. 5–5,5 Stunden, ab etwa 3 Stunden ist alles gekauft. Die Sperren sind dann in unter einer Minute weg; die Zeit bestimmt das Finden wichtiger Kabel.
-2. **Geld-Senken für das späte Spiel:** Ab der Altstadt wächst das Geld in die Millionen (Kupferhändler und Dienst-Boni multiplizieren sich). Idee: Prestige, Ausbau des Serverraums, Kosmetik.
+2. **Geld-Senken prüfen:** Ausbau und Kosmetik binden zusammen ca. 100 Mio. €; im ersten Auftrag bleiben am Ende trotzdem ca. 260 Mio. € übrig. Der eigentliche Kreislauf ist der neue Auftrag (zweiter Durchgang mit 18 Ruf laut Verlaufs-Rechnung ca. 4 Stunden).
 3. **Story ausbauen:** C.O.R.D.-Durchsagen als Running Gag, Chefs in der Stadt, Finale mit Party und Pointe, Aufzugfahrt sichtbar machen.
 4. **Klettern, Leitern:** Höhe in der Stadt nutzen.
-5. **Optik und Ton:** Flimmern dichter Haufen in 50–100 m, Anzeige (HUD) und Tablet im Spielzeug-Look, Sound.
-6. **Koop vorbereiten:** CableSystem, Economy, ServiceRack und CordLogic laufen später beim Host; Clients bekommen Zustand und senden Absichten.
+5. **Optik und Ton:** Flimmern dichter Haufen in 50–100 m, eigene runde Schrift statt Systemschrift, Sound.
+6. **Mehrspieler testen und ausbauen:** echter Test mit mehreren Rechnern und über das Internet (Portfreigabe), Steam-Lobbys über GodotSteam (die Spiellogik bleibt), Seilbahn und Aufzug bei Clients im echten Spiel prüfen.
 
 ## Technik
 
 ### Engine
 
 **Godot 4.7 mit GDScript** (bestätigt). Szenen und Ressourcen sind Textdateien; das erleichtert die Arbeit mit Claude Code.
-Starten: Projekt in Godot öffnen, F5. Kommandozeile: `/Applications/Godot.app/Contents/MacOS/Godot`.
+Starten: Projekt in Godot öffnen, F5 (startet das Startmenü). Direkt in die Welt: `godot res://scenes/world.tscn`. Kommandozeile: `/Applications/Godot.app/Contents/MacOS/Godot`.
 
 ### Kabel-Simulation (wichtigste Regel)
 
@@ -102,7 +106,26 @@ Konzept im GDD, Abschnitt „Welt und offene Map“: offene Kleinstadt, ca. 2 ×
 - **Altstadt:** Zaun mit Lücke zum Wohnviertel, davor auf der Hauptstraße der zweite Kabelberg (`sperre_altstadt`, `offset_m` positiv = Berg außerhalb, Blockade dahinter in der Altstadt). Kabel auf Kreuzungen und Straßen, dazu ein großer Haufen auf dem Marktplatz (`extra_heaps`); 150 wichtige Kabel für 15 Reihen. Einheiten haben feste Nummern (`unit` in `world.json`), damit Kabel-IDs alter Spielstände gleich bleiben.
 - **Seilbahn zur Basis** (`ziplines` in `world.json`, `scripts/world/zipline.gd`): Strecken aus Punkten [x, z, Höhe über Boden] vom äußeren Ende zur Basis, erster und letzter Punkt sind Stationen. Freigeschaltet durch Dienste mit `special` `zipline_wohnviertel` (Wohnviertel-Reihe „Seilbahn-Leitstand“) bzw. `zipline_altstadt` (Altstadt-Reihe „Stadtwerke-Portal“). E an einer Station fährt; von der Altstadt geht es über `continues` ohne Halt weiter bis zur Basis. Die Bahn fährt an, beschleunigt bis 42 m/s (rennen: 7 m/s) und bremst vor der Endstation. Werte in `balancing.json` → `zipline`.
 - **Umland** (`countryside` in `world.json`, `CityBlockout._build_countryside`): Bebauung ohne Kabel zwischen den Vierteln, direkt auf dem Gelände: Häuser (Blender-Modelle, zur Straße gedreht) und Scheunen (Kiste mit Bausatz-Dach) an den Hauptstraßen, verstreute Höfe auf der Wiese und sieben kleine Vororte mit eigenen Straßen und Zufahrt (Sonnenhang, Kirchberg, Lindenau, Nordheide, Westend, Seeblick, Am Ostrand). Abstand zu Vierteln, Sperren, Seilbahnen, Meer und Krater; steile Stellen bleiben frei. Zusammen ca. 300 Gebäude. Dazu die Ausstattung des Hinterhofs (Tripo-Bäume, Büsche, Felsen, Laternen, Blumenkübel, Bänke, Paletten, Kabeltrommeln, Lieferwagen): Bäume und Büsche an den Häusern, Lager an Scheunen, Laternen und Bänke in den Vororten (Kirchberg und Westend mit Altstadt-Laterne), Alleen an Landstraßen, Wäldchen mit Felsen auf der Wiese (Nadelbäume an den Hügeln); ca. 1.800 Stücke über `YardProps.add_items()` in Kacheln, ab 380 m ausgeblendet (`countryside.props`).
+- **Oberfläche im Spielzeug-Look** (`scripts/ui/ui_theme.gd`, `UiTheme`): alle Farben, Flächen (runde Ecken, dicker Rand unten, weicher Schatten), Pillen-Knöpfe und Schrift an einer Stelle. Schrift ist eine `SystemFont` mit Liste (Nunito, Varela Round, Arial Rounded MT Bold …); eine eigene Schriftdatei liegt noch nicht im Projekt. Anzeige (`world.gd` → `_style_hud`): Statuskarte oben links, Geld als gelbe Pille, „Tab Tablet“ als Taste, Hinweis unten als dunkle Pille, Meldungen als helle Sprechblase darüber (`_toast`, lange Meldungen brechen bei 900 px um). C.O.R.D.-Frage, Detektor, Wegweiser, schwebender Text und Abspann nutzen dasselbe Theme.
 - **Wegweiser:** Sind Knäuel in der Tasche und der Serverraum mehr als 30 m entfernt, zeigt oben ein Pfeil Richtung und Entfernung (`scripts/ui/waypoint.gd`).
+
+### Startmenü und Einstellungen
+
+- **Startmenü** (`scripts/ui/main_menu.gd`, `MainMenu`): eigene kleine Szene (drei Kabelhaufen, Bäume und Ausstattung über `YardProps.add_items`, C.O.R.D. fliegt Achten, Kamera kreist). Weiterspielen erscheint nur mit Spielstand; „Neues Spiel“ fragt bei vorhandenem Stand nach und setzt `SaveGame.force_new` (Intro spielt). Mehrspieler-Feld: Name, „Spiel hosten“ (Port aus den Einstellungen), Adresse und „Beitreten“. Aus der Welt zurück über das Tablet („Hauptmenü“, speichert vorher). Testoptionen im Menü: `--autojoin=<IP>`, `--runfor=<s>`.
+- **Einstellungen** (Autoload `Settings`, `scripts/core/settings.gd`, Datei `user://settings.cfg`): Mausempfindlichkeit (Faktor auf `player.mouse_sensitivity`), Maus umkehren, Vollbild, Grafikstufe (Niedrig/Mittel/Hoch: Schatten aus/90 m/160 m in `CityLook.setup_sun`, Bildschärfe 75 %, Sichtweite der Umland-Bäume ×0,6/0,8/1), Lautstärke (Master-Bus, Ton gibt es noch nicht), Spielername, letzte Adresse, Port (24680), eigenes Aussehen als Mitspieler.
+
+### Mehrspieler
+
+Koop für 2–4 Spieler über ENet (IP und Port, UDP). **Der Host rechnet alles**, Clients erzeugen dieselbe Stadt aus denselben Seeds und rechnen nichts selbst.
+
+- **`Net`** (Autoload, `scripts/net/net.gd`): Verbinden, Handschlag und alle Nachrichten. Ablauf: Client verbindet → `hello(Name, Version)` → Host schickt `welcome` (Spielstand aus `_collect_save`, mit zstd gepackt) → Client lädt die Welt mit diesem Stand → `entered` → Host legt die Figur an. Alle Spiel-Nachrichten laufen über das Autoload und werden an die registrierte Welt (`Net.world`) gereicht: `send_intent` (Client → Host, zuverlässig), `send_event` (Host → Clients, zuverlässig), `send_snapshot` (Host → Clients, 10-mal pro Sekunde, gepackt; über 1.200 Byte zuverlässig), `send_player_state` (jede Figur 20-mal pro Sekunde, Host leitet weiter). ENet-Zeitgrenze 45–90 s, weil der Neuaufbau der Stadt einige Sekunden blockiert. Version in `Net.VERSION`.
+- **Spieler-Kontext** (`PlayerCtx`, `scripts/net/player_ctx.gd`): Figur, Arm, Tasche, getragene Rolle, Seilbahnfahrt, Sauger-Plätze, Aussehen. `world.gd` hat `_me` (eigene Figur), `_players` (Peer-ID → Kontext) und `_actor`; die alten Namen `_player`, `_arm_reel`, `_bag`, `_carried_reel`, `_ride`, `_cranking_reel` sind Eigenschaften, die auf `_actor` zeigen. Der Host führt Absichten eines Mitspielers mit `_act_as(ctx, …)` aus, dadurch läuft derselbe Code wie im Einzelspieler. `_show_message` geht an den aktuellen `_actor` (Mitspieler bekommen sie übers Netz), `_announce` an alle, `_float` und `_fx` zeigen schwebenden Text bzw. Effekte bei allen.
+- **Absichten** (`_request` → offline/Host sofort `_do_intent`, Client `Net.send_intent`): `interact` (alles Anvisierte als IDs, der Host prüft Abstand und Zustand), `pull`, `release`, `buy`, `wear`, `decline`, `snooze`, `recall`. Aufzug und Seilbahn rechnet jeder für die eigene Figur (Host schickt `elevator` bzw. `ride` zurück).
+- **Zustand an Clients:** Snapshot mit allen Aufwicklern (Lage, Besitzer, Kabel, Träger), eingehängten Kabeln (Meter, Knoten, umgedreht), Wagen, Drohnen, Geld, C.O.R.D.-Phase; der Client gleicht ab (`net_snapshot`: `CableSystem.force_hook`, Loslassen nach 0,6 s ohne Meldung). Ereignisse: `done` (Kabel fertig, Bezahlung, Ort), `items` (alle Knäuel mit Tasche bzw. Boden), `econ` (ganzer `GameState`), `zone`, `order`, `cord`, `finale`, `looks`, `joined`, `left`, `msg`, `float`, `fx`. Clients: `CableSystem.authority` und `MassTools.authority` aus, C.O.R.D. aus, kein Speichern, kein Intro.
+- **Mitspieler-Figuren:** `Player.remote` (keine Eingabe, Kamera, Physik; `net_state` / `apply_net_state` gleiten weich nach), Name darüber. Der Host gibt jedem Mitspieler einen eigenen Arm (IDs ab 950.000) und eigene Sauger-Plätze; Clients übernehmen ihren Arm aus dem Snapshot. Der Wagen folgt dem, der ihn zuletzt angekoppelt bzw. gekauft hat.
+- **Gemeinsam:** Kasse, Upgrades, Ports, Ausbau, Kosmetik-Käufe, Finale. Pro Figur: Tasche, Arm, Sauger, Aussehen von Hoodie, Hose, Kopfhörer, Schuhe (Clients speichern es in `Settings.looks`). Nur der Host speichert und kann „Neuer Auftrag“ bzw. „Neues Spiel“; beim neuen Auftrag schickt er allen den neuen Stand, sie laden mit.
+- **Geht ein Mitspieler,** lässt der Host dessen Kabel los, legt Knäuel und Rolle ab und meldet es allen. Verliert ein Client den Host, landet er im Hauptmenü mit Hinweis.
+- **Testen mit zwei Instanzen:** Host `godot --headless res://scenes/world.tscn -- --nosave --host --runfor=75`, nach ca. 15 s Client `godot --headless res://scenes/main_menu.tscn -- --nosave --autojoin=127.0.0.1 --network --runfor=40` (`--network` greift, zieht und löst Knoten übers Netz und kauft eine Kurbel; `--network=important` rollt ein wichtiges Kabel auf und steckt es ein). Weitere: `--newjobafter=<s>` (Host nimmt einen neuen Auftrag an), `--netlog` (Host gibt Absichten aus), `--shot=<pfad>` (Bild bei `--runfor`-Ende). Achtung: `--headless` rechnet ungebremst, deshalb zeitbasiert mit `--runfor` statt `--quit-after`.
 
 ### Werkzeug-Kette und Eingabe
 
@@ -136,6 +159,12 @@ Tab: Tablet (Spiel läuft weiter). N: „Nein“ zu C.O.R.D.s Bestellfrage. F5 s
 
 **Dienste** (`data/services.json`): Jede der 198 Reihen hat eine Wirkung (neue Viertel: kleine Boni von 3–6 % im Wechsel und einmalige Auszahlungen; Lauftempo gedeckelt über `player.max_speed_factor`). `unlocks` schaltet ein Upgrade frei (Port 1 Festerer Griff, Port 2 Dauerzug, Port 3 Stärkere Motoren, Port 5 Kupferhändler, erste Campus-Reihe Größere Tasche), `bonus` wirkt dauerhaft (Geld, Handzug, Motoren, Lauftempo, Tasche, Knoten, C.O.R.D.s Takt und Bestellmenge), `payout` zahlt einmalig Geld, `special` ist eine Sonderfunktion. Port 20 „C.O.R.D.-Abschaltknopf“: Knopf im Tablet, C.O.R.D. schweigt 5 Minuten, danach 10 Minuten Wartezeit. Die Summe der Boni berechnet `RackPlan.bonuses()`, `world.gd` → `_apply_upgrades()` verteilt sie.
 
+**Serverraum-Ausbau** (`room_order` und `room_*` in `balancing.json` → `upgrades`, Tablet-Reiter „Serverraum“): Neonbeleuchtung (Leisten an Decke und Schränken, Stufe 3 Farbwechsel; +5 % Geld je Stufe), Kühlung (Klimageräte auf dem Dach und an der Vorderwand, Stufe 4 Kaltluft-Gitter; Motoren +6 %), Kabelmanagement (Pritschen über den Schränken, Bündel, Kabel in die Schränke; Tasche +2, wichtige Kabel +20 %), Leitstand (Pult, Monitorwand, großer Lagebildschirm mit Live-Stand; Antwortzeit +1 s), Kaffeeecke (Bank, Pflanzen, Kaffeemaschine, Sofa; Handzug +15 %, Laufen +3 %). Jede Stufe wirkt wie ein Dienst-Bonus (`bonus` je Stufe, `Economy.refresh_bonuses`). Teile baut `ServerRoomView._refresh_extras` neu, wenn sich eine Stufe ändert. Testoption `--roomview` / `--roomview=back`.
+
+**Kosmetik** (`cosmetics` in `balancing.json`, Tablet-Reiter „Kosmetik“): neun Plätze (Hoodie, Hose, Kopfhörer, Schuhe, C.O.R.D.-Leuchtband, C.O.R.D.-Lack, Drohnen-Lack, Wagen-Lack, Effekt), je Platz ein `*_standard` gratis. Gekauft wird einmal (`GameState.cosmetics`), angelegt je Platz (`GameState.looks`); `Economy.wear_cosmetic` kauft und legt an. Die Figur färbt `assets/shaders/outfit.gdshader` um: Teile werden an Farbton, Sättigung und Helligkeit der Tripo-Textur und an der Höhe am Körper erkannt (`Player.set_outfit`, nur wenn etwas angelegt ist). C.O.R.D.: `CordView.set_band` / `set_paint` (Lack multipliziert die Textur). Drohne und Wagen: `paint` als static var plus `set_paint`. Effekte (`CelebrationFx`, `scripts/ui/celebration_fx.gd`): Funken, Konfetti, Sterne, Regenbogen beim Fertigwerden eines Kabels (bis 40 m um die Figur) und beim Einstecken. `world.gd` → `_apply_looks`. Testoption `--look=<ids>` (kauft und legt an).
+
+**Neuer Auftrag** (Prestige, `prestige` in `balancing.json`, Tablet-Reiter „Auftrag“): erst nach dem Finale. Ruf = `points_per_sqrt_million` × √(Verdienst dieses Auftrags in Mio. €). Je Ruf-Punkt +10 % Geld und +5 % Ziehen (Hand, Motoren, Werkzeuge); C.O.R.D. bestellt je Auftrag ×1,15 mehr und fragt öfter (×0,9 Pause). Ruf, Zahl der Aufträge und Kosmetik stehen in `GameState.meta_dict()` und bleiben; alles andere (Geld, Upgrades, Ausbau, Ports, Kabel, Finale) geht zurück. Ablauf: `world.gd` → `_start_new_job` legt die Meta-Daten in `SaveGame.carry_meta`, löscht den Spielstand (nur wenn gespeichert wird) und lädt die Szene neu; dort übernimmt `_ready` sie, zeigt statt des Intros eine Meldung und speichert sofort. „Neues Spiel“ löscht dagegen alles, auch Ruf und Kosmetik. Testoption `--newjob[=<Mio. €>]`. Verlaufs-Rechnung für einen weiteren Auftrag: `-- --ruf=<Punkte> [--auftrag=<Nr>]`.
+
 **C.O.R.D.:** erste Bestellfrage nach 30 s, danach alle 45–90 s; 6 s Zeit für N, sonst fallen 100 Kabel als neuer Haufen in Blickrichtung neben den Spieler.
 
 **Speichern:** `user://savegame.json` (macOS: `~/Library/Application Support/Godot/app_userdata/Knot My Problem/`), automatisch alle 30 s und beim Schließen. Gespeichert werden nur Seeds und veränderlicher Zustand; Kabelformen entstehen beim Laden neu. Datei hat eine Versionsnummer; kaputte oder fremde Versionen werden ignoriert. „Neues Spiel“ im Tablet löscht den Stand.
@@ -163,6 +192,9 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 | Sprunghöhe | 1,25 m (Schwerkraft ×1,8) | – |
 | Laufen / Rennen | 4 / 7 m/s | Laufschuhe ×1,1, Kosten 120 € × 2,6^Stufe, max. 5; Dienst-Boni bis ×1,6, zusammen höchstens ×2,2 |
 | Seilbahn | 42 m/s (Anfahren 12 m/s², Bremsen 14 m/s²) | – |
+| Serverraum-Ausbau | – | Neon 250 Tsd. € × 4^Stufe (3), Kühlung 400 Tsd. € × 3,5^Stufe (4), Kabelmanagement 600 Tsd. € × 4^Stufe (3), Leitstand 1 Mio. € × 4^Stufe (3), Kaffeeecke 150 Tsd. € × 4^Stufe (3) |
+| Kosmetik | – | 80 Tsd. € bis 10 Mio. € je Stück, zusammen ca. 37 Mio. € |
+| Neuer Auftrag | – | Ruf = √(Verdienst in Mio. €); je Punkt +10 % Geld, +5 % Ziehen; C.O.R.D. ×1,15 Bestellmenge je Auftrag |
 
 ### Architektur
 
@@ -173,7 +205,7 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 ```
 /data        balancing.json (Werte), zone.json (Anordnung), services.json (Dienste je Port)
 /data        world.json (Stadt, Viertel, Kabel, Sperren, Seilbahnen)
-/scenes      world.tscn (Hauptszene), city_preview.tscn (Stadt-Vorschau), player.tscn, reel_test.tscn
+/scenes      main_menu.tscn (Startmenü, Hauptszene des Projekts), world.tscn (Spielwelt), city_preview.tscn (Stadt-Vorschau), player.tscn, reel_test.tscn
 /scripts     cable/   Bahn, Tube-Mesh, Kabeldaten, Haufen, Zone, CableSystem, Blöcke ruhender Kabel (CableBatch/-Batcher)
              world/   Stadt-Layout, Gelände, Blockout, Kabel-Einheiten, Seilbahn, Hof-Ausstattung, Spielzeug-Look
              reel/    Aufwickler-Daten (Arm, Kurbel, Motor) und Rollen-Darstellung
@@ -182,7 +214,8 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
              cord/    C.O.R.D.-Logik und -Figur
              save/    Spielstand
              player/  Spielfigur, Animator, Anvisieren
-             ui/      Fadenkreuz, Tablet, C.O.R.D.-Anzeige, Wegweiser, schwebender Text
+             ui/      Theme (UiTheme), Startmenü, Fadenkreuz, Tablet, C.O.R.D.-Anzeige, Detektor, Wegweiser, schwebender Text, Effekte, Abspann
+             net/     Mehrspieler: Net (Autoload), PlayerCtx
              core/    Balancing (Autoload), GameState, World
              debug/   Testkameras und -aufbauten
 /tests       logic_test.tscn (automatischer Logik-Test), balance_sim.tscn (Verlaufs-Rechnung)
@@ -195,7 +228,7 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 
 - **Logik-Test:** `godot --headless res://tests/logic_test.tscn` muss „ALLE TESTS OK“ ausgeben.
 - **Verlaufs-Rechnung:** `godot --headless res://tests/balance_sim.tscn` spielt Hinterhof und erste Sperre Kabel für Kabel durch, danach alle Viertel bis zum Turm als Durchsatz-Modell (Werkzeuge bringen Geld, wichtige Kabel suchen mit bzw. ohne Detektor, Drohnen, Abliefern; Annahmen oben im Skript) und gibt aus, wann welcher Kauf und welcher Dienst kommt. Ersetzt keinen echten Spieltest.
-- **Testoptionen** für die Hauptszene (nach `--`): `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` / `--dumpafter=<frames>` (Zustand ausgeben), `--grab`, `--pull=<m>`, `--buy=<ids>`, `--hang`, `--order`, `--ask`, `--room` / `--room=in` (vor bzw. in den Serverraum), `--plugports=<von>-<bis>`, `--fillbag=<n>`, `--deliver`, `--jump`, `--snooze`, `--wagon` / `--wagon=fill`, `--carryreel`, `--vacuum` (Kabelsauger dauerhaft an, mit `--buy=vacuum`), `--zipline=<Strecken-ID>` / `--zipline=<ID>,ride`, `--closeup` (Kamera nah an der Figur), `--teleport=x,z` (wird zuerst ausgeführt, Kabel dort sofort geladen), `--perf` (alle 2 s Bildrate, Dreiecke, Detailstufen, Rechenzeit), `--unitstats`, `--intro` / `--intro=<Nr>` (Intro zeigen bzw. ab Einstellung Nr.), `--anim=<walk|run|back|strain|crank|tug|reach|pickup|wind|sulk|happy>` (Bewegung vorführen, Kamera mittig), `--rigdump` (Knochen der Figur ausgeben) usw.; vollständige Liste in `world.gd` → `_apply_test_args`. Für Testläufe immer `--nosave` verwenden, sonst wird der echte Spielstand geladen.
+- **Testoptionen** für die Hauptszene (nach `--`): `--nosave` (ohne Spielstand starten/speichern), `--savefile=<pfad>`, `--dump` / `--dumpafter=<frames>` (Zustand ausgeben), `--grab`, `--pull=<m>`, `--buy=<ids>`, `--hang`, `--order`, `--ask`, `--room` / `--room=in` (vor bzw. in den Serverraum), `--plugports=<von>-<bis>`, `--fillbag=<n>`, `--deliver`, `--jump`, `--snooze`, `--wagon` / `--wagon=fill`, `--carryreel`, `--vacuum` (Kabelsauger dauerhaft an, mit `--buy=vacuum`), `--zipline=<Strecken-ID>` / `--zipline=<ID>,ride`, `--closeup` (Kamera nah an der Figur), `--teleport=x,z` (wird zuerst ausgeführt, Kabel dort sofort geladen), `--perf` (alle 2 s Bildrate, Dreiecke, Detailstufen, Rechenzeit), `--unitstats`, `--intro` / `--intro=<Nr>` (Intro zeigen bzw. ab Einstellung Nr.), `--anim=<walk|run|back|strain|crank|tug|reach|pickup|wind|sulk|happy>` (Bewegung vorführen, Kamera mittig), `--rigdump` (Knochen der Figur ausgeben), `--tablet=<0..3>` (Tablet mit Reiter), `--look=<ids>`, `--roomview[=back]`, `--newjob[=<Mio. €>]` usw.; vollständige Liste in `world.gd` → `_apply_test_args`. Für Testläufe immer `--nosave` verwenden, sonst wird der echte Spielstand geladen.
 - **Bilder rendern:** `godot --write-movie <pfad>.png --quit-after 3 -- --nosave ...`
 
 ### Technische Hinweise
@@ -239,3 +272,6 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 - ✅ Werkzeuge für die Masse: Kabelsauger, Haufen-Winden, Abräum-Drohnen (mit Upgrades, Tablet scrollbar)
 - ✅ Intro-Szene: Stammtisch im „Goldenen Router“, drei Monate später, Anruf beim Admin
 - ✅ Fortschritt je Viertel, Kabel-Detektor mit Peilantenne, Drohnen holen wichtige Kabel zuerst, Turm-Finale mit Aufzug, Etage 40, Dach, C.O.R.D.s Kern und Abspann; Verlaufs-Rechnung für alle Viertel, späte Preise angehoben
+- ✅ Umland (Häuser, Höfe, Vororte, Bäume), Laufschuhe, schnellere Seilbahn, mehr Sauger-Upgrades
+- ✅ Geld-Senken: Serverraum-Ausbau, Kosmetik, Neuer Auftrag (Prestige); Anzeige und Tablet im Spielzeug-Look
+- ✅ Startmenü mit Einstellungen; Koop für 2–4 Spieler über IP (Host rechnet, Clients schicken Absichten)

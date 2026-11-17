@@ -18,6 +18,8 @@ const SULK_S := 3.0
 const HAPPY_S := 1.2
 
 const CALM := Color(0.3, 0.9, 1.0)
+## Farbe des Leuchtbands in Ruhe (Kosmetik); rot blinkt es bei der Frage immer
+var calm := CALM
 const ALARM := Color(1.0, 0.2, 0.15)
 const MODEL_PATH := "res://assets/models/cord/cord_server.glb"
 ## In Tripo3D erzeugtes Modell (eine Textur, ca. 1 m hoch). Hat Vorrang; der Leuchtring liegt dort in der
@@ -35,9 +37,9 @@ func _ready() -> void:
 	add_child(_body)
 
 	_ring_mat = StandardMaterial3D.new()
-	_ring_mat.albedo_color = CALM
+	_ring_mat.albedo_color = calm
 	_ring_mat.emission_enabled = true
-	_ring_mat.emission = CALM
+	_ring_mat.emission = calm
 	_ring_mat.emission_energy_multiplier = 3.0
 
 	if not _build_tripo() and not _build_model():
@@ -210,7 +212,7 @@ func set_asking(asking: bool, text_value: String = "") -> void:
 	_speech.visible = asking
 	_speech.text = text_value
 	if not asking:
-		_set_ring(CALM)
+		_set_ring(calm)
 
 
 ## Reaktion zeigen: "declined" (beleidigt: sinkt, schaut weg, Band gedimmt), "placed" (dreht sich vor Freude)
@@ -242,7 +244,7 @@ func _process(delta: float) -> void:
 		rot.x += 0.4
 		bob_speed = 0.6
 		bob_height = 0.02
-		_set_ring(CALM.darkened(0.85))
+		_set_ring(calm.darkened(0.85))
 	elif _mood == "sulk" and _mood_t < SULK_S:
 		# Beleidigt: sinkt ab, kippt nach vorn, dreht sich weg und schüttelt langsam den Kopf
 		var w := _ease_in_out(_mood_t, SULK_S)
@@ -251,7 +253,7 @@ func _process(delta: float) -> void:
 		rot.y += (0.9 + sin(_mood_t * 3.0) * 0.25) * w
 		bob_speed = 1.0
 		bob_height = 0.025
-		_set_ring(CALM.darkened(0.55 * w))
+		_set_ring(calm.darkened(0.55 * w))
 	elif _mood == "happy" and _mood_t < HAPPY_S:
 		# Zufrieden: kleiner Hüpfer und eine ganze Drehung
 		var x := _mood_t / HAPPY_S
@@ -259,7 +261,7 @@ func _process(delta: float) -> void:
 		rot.y += smoothstep(0.0, 1.0, x) * TAU
 	elif _mood != "":
 		_mood = ""
-		_set_ring(CALM)
+		_set_ring(calm)
 	pos.y += sin(_t * bob_speed) * bob_height
 	_body.position = _body.position.lerp(pos, 1.0 - exp(-12.0 * delta)) if not _asking else pos
 	_body.rotation = Vector3(lerp_angle(_body.rotation.x, rot.x, 1.0 - exp(-8.0 * delta)), \
@@ -273,6 +275,29 @@ func _process(delta: float) -> void:
 ## Weicher Verlauf 0 -> 1 -> (hält) -> 0 über die Dauer
 static func _ease_in_out(t: float, length: float) -> float:
 	return smoothstep(0.0, 0.2, t / length) * (1.0 - smoothstep(0.75, 1.0, t / length))
+
+
+## Kosmetik: Leuchtband-Farbe (Ruhe) und Lack fürs Gehäuse (weiß = Grundfarbe, wird mit der Textur multipliziert)
+func set_band(color: Color) -> void:
+	calm = color
+	if not _asking:
+		_set_ring(calm)
+
+
+func set_paint(color: Color) -> void:
+	for mi in _body.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		for i in m.mesh.get_surface_count():
+			var mat := m.get_active_material(i) as BaseMaterial3D
+			if mat == null or mat == _ring_mat:
+				continue
+			if not m.has_meta("paint_src_%d" % i):
+				m.set_meta("paint_src_%d" % i, mat)
+				mat = mat.duplicate() as BaseMaterial3D
+				m.set_surface_override_material(i, mat)
+			mat.albedo_color = color
 
 
 func _set_ring(color: Color) -> void:

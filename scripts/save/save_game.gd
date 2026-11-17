@@ -7,6 +7,8 @@ extends RefCounted
 static var pending_load := false
 ## Beim nächsten Start ohne Spielstand neu beginnen (nach "Neues Spiel").
 static var force_new := false
+## Neuer Auftrag (Prestige): was in den neuen Spielstand übernommen wird (Ruf, Kosmetik). Leer = nichts.
+static var carry_meta: Dictionary = {}
 
 
 static func path() -> String:

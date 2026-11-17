@@ -3,13 +3,17 @@ extends Node3D
 ## Abräum-Drohne: gelber Körper, vier Arme mit Rotoren, Leuchte unten. Platzhalter im Spielzeug-Look,
 ## alles aus Grundformen. Die Lage setzt die Hauptszene; die Rotoren drehen sich hier.
 
+## Lack (Kosmetik): gilt für neue Drohnen; laufende stellt set_paint um
+static var paint := Color(0.98, 0.78, 0.15)
+var _body_mat: StandardMaterial3D
 var _rotors: Array[Node3D] = []
 var _lamp: StandardMaterial3D
 var _t := 0.0
 
 
 func _ready() -> void:
-	var body_mat := _mat(Color(0.98, 0.78, 0.15))
+	var body_mat := _mat(paint)
+	_body_mat = body_mat
 	var dark := _mat(Color(0.18, 0.2, 0.24))
 	var body := MeshInstance3D.new()
 	var box := BoxMesh.new()
@@ -95,3 +99,8 @@ static func _mat(c: Color) -> StandardMaterial3D:
 	m.albedo_color = c
 	m.roughness = 0.45
 	return m
+
+
+func set_paint(color: Color) -> void:
+	if _body_mat:
+		_body_mat.albedo_color = color

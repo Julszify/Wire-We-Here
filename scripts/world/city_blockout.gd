@@ -696,7 +696,8 @@ func _build_countryside() -> void:
 	countryside_count = building_count - before
 	# Ausstattung aus dem Hinterhof (Tripo-Bäume, Büsche, Laternen …): in Kacheln, weit weg ausgeblendet
 	var pc: Dictionary = cfg.get("props", {})
-	YardProps.add_items(body, body, ctx["props"], float(pc.get("chunk_m", 160.0)), float(pc.get("range_m", 380.0)))
+	YardProps.add_items(body, body, ctx["props"], float(pc.get("chunk_m", 160.0)),
+		float(pc.get("range_m", 380.0)) * Settings.view_factor())
 	countryside_props = (ctx["props"] as Array).size()
 
 

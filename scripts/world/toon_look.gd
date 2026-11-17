@@ -10,10 +10,22 @@ const OUTLINE_SHADER := "res://assets/shaders/outline.gdshader"
 static var _done: Dictionary = {}  # Instanz-IDs bereits umgestellter Materialien
 
 
+static var _hooked := false
+
+
 static func install(root: Node, camera: Camera3D) -> void:
 	_done.clear()
 	_apply_tree(root)
-	root.get_tree().node_added.connect(func(n: Node) -> void: _on_node_added.call_deferred(n))
+	# Einmal pro Programmlauf verbinden (Menü und Welt rufen install beide auf); verzögert, und nur, wenn der
+	# Node bis dahin noch lebt
+	if not _hooked:
+		_hooked = true
+		root.get_tree().node_added.connect(func(n: Node) -> void:
+			var id := n.get_instance_id()
+			(func() -> void:
+				var obj := instance_from_id(id)
+				if obj != null and is_instance_valid(obj):
+					_apply_node(obj as Node)).call_deferred())
 	if camera:
 		add_outline(camera)
 

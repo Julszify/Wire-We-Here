@@ -36,6 +36,12 @@ var drone: Dictionary = {}
 ## Kabel-Detektor (warm/kalt)
 var detector: Dictionary = {}
 var tablet_order: Array = []
+## Serverraum-Ausbau: Reihenfolge der Ausbau-Linien im Tablet (die Linien selbst stehen in upgrades)
+var room_order: Array = []
+## Neuer Auftrag (Prestige): Ruf-Punkte und ihre Wirkung
+var prestige: Dictionary = {}
+## Kosmetik: Plätze (slots) und Stücke (items)
+var cosmetics: Dictionary = {}
 ## Ein Dienst pro Port: { "name", optional "unlocks" }
 var services: Array = []
 ## Anordnung der Zone (Haufen, Streukabel, Schrank, Start)
@@ -86,6 +92,9 @@ func reload() -> void:
 	drone = parsed.get("drone", {})
 	detector = parsed.get("detector", {})
 	tablet_order = parsed.get("tablet_order", [])
+	room_order = parsed.get("room_order", [])
+	prestige = parsed.get("prestige", {})
+	cosmetics = parsed.get("cosmetics", {})
 	var sv := _load_json(SERVICES_PATH)
 	services = sv.get("services", [])
 	service_rows = sv.get("rows", {})
