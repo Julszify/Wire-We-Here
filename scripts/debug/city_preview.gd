@@ -94,8 +94,8 @@ func _apply_args() -> void:
 				add_child(cam)
 				cam.far = 6000.0
 				cam.fov = 55.0
-				cam.global_position = Vector3(0, 1100, 1700)
-				cam.look_at(Vector3(0, 0, -150))
+				cam.global_position = Vector3(40, 900, 1380)
+				cam.look_at(Vector3(40, 0, -10))
 				cam.current = true
 				_label.visible = false
 			"cam":
