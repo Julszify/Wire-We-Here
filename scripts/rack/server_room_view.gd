@@ -216,6 +216,8 @@ func _build_cooling(level: int) -> void:
 		var x := lerpf(-size.x * 0.38, size.x * 0.38, (i + 0.5) / 8.0)
 		var z := size.z * (0.22 if i % 2 == 0 else -0.05)
 		var at := Vector3(x, size.y + 0.3, z)
+		if _model("klima_wand", 1.2, at, PI if i % 2 == 0 else 0.0):
+			continue
 		if ac:
 			var mi := MeshInstance3D.new()
 			mi.mesh = ac
@@ -229,6 +231,8 @@ func _build_cooling(level: int) -> void:
 	var front := -size.z * 0.5 + wall
 	for i in level:
 		var x: float = [-7.5, 0.0, -4.5, 8.7][i]  # nicht vor dem großen Lagebildschirm
+		if _model("klima_b", 0.8, Vector3(x, 3.2, front + 0.05), 0.0):
+			continue
 		_part(Vector3(x, 3.7, front + 0.16), Vector3(1.6, 0.42, 0.28), white)
 		_part(Vector3(x, 3.52, front + 0.31), Vector3(1.4, 0.04, 0.02), _neon_mat(Color(0.5, 0.85, 1.0), 1.2))
 	if level >= 4:
@@ -250,8 +254,12 @@ func _build_cable_trays(level: int) -> void:
 	var rd := float(Balancing.server_room.get("rack_depth_m", 0.6))
 	var colors := [Color(0.95, 0.3, 0.25), Color(0.25, 0.6, 1.0), Color(0.3, 0.85, 0.4), Color(1.0, 0.8, 0.2), Color(0.7, 0.4, 0.95)]
 	for xf in _rack_xf:
-		var y := rh + 0.95
-		var base := xf * Transform3D(Basis.IDENTITY, Vector3(0, y, 0))
+		# Kabel-Paneel aus Tripo über dem Schrank (Vorderseite zum Raum)
+		# über dem Schild des Schranks, unter den Bündeln an der Decke
+		var panel_at := xf * Vector3(0, rh + 0.85, -0.1)
+		_model("kabelpritsche", 0.8, panel_at, xf.basis.get_euler().y)
+		var y := rh + 1.78
+		var base := xf * Transform3D(Basis.IDENTITY, Vector3(0, y, -0.1))
 		var t := _part(Vector3.ZERO, Vector3(2.6, 0.06, 0.5), tray)
 		t.transform = base
 		for side in [-1.0, 1.0]:
@@ -275,10 +283,13 @@ func _build_monitors(level: int) -> void:
 	var front := -size.z * 0.5 + wall
 	var dark := _flat(Color(0.12, 0.13, 0.16), 0.4)
 	var cx := 5.8
-	# Pult
-	_part(Vector3(cx, 0.45, front + 0.9), Vector3(3.2, 0.9, 0.8), _flat(Color(0.3, 0.33, 0.38)), true)
-	for i in 2:
-		_screen(Vector3(cx - 0.75 + i * 1.5, 1.35, front + 0.75), Vector2(1.2, 0.7), ["Kabel-Monitor", "Knoten-Alarm"][i])
+	# Pult mit zwei Bildschirmen und Stuhl (Tripo), Rückfall aus Kisten
+	if _model("leitstand", 1.45, Vector3(cx, 0, front + 0.75), 0.0, Vector3(2.2, 1.0, 0.9)):
+		pass
+	else:
+		_part(Vector3(cx, 0.45, front + 0.9), Vector3(3.2, 0.9, 0.8), _flat(Color(0.3, 0.33, 0.38)), true)
+		for i in 2:
+			_screen(Vector3(cx - 0.75 + i * 1.5, 1.35, front + 0.75), Vector2(1.2, 0.7), ["Kabel-Monitor", "Knoten-Alarm"][i])
 	if level >= 2:
 		for r in 2:
 			for c in 3:
@@ -323,13 +334,16 @@ func _build_coffee(level: int) -> void:
 		return
 	var wall := float(Balancing.server_room.get("wall_m", 0.4))
 	var front := -size.z * 0.5 + wall
-	var items: Array = [["Bench", Vector3(-5.8, 0, front + 0.6), 0.0, 1.0], ["Planter", Vector3(-3.1, 0, front + 0.8), 0.0, 0.8]]
+	var items: Array = [["Planter", Vector3(-3.1, 0, front + 0.8), 0.0, 0.8]]
+	if level < 3:
+		items.append(["Bench", Vector3(-5.8, 0, front + 0.6), 0.0, 1.0])
 	if level < 2:
 		items.append(["Planter", Vector3(-8.6, 0, front + 0.8), 0.0, 0.8])
 	else:
 		_part(Vector3(-8.2, 0.5, front + 0.45), Vector3(1.6, 1.0, 0.7), _flat(Color(0.55, 0.36, 0.22)), true)
-		_part(Vector3(-8.4, 1.25, front + 0.4), Vector3(0.45, 0.5, 0.4), _flat(Color(0.75, 0.15, 0.12), 0.3))
-		_part(Vector3(-8.4, 1.32, front + 0.61), Vector3(0.06, 0.06, 0.02), _neon_mat(Color(0.3, 1.0, 0.4), 2.0))
+		if not _model("kaffeemaschine", 0.55, Vector3(-8.35, 1.0, front + 0.4), 0.0):
+			_part(Vector3(-8.4, 1.25, front + 0.4), Vector3(0.45, 0.5, 0.4), _flat(Color(0.75, 0.15, 0.12), 0.3))
+			_part(Vector3(-8.4, 1.32, front + 0.61), Vector3(0.06, 0.06, 0.02), _neon_mat(Color(0.3, 1.0, 0.4), 2.0))
 		var sign := Label3D.new()
 		sign.text = "KAFFEE"
 		sign.font_size = 40
@@ -340,14 +354,49 @@ func _build_coffee(level: int) -> void:
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		_extras.add_child(sign)
 	if level >= 3:
-		var sofa := _flat(Color(0.3, 0.55, 0.85), 0.8)
-		_part(Vector3(-5.6, 0.25, front + 2.9), Vector3(2.4, 0.5, 0.9), sofa, true)
-		_part(Vector3(-5.6, 0.7, front + 3.25), Vector3(2.4, 0.5, 0.2), sofa)
-		for side in [-1.0, 1.0]:
-			_part(Vector3(-5.6 + side * 1.15, 0.45, front + 2.9), Vector3(0.2, 0.5, 0.9), sofa)
-		_part(Vector3(-5.6, 0.015, front + 2.0), Vector3(3.2, 0.03, 2.2), _flat(Color(0.8, 0.45, 0.3), 0.9))
+		# Sofa an der Wand (schaut in den Raum), Couchtisch davor, Teppich
+		if not _model("sofa", 0.95, Vector3(-5.8, 0, front + 0.6), 0.0, Vector3(2.2, 0.9, 1.0)):
+			var sofa := _flat(Color(0.3, 0.55, 0.85), 0.8)
+			_part(Vector3(-5.8, 0.25, front + 0.7), Vector3(2.4, 0.5, 0.9), sofa, true)
+			_part(Vector3(-5.8, 0.7, front + 0.35), Vector3(2.4, 0.5, 0.2), sofa)
+		_model("couchtisch", 0.55, Vector3(-5.8, 0.03, front + 2.0), 0.4, Vector3(1.0, 0.5, 1.0))
+		_part(Vector3(-5.8, 0.015, front + 1.6), Vector3(3.2, 0.03, 2.4), _flat(Color(0.8, 0.45, 0.3), 0.9))
 		items.append(["Bush", Vector3(-3.2, 0, front + 3.0), 30.0, 0.9])
 	YardProps.add_items(_extras, _extras_body, items)
+
+
+## Tripo-Modelle des Ausbaus (assets/models/props/room/tripo/<name>.glb): auf `height` bringen, Fuß auf `at`,
+## mittig, um `yaw` gedreht (Modelle schauen nach +Z). `collide` = Kiste für die Kollision (Größe), sonst keine.
+## Gibt false zurück, wenn die Datei fehlt (dann bleibt der Platzhalter).
+const ROOM_MODELS := "res://assets/models/props/room/tripo/%s.glb"
+static var _model_cache: Dictionary = {}
+
+
+func _model(name_value: String, height: float, at: Vector3, yaw: float, collide := Vector3.ZERO) -> bool:
+	var path := ROOM_MODELS % name_value
+	if not _model_cache.has(path):
+		_model_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	var scene: PackedScene = _model_cache[path]
+	if scene == null:
+		return false
+	var holder := Node3D.new()
+	_extras.add_child(holder)
+	var m := scene.instantiate() as Node3D
+	holder.add_child(m)
+	var box := ChefView._world_aabb(m)
+	m.scale = Vector3.ONE * (height / maxf(box.size.y, 0.01))
+	box = ChefView._world_aabb(m)
+	m.position -= Vector3(box.get_center().x, box.position.y, box.get_center().z) - holder.global_position
+	holder.position = at
+	holder.rotation.y = yaw
+	if collide != Vector3.ZERO:
+		var col := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = collide
+		col.shape = shape
+		col.transform = Transform3D(Basis(Vector3.UP, yaw), at + Vector3(0, collide.y * 0.5, 0))
+		_extras_body.add_child(col)
+	return true
 
 
 static var _kit_cache: Dictionary = {}
@@ -504,6 +553,7 @@ func _build_racks(cfg: Dictionary) -> void:
 		title.font_size = 48
 		title.outline_size = 12
 		title.pixel_size = 0.0046
+		title.double_sided = false  # von hinten (Seitenschränke) nicht spiegelverkehrt durch den Raum
 		title.transform = xf * Transform3D(Basis.IDENTITY, Vector3(0, rh + 0.55, rd * 0.5))
 		add_child(title)
 		_titles.append(title)

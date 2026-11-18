@@ -6,7 +6,7 @@ extends Node3D
 ##   - Gebäude als Kisten auf den Grundstücken zwischen den Straßen, Stil je Viertel
 ## Deterministisch (Seed je Viertel). Pro Viertel ein Mesh und ein StaticBody mit Kisten-Kollision.
 
-const ROAD_LIFT := 0.12        # Hauptstraßen knapp über dem Boden
+const ROAD_LIFT := 0.05        # Hauptstraßen knapp über dem Boden (folgen dem Gelände auch quer)
 const STREET_TOP := 0.03       # Straßen in den Vierteln (flach, damit Kabel darauf sichtbar bleiben)
 const BASE_DEPTH := 3.0        # Gebäude reichen so tief in den Boden (keine Lücken an Rampen)
 const STREET_COLOR := Color(0.32, 0.33, 0.36)
@@ -102,35 +102,60 @@ func _build_main_roads() -> void:
 	mi.mesh = st.commit()
 	mi.material_override = _material
 	add_child(mi)
+	add_child(_road_body(mi.mesh, "MainRoadsBody"))
 
 
-## Straßenband von a nach b, alle 2 m (= Rasterweite des Geländes) an die Geländehöhe angepasst
+## Kollision aus den Dreiecken eines Straßenbands: man steht auf dem Asphalt, nicht im Gelände darunter
+static func _road_body(mesh: Mesh, body_name: String) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = body_name
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(mesh.get_faces())
+	shape.backface_collision = true
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	body.add_child(col)
+	return body
+
+
+## Straßenband von a nach b: längs und quer alle 2 m (= Rasterweite des Geländes) an die Geländehöhe
+## angepasst, damit es dicht auf dem Boden liegt statt darüber zu schweben
 func _add_ribbon(st: SurfaceTool, a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	var length := a.distance_to(b)
 	var steps := maxi(1, ceili(length / 2.0))
+	var cols := maxi(1, ceili(width / 2.0))
 	var side := (b - a).normalized().orthogonal() * width * 0.5
 	st.set_color(Color(color, 0.1))
 	st.set_normal(Vector3.UP)
+	# Gitter der Punkte: Reihe i (längs), Spalte j (quer von links +1 nach rechts -1)
+	var rows: Array[PackedVector3Array] = []
+	for i in steps + 1:
+		var q := a.lerp(b, float(i) / steps)
+		var row := PackedVector3Array()
+		for j in cols + 1:
+			row.append(_ground(q + side * (1.0 - 2.0 * float(j) / cols)))
+		rows.append(row)
 	for i in steps:
-		var q0 := a.lerp(b, float(i) / steps)
-		var q1 := a.lerp(b, float(i + 1) / steps)
-		var l0 := _ground(q0 + side)
-		var r0 := _ground(q0 - side)
-		var l1 := _ground(q1 + side)
-		var r1 := _ground(q1 - side)
 		var m0 := length * float(i) / steps
 		var m1 := length * float(i + 1) / steps
-		# UV: Lage quer (-1 … 1) und längs in Metern, für Mittel- und Randlinien
-		for v: Array in [[l0, 1.0, m0], [r1, -1.0, m1], [r0, -1.0, m0], [l0, 1.0, m0], [l1, 1.0, m1], [r1, -1.0, m1]]:
-			st.set_uv(Vector2(v[1], v[2]))
-			st.add_vertex(v[0])
+		for j in cols:
+			var u0 := 1.0 - 2.0 * float(j) / cols
+			var u1 := 1.0 - 2.0 * float(j + 1) / cols
+			var l0: Vector3 = rows[i][j]
+			var r0: Vector3 = rows[i][j + 1]
+			var l1: Vector3 = rows[i + 1][j]
+			var r1: Vector3 = rows[i + 1][j + 1]
+			# UV: Lage quer (-1 … 1) und längs in Metern, für Mittel- und Randlinien
+			for v: Array in [[l0, u0, m0], [r1, u1, m1], [r0, u1, m0], [l0, u0, m0], [l1, u0, m1], [r1, u1, m1]]:
+				st.set_uv(Vector2(v[1], v[2]))
+				st.add_vertex(v[0])
 
 
-## Punkt knapp über dem Gelände; an Hängen etwas höher, damit das Band nicht im Boden verschwindet
+## Punkt knapp über dem Gelände; an steilen Stellen minimal höher, damit nichts durchsticht
 func _ground(p: Vector2) -> Vector3:
 	var h := layout.height(p.x, p.y)
 	var slope := absf(layout.height(p.x + 2.0, p.y) - h) + absf(layout.height(p.x, p.y + 2.0) - h)
-	return Vector3(p.x, maxf(h, 0.0) + ROAD_LIFT + slope * 0.5, p.y)
+	return Vector3(p.x, maxf(h, 0.0) + ROAD_LIFT + minf(slope * 0.08, 0.15), p.y)
 
 
 func _near_main_road(center: Vector2, radius: float) -> bool:
@@ -688,6 +713,8 @@ func _build_countryside() -> void:
 	smi.mesh = streets.commit()
 	smi.material_override = _material
 	body.add_child(smi)
+	if smi.mesh and smi.mesh.get_surface_count() > 0:
+		add_child(_road_body(smi.mesh, "StreetsBody"))
 	add_child(body)
 	if ctx.has("houses"):
 		_build_houses(body, ctx["houses"])

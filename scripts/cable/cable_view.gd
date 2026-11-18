@@ -34,8 +34,10 @@ func setup(cable: CableData) -> void:
 		# Wichtige Kabel leuchten schwach und tragen ein Etikett (eigenes Material)
 		_mat = _new_material(cable.color())
 		_mat.emission_enabled = true
-		_mat.emission = cable.color().lightened(0.3)
+		# Leuchten zwischen Kabelfarbe und warmem Gold: fällt bei jeder Farbe und auch bei Sonne auf
+		_mat.emission = cable.color().lerp(Color(1.0, 0.7, 0.05), 0.75)
 		_mat.emission_energy_multiplier = 0.6
+		_glow_mats.append(_mat)
 		_label = Label3D.new()
 		_label.text = RackPlan.port_label(cable.port_id)
 		_label.font_size = 40
@@ -133,6 +135,46 @@ static var stat_us := [0, 0, 0, 0]  # Form, Ausdünnen, Röhre, Stecker
 
 ## Kamera für die Detailstufe aktiver Kabel (von der Welt gesetzt)
 static var camera: Camera3D
+## Materialien wichtiger Kabel: pulsieren gemeinsam hell (update_glow einmal pro Bild)
+static var _glow_mats: Array[StandardMaterial3D] = []
+## Lichtsaum um wichtige Kabel (eine Röhre, gemeinsames Material, pulsiert mit)
+static var _halo_mat: StandardMaterial3D
+var _halo: MeshInstance3D
+var _halo_mesh: ArrayMesh
+
+
+static func _halo_material() -> StandardMaterial3D:
+	if _halo_mat == null:
+		_halo_mat = StandardMaterial3D.new()
+		_halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_halo_mat.cull_mode = BaseMaterial3D.CULL_FRONT  # nur die Rückseite: Saum um das Kabel, Kabel bleibt sichtbar
+		_halo_mat.albedo_color = Color(1.0, 0.72, 0.05, 0.5)
+	return _halo_mat
+
+
+## Wichtige Kabel pulsieren lassen (ruft die Welt einmal pro Bild); Werte in balancing.json → cable.important_glow
+static func update_glow(time: float) -> void:
+	var g: Dictionary = Balancing.cable.get("important_glow", {})
+	var lo := float(g.get("min", 0.5))
+	var hi := float(g.get("max", 2.6))
+	var k := 0.5 + 0.5 * sin(time * TAU * float(g.get("hz", 0.9)))
+	var energy := lerpf(lo, hi, k * k)
+	var i := 0
+	while i < _glow_mats.size():
+		var m := _glow_mats[i]
+		if m == null:
+			_glow_mats.remove_at(i)
+			continue
+		m.emission_energy_multiplier = energy
+		i += 1
+	if _halo_mat:
+		_halo_mat.albedo_color.a = lerpf(float(g.get("halo_min", 0.15)), float(g.get("halo_max", 0.6)), k)
+
+
+func _exit_tree() -> void:
+	if data and data.is_important():
+		_glow_mats.erase(_mat)
 
 
 func _build(pts: PackedVector3Array) -> void:
@@ -152,7 +194,19 @@ func _build(pts: PackedVector3Array) -> void:
 	var t1 := Time.get_ticks_usec()
 	stat_builds += 1
 	stat_points += pts.size()
-	TubeMesh.build(pts, data.radius(), sides, _mesh)
+	# Wichtige Kabel etwas dicker, damit sie zwischen den anderen auffallen
+	var radius := data.radius() * (float(Balancing.cable.get("important_glow", {}).get("thickness", 1.35)) if data.is_important() else 1.0)
+	TubeMesh.build(pts, radius, sides, _mesh)
+	if data.is_important():
+		if _halo == null:
+			_halo_mesh = ArrayMesh.new()
+			_halo = MeshInstance3D.new()
+			_halo.mesh = _halo_mesh
+			_halo.material_override = _halo_material()
+			_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(_halo)
+		var halo_k := float(Balancing.cable.get("important_glow", {}).get("halo_radius", 2.6))
+		TubeMesh.build(simplify(pts, maxf(step, 0.12)), radius * halo_k, 6, _halo_mesh)
 	var t2 := Time.get_ticks_usec()
 	_place_plugs(pts)
 	stat_us[1] += t1 - t0

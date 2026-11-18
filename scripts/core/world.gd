@@ -56,6 +56,9 @@ var _target_knot: CableData
 var _target_reel: ReelData
 var _target_item: CoilItem
 var _target_rack := false
+var _target_post: PneumaticPost         # Rohrpost-Station in Reichweite (mit Knäueln in der Tasche)
+var _posts: Array[PneumaticPost] = []
+var _post_t := 0.0
 var _end_marker: MeshInstance3D
 
 # C.O.R.D. und Bestellfalle
@@ -264,6 +267,7 @@ func _ready() -> void:
 	_tablet.new_job_requested.connect(_start_new_job)
 
 	_build_ziplines()
+	_build_posts()
 	_units = CableUnit.build_all(_city)
 	if not save.is_empty():
 		_apply_save(save)
@@ -272,6 +276,7 @@ func _ready() -> void:
 
 	_refresh_finale(false)
 	_apply_looks()
+	_refresh_posts()
 	# Intro beim neuen Spiel (erster Start oder „Neues Spiel“); in Testläufen mit --nosave nur mit --intro
 	var args := OS.get_cmdline_user_args()
 	var intro_arg := ""
@@ -412,14 +417,20 @@ func _process(delta: float) -> void:
 	_update_ride(delta)
 	_net_tick(delta)
 	_wagon_confirm_t = maxf(_wagon_confirm_t - delta, 0.0)
-	var far := _player.global_position.distance_to(ServerRoomView.door_point()) > 30.0
+	# Wegweiser: zur nächsten Abgabe (Serverraum oder Rohrpost-Station in Betrieb)
+	var drop := delivery_point(_player.global_position)
+	_waypoint.target = drop["pos"]
+	_waypoint.label = "Rohrpost" if drop["post"] != null else "Serverraum"
+	var far := _player.global_position.distance_to(drop["pos"]) > 30.0
 	_waypoint.visible = not _bag.is_empty() and far and _ride.is_empty()
+	_update_posts(delta)
 
 	_cord_view.follow(_player.global_position, _player.facing(), delta)
 	if _cord.phase == CordLogic.Phase.ASKING:
 		_cord_prompt.update_time(_cord.time_left)
 	_update_landing(delta)
 
+	CableView.update_glow(_time)
 	# Knoten-Markierungen pulsieren
 	for m: MeshInstance3D in _knot_markers.values():
 		m.scale = Vector3.ONE * (1.0 + 0.18 * sin(_time * 8.0))
@@ -479,13 +490,14 @@ func _target_args() -> Dictionary:
 	return { "end": _target_end.id if _target_end else -1, "tail": _target_tail,
 		"knot": _target_knot.id if _target_knot else -1, "reel": _target_reel.id if _target_reel else -1,
 		"item": _target_item.id if _target_item else -1, "rack": _target_rack, "stop": _target_stop,
+		"post": _posts.find(_target_post) if _target_post else -1,
 		"core": _target_core, "station": [(_target_station[0] as Zipline).id, _target_station[1]] if not _target_station.is_empty() else [] }
 
 
 ## Absicht „E“ der aktuellen Figur (`_actor`) ausführen; Ziele kommen als IDs und werden geprüft
 func _interact_with(args: Dictionary) -> void:
 	var saved := [_target_end, _target_tail, _target_knot, _target_reel, _target_item, _target_rack, _target_stop,
-		_target_core, _target_station]
+		_target_core, _target_station, _target_post]
 	var pos := _player.global_position
 	var reach := float(Balancing.player["reach_m"]) + 3.0
 	var c: CableData = _system.cables.get(int(args.get("end", -1)))
@@ -498,6 +510,11 @@ func _interact_with(args: Dictionary) -> void:
 	var it: CoilItem = _items.get(int(args.get("item", -1)))
 	_target_item = it if it and it.carried_by == -1 else null
 	_target_rack = bool(args.get("rack", false)) and pos.distance_to(ServerRoomView.center()) < 14.0
+	var pi := int(args.get("post", -1))
+	_target_post = _posts[pi] if pi >= 0 and pi < _posts.size() and _posts[pi].active \
+		and _posts[pi].global_position.distance_to(pos) < 5.0 else null
+	if _target_post:
+		_target_rack = bool(args.get("rack", false))
 	_target_stop = int(args.get("stop", -1))
 	_target_core = bool(args.get("core", false))
 	var st: Array = args.get("station", [])
@@ -512,6 +529,7 @@ func _interact_with(args: Dictionary) -> void:
 	_target_stop = saved[6]
 	_target_core = saved[7]
 	_target_station = saved[8]
+	_target_post = saved[9]
 
 
 func _interact_core() -> void:
@@ -532,8 +550,14 @@ func _interact_core() -> void:
 		_player.act("tug")
 	# 3. Knäuel aus der Tasche in die Schränke stecken (alle auf einmal)
 	elif not _bag.is_empty() and _target_rack:
+		var post := _target_post
+		var n := _bag.size()
 		_deliver_bag()
 		_player.act("reach")
+		if post:
+			post.launch()
+			Net.send_event("post", { "i": _posts.find(post) })
+			_show_message("Rohrpost! %d Knäuel sind unterwegs in den Serverraum und stecken schon." % n)
 	# 4. Kabel vom Arm an eine freie Rolle hängen
 	elif held and _target_reel and _target_reel.is_free():
 		_system.transfer(_arm_reel, _target_reel)
@@ -1050,12 +1074,18 @@ func _update_targets() -> void:
 	_target_end = null
 	_target_item = null
 	_target_rack = false
+	_target_post = null
 	if _target_knot == null and not _bag.is_empty():
 		var reach: float = Balancing.rack["reach_m"]
 		for rp in _room.rack_points():
 			if CableTargeting._hit(rp, origin, dir, pos, reach) < 1.3:
 				_target_rack = true
 				break
+		if not _target_rack:
+			var post := _post_near(pos, 3.2)
+			if post:
+				_target_rack = true
+				_target_post = post
 	if _target_knot == null and not _target_rack:
 		_target_reel = CableTargeting.find_reel(_system.reels.values().filter(func(r: ReelData) -> bool: return not r.carried),
 			origin, dir, pos)
@@ -1371,6 +1401,8 @@ func _update_hud() -> void:
 		_hint.text = "Knoten! E: lösen (%d/%d)" % [held.knot_presses, presses]
 	elif _target_knot:
 		_hint.text = "E: Knoten lösen (%d/%d)" % [_target_knot.knot_presses, presses]
+	elif not _bag.is_empty() and _target_post:
+		_hint.text = "E: %d Knäuel per Rohrpost in den Serverraum" % _bag.size()
 	elif not _bag.is_empty() and _target_rack:
 		_hint.text = ("E: %d Knäuel einstecken" % _bag.size()) if _bag.size() > 1 else "E: Knäuel einstecken (%s)" % RackPlan.port_label(_bag[0].port_id)
 	elif not _ride.is_empty():
@@ -1853,6 +1885,65 @@ func _toggle_wagon() -> void:
 
 # --- Seilbahn -------------------------------------------------------------------
 
+# --- Rohrpost ---------------------------------------------------------------------
+
+## Je Viertel eine Rohrpost-Station (Lage aus dem Viertel, world.json → pneumatic_post)
+func _build_posts() -> void:
+	for d in _city.layout.districts:
+		var post := PneumaticPost.new()
+		post.name = "Rohrpost_%s" % d["id"]
+		add_child(post)
+		if post.setup(_city, d):
+			_posts.append(post)
+		else:
+			post.queue_free()
+
+
+func _refresh_posts() -> void:
+	for post in _posts:
+		post.set_active(_economy.state.posts.has(post.district_id))
+
+
+## Station in Betrieb, die näher als `reach` ist (oder null)
+func _post_near(pos: Vector3, reach: float) -> PneumaticPost:
+	for post in _posts:
+		if post.active and post.global_position.distance_to(pos) < reach:
+			return post
+	return null
+
+
+## Nächste Abgabe für Knäuel: { "pos", "post" } – Serverraum oder eine Rohrpost-Station in Betrieb
+func delivery_point(from: Vector3) -> Dictionary:
+	var best := { "pos": ServerRoomView.door_point(), "post": null }
+	var best_d := from.distance_to(best["pos"])
+	for post in _posts:
+		if post.active and from.distance_to(post.global_position) < best_d:
+			best_d = from.distance_to(post.global_position)
+			best = { "pos": post.global_position, "post": post }
+	return best
+
+
+## Host: Stationen gehen in Betrieb, sobald jemand zum ersten Mal in der Nähe ist
+func _update_posts(delta: float) -> void:
+	if not _authority:
+		return
+	_post_t -= delta
+	if _post_t > 0.0:
+		return
+	_post_t = 0.5
+	var reach := float(_city.layout.raw().get("pneumatic_post", {}).get("activate_m", 14.0))
+	for post in _posts:
+		if post.active:
+			continue
+		for ctx: PlayerCtx in _players.values():
+			if ctx.node.global_position.distance_to(post.global_position) < reach:
+				_economy.state.posts.append(post.district_id)
+				post.set_active(true)
+				_econ_dirty = true
+				_announce("Rohrpost-Station %s in Betrieb: Knäuel hier einwerfen, sie landen direkt im Serverraum." % post.district_name)
+				break
+
+
 func _build_ziplines() -> void:
 	for cfg: Dictionary in _city.layout.raw().get("ziplines", []):
 		var zl := Zipline.new()
@@ -2317,6 +2408,16 @@ func _apply_test_args() -> void:
 		_economy.state.total_earned = float(opts["newjob"]) * 1e6 if String(opts["newjob"]).is_valid_float() else 1e8
 		_start_new_job.call_deferred()
 		return
+	if opts.has("nearimportant"):
+		# Test: neben das nächste wichtige Kabel stellen und es anschauen
+		var best: CableData = null
+		for c: CableData in _system.important.values():
+			if best == null or c.path.points[0].distance_to(_player.global_position) < best.path.points[0].distance_to(_player.global_position):
+				best = c
+		if best:
+			var end := best.path.points[0]
+			_player.global_position = end + Vector3(2.5, 0.3, 2.5)
+			_player.look_toward(end)
 	if opts.has("look"):
 		# --look=hoodie_pink,shoes_weiss,fx_confetti: Kosmetik kaufen und anlegen
 		for id in String(opts["look"]).split(","):
@@ -2393,6 +2494,18 @@ func _apply_test_args() -> void:
 					_system.hook(c, _arm_reel)
 					_system.pull(_arm_reel, 1000.0)
 					break
+	if opts.has("post"):
+		# Test: neben die Rohrpost-Station eines Viertels stellen (--post=wohnviertel); --usepost wirft dann ein
+		for post in _posts:
+			if post.district_id == String(opts["post"]):
+				_player.global_position = post.global_position + Vector3(2.0, 0.5, 2.0)
+				_player.look_toward(post.global_position)
+				_stream_update(true)
+				if opts.has("usepost"):
+					get_tree().create_timer(2.0).timeout.connect(func() -> void:
+						_request("interact", { "end": -1, "knot": -1, "reel": -1, "item": -1, "rack": true, "stop": -1,
+							"station": [], "post": _posts.find(post) })
+						print("ROHRPOST: Tasche %d, Ports %s" % [_bag.size(), str(_economy.state.active_ports)]))
 	if opts.has("deliver"):
 		_deliver_bag()
 	if opts.has("jump"):
@@ -2995,6 +3108,7 @@ func net_event(kind: String, a: Dictionary) -> void:
 			_refresh_ziplines()
 			_refresh_finale(false)
 			_apply_looks()
+			_refresh_posts()
 			_economy.money_changed.emit(_economy.state.money)
 		"zone":
 			var ports: Array[int] = []
@@ -3011,6 +3125,10 @@ func net_event(kind: String, a: Dictionary) -> void:
 					_cord_view.react("placed")
 		"finale":
 			_show_finale_screen()
+		"post":
+			var i := int(a.get("i", -1))
+			if i >= 0 and i < _posts.size():
+				_posts[i].launch()
 		"looks":
 			var id := int(a["id"])
 			var looks: Dictionary = a.get("looks", {})

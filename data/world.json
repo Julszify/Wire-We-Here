@@ -6,27 +6,27 @@
 	"valley_height_m": 8.0,
 	"sea_floor_m": -12.0,
 	"coast": {
-		"z_m": 640.0,
+		"z_m": 666.0,
 		"wobble_m": 40.0,
 		"width_m": 120.0
 	},
 	"hills": [
 		{
 			"side": "north",
-			"from_m": -820,
-			"to_m": -1010,
+			"from_m": -654,
+			"to_m": -844,
 			"height_m": 50
 		},
 		{
 			"side": "east",
-			"from_m": 860,
-			"to_m": 1020,
+			"from_m": 782,
+			"to_m": 942,
 			"height_m": 55
 		},
 		{
 			"side": "west",
-			"from_m": -880,
-			"to_m": -1020,
+			"from_m": -688,
+			"to_m": -828,
 			"height_m": 40
 		}
 	],
@@ -34,13 +34,56 @@
 		{
 			"id": "campus",
 			"name": "Wolkig-Campus",
-			"center": [-700, -650],
-			"size": [360, 300],
-			"height_m": 33,
+			"center": [
+				-484,
+				-484
+			],
+			"size": [
+				360,
+				300
+			],
+			"height_m": 24,
 			"edge_m": 120,
 			"blockout": {
-				"kit": {"facade": "office", "roofs": [["RoofParapet", 1]], "roof_palette": ["#aeb8c3", "#9eaab7"], "props": [["AcUnit", 3], ["SolarPanels", 2], ["VentStack", 1], ["Dish", 1]], "prop_density": 1.0},
-				"palette": ["#e9eef4", "#cfe0f2", "#dfe6ee", "#b9d3ee", "#f1f3f5"],
+				"kit": {
+					"facade": "office",
+					"roofs": [
+						[
+							"RoofParapet",
+							1
+						]
+					],
+					"roof_palette": [
+						"#aeb8c3",
+						"#9eaab7"
+					],
+					"props": [
+						[
+							"AcUnit",
+							3
+						],
+						[
+							"SolarPanels",
+							2
+						],
+						[
+							"VentStack",
+							1
+						],
+						[
+							"Dish",
+							1
+						]
+					],
+					"prop_density": 1.0
+				},
+				"palette": [
+					"#e9eef4",
+					"#cfe0f2",
+					"#dfe6ee",
+					"#b9d3ee",
+					"#f1f3f5"
+				],
 				"style": "grid",
 				"block_m": 90,
 				"street_m": 14,
@@ -50,26 +93,112 @@
 				"h_max": 30,
 				"fill": 0.7,
 				"keep_free": [
-					[-640, -585, 130, 130],
-					[-700, -700, 130, 130]
+					[
+						-424,
+						-419,
+						130,
+						130
+					],
+					[
+						-484,
+						-534,
+						130,
+						130
+					]
 				]
 			},
 			"ground": "platten",
 			"important_cables": 50,
-			"cables": {"seed": 2107, "unit": 4, "section": "", "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Wolkig-Turm", "at": [-658.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -663.6], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-742.0, -700.0], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-721.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}, {"name": "Wolkig-Turm", "at": [-679.0, -736.4], "count": 2500, "radius": 9.0, "peak": 5.0}]},
+			"cables": {
+				"seed": 2107,
+				"unit": 4,
+				"section": "",
+				"crossing_heaps": 0,
+				"street_cables": 0,
+				"extra_heaps": [
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-442,
+							-534
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-463,
+							-497.6
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-505,
+							-497.6
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-526,
+							-534
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-505,
+							-570.4
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Wolkig-Turm",
+						"at": [
+							-463,
+							-570.4
+						],
+						"count": 2500,
+						"radius": 9.0,
+						"peak": 5.0
+					}
+				]
+			},
 			"wall": {
 				"height_m": 2.6,
 				"thickness_m": 1.2,
 				"gap_m": 22,
-				"exits": ["wohnviertel"],
+				"exits": [
+					"wohnviertel"
+				],
 				"_kommentar": "Zaun am Rand des Campus; Lücken nur zu den Vierteln in exits (dort liegt die Sperre)"
 			}
 		},
 		{
 			"id": "wohnviertel",
 			"name": "Wohnviertel",
-			"center": [-620, -200],
-			"size": [380, 360],
+			"center": [
+				-491,
+				-94
+			],
+			"size": [
+				380,
+				360
+			],
 			"height_m": 12,
 			"edge_m": 80,
 			"blockout": {
@@ -86,18 +215,100 @@
 			},
 			"ground": "gras",
 			"important_cables": 100,
-			"cables": {"seed": 2001, "unit": 1, "crossing_heaps": 30, "heap_count": [180, 240], "heap_radius": [3.5, 4.5], "heap_peak": [1.6, 2.4], "street_cables": 900, "street_length_m": [14, 30], "segment_heaps": {"count": 20, "heap_count": [120, 160], "heap_radius": [3.0, 4.0], "heap_peak": [1.4, 2.0]}, "_kommentar": "Haufen auf Straßenkreuzungen (zufällig ausgewählt), Kabel entlang der Straßen"}
+			"cables": {
+				"seed": 2001,
+				"unit": 1,
+				"crossing_heaps": 30,
+				"heap_count": [
+					180,
+					240
+				],
+				"heap_radius": [
+					3.5,
+					4.5
+				],
+				"heap_peak": [
+					1.6,
+					2.4
+				],
+				"street_cables": 900,
+				"street_length_m": [
+					14,
+					30
+				],
+				"segment_heaps": {
+					"count": 20,
+					"heap_count": [
+						120,
+						160
+					],
+					"heap_radius": [
+						3.0,
+						4.0
+					],
+					"heap_peak": [
+						1.4,
+						2.0
+					]
+				},
+				"_kommentar": "Haufen auf Straßenkreuzungen (zufällig ausgewählt), Kabel entlang der Straßen"
+			}
 		},
 		{
 			"id": "altstadt",
 			"name": "Altstadt",
-			"center": [-120, 0],
-			"size": [380, 320],
+			"center": [
+				-6,
+				60
+			],
+			"size": [
+				380,
+				320
+			],
 			"height_m": 9,
 			"edge_m": 70,
 			"blockout": {
-				"kit": {"facade": "altstadt", "roofs": [["RoofGable", 4], ["RoofHip", 1], ["RoofMansard", 2]], "roof_palette": ["#b8533c", "#a5452f", "#8b5a44", "#5c6470", "#c0653f"], "chimney_chance": 0.6, "awning_chance": 0.45, "awning_palette": ["#c94b3c", "#3c7a5a", "#2f5f9e", "#d9a441", "#7a4a8c"]},
-				"palette": ["#e8c9a0", "#d9a57c", "#f0dcb8", "#c98b6b", "#e6d3c0", "#b97a5e"],
+				"kit": {
+					"facade": "altstadt",
+					"roofs": [
+						[
+							"RoofGable",
+							4
+						],
+						[
+							"RoofHip",
+							1
+						],
+						[
+							"RoofMansard",
+							2
+						]
+					],
+					"roof_palette": [
+						"#b8533c",
+						"#a5452f",
+						"#8b5a44",
+						"#5c6470",
+						"#c0653f"
+					],
+					"chimney_chance": 0.6,
+					"awning_chance": 0.45,
+					"awning_palette": [
+						"#c94b3c",
+						"#3c7a5a",
+						"#2f5f9e",
+						"#d9a441",
+						"#7a4a8c"
+					]
+				},
+				"palette": [
+					"#e8c9a0",
+					"#d9a57c",
+					"#f0dcb8",
+					"#c98b6b",
+					"#e6d3c0",
+					"#b97a5e"
+				],
 				"style": "grid",
 				"block_m": 45,
 				"street_m": 8,
@@ -107,7 +318,12 @@
 				"h_max": 15,
 				"fill": 0.95,
 				"keep_free": [
-					[-120, 0, 70, 70]
+					[
+						-6,
+						60,
+						70,
+						70
+					]
 				]
 			},
 			"ground": "pflaster",
@@ -116,21 +332,134 @@
 				"height_m": 2.6,
 				"thickness_m": 1.2,
 				"gap_m": 22,
-				"exits": ["wohnviertel", "gamer"]
+				"exits": [
+					"wohnviertel",
+					"gamer"
+				]
 			},
-			"cables": {"seed": 2002, "unit": 3, "crossing_heaps": 36, "heap_count": [180, 240], "heap_radius": [3.0, 3.8], "heap_peak": [1.6, 2.2], "street_cables": 1000, "street_length_m": [12, 26], "extra_heaps": [{"name": "Marktplatz", "at": [-120, 0], "count": 3500, "radius": 13.0, "peak": 5.5}], "segment_heaps": {"count": 24, "heap_count": [100, 140], "heap_radius": [2.6, 3.2], "heap_peak": [1.3, 1.8]}, "_kommentar": "extra_heaps: feste große Haufen (z. B. auf dem Marktplatz); Kreuzungen in deren Nähe bekommen keinen eigenen Haufen"}
+			"cables": {
+				"seed": 2002,
+				"unit": 3,
+				"crossing_heaps": 36,
+				"heap_count": [
+					180,
+					240
+				],
+				"heap_radius": [
+					3.0,
+					3.8
+				],
+				"heap_peak": [
+					1.6,
+					2.2
+				],
+				"street_cables": 1000,
+				"street_length_m": [
+					12,
+					26
+				],
+				"extra_heaps": [
+					{
+						"name": "Marktplatz",
+						"at": [
+							-6,
+							60
+						],
+						"count": 3500,
+						"radius": 13.0,
+						"peak": 5.5
+					}
+				],
+				"segment_heaps": {
+					"count": 24,
+					"heap_count": [
+						100,
+						140
+					],
+					"heap_radius": [
+						2.6,
+						3.2
+					],
+					"heap_peak": [
+						1.3,
+						1.8
+					]
+				},
+				"_kommentar": "extra_heaps: feste große Haufen (z. B. auf dem Marktplatz); Kreuzungen in deren Nähe bekommen keinen eigenen Haufen"
+			}
 		},
 		{
 			"id": "gamer",
 			"name": "Gamer-Viertel",
-			"center": [-60, -480],
-			"size": [360, 260],
+			"center": [
+				-61,
+				-307
+			],
+			"size": [
+				360,
+				260
+			],
 			"height_m": 11,
 			"edge_m": 70,
 			"blockout": {
-				"kit": {"facade": "shop", "roofs": [["RoofParapet", 1]], "roof_palette": ["#3c4466", "#4a4f6e", "#2f3550"], "props": [["Billboard", 2], ["AcUnit", 2], ["Dish", 1], ["Antenna", 0.5]], "neon_chance": 0.7, "shop_sign_chance": 0.8, "neon_palette": ["#ff4fd8", "#4ff0ff", "#ffd84f", "#7cff6b", "#b26bff", "#ff7a3c"]},
-				"palette": ["#8f7fd6", "#4fb3b0", "#e06aa6", "#5b6bd0", "#3c4466", "#f2c14e"],
-				"keep_free": [[-60, -480, 60, 60]],
+				"kit": {
+					"facade": "shop",
+					"roofs": [
+						[
+							"RoofParapet",
+							1
+						]
+					],
+					"roof_palette": [
+						"#3c4466",
+						"#4a4f6e",
+						"#2f3550"
+					],
+					"props": [
+						[
+							"Billboard",
+							2
+						],
+						[
+							"AcUnit",
+							2
+						],
+						[
+							"Dish",
+							1
+						],
+						[
+							"Antenna",
+							0.5
+						]
+					],
+					"neon_chance": 0.7,
+					"shop_sign_chance": 0.8,
+					"neon_palette": [
+						"#ff4fd8",
+						"#4ff0ff",
+						"#ffd84f",
+						"#7cff6b",
+						"#b26bff",
+						"#ff7a3c"
+					]
+				},
+				"palette": [
+					"#8f7fd6",
+					"#4fb3b0",
+					"#e06aa6",
+					"#5b6bd0",
+					"#3c4466",
+					"#f2c14e"
+				],
+				"keep_free": [
+					[
+						-61,
+						-307,
+						60,
+						60
+					]
+				],
 				"style": "grid",
 				"block_m": 55,
 				"street_m": 10,
@@ -142,20 +471,128 @@
 			},
 			"ground": "platten",
 			"important_cables": 200,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["altstadt", "buero"]},
-			"cables": {"seed": 2101, "unit": 5, "crossing_heaps": 14, "heap_count": [380, 480], "heap_radius": [4.5, 5.5], "heap_peak": [2.0, 3.0], "segment_heaps": {"count": 22, "heap_count": [300, 400], "heap_radius": [4.0, 5.0], "heap_peak": [1.8, 2.6]}, "street_cables": 1500, "street_length_m": [12, 26], "extra_heaps": [{"name": "Arcade-Platz", "at": [-60, -480], "count": 4000, "radius": 14.0, "peak": 6.5}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"altstadt",
+					"buero"
+				]
+			},
+			"cables": {
+				"seed": 2101,
+				"unit": 5,
+				"crossing_heaps": 14,
+				"heap_count": [
+					380,
+					480
+				],
+				"heap_radius": [
+					4.5,
+					5.5
+				],
+				"heap_peak": [
+					2.0,
+					3.0
+				],
+				"segment_heaps": {
+					"count": 22,
+					"heap_count": [
+						300,
+						400
+					],
+					"heap_radius": [
+						4.0,
+						5.0
+					],
+					"heap_peak": [
+						1.8,
+						2.6
+					]
+				},
+				"street_cables": 1500,
+				"street_length_m": [
+					12,
+					26
+				],
+				"extra_heaps": [
+					{
+						"name": "Arcade-Platz",
+						"at": [
+							-61,
+							-307
+						],
+						"count": 4000,
+						"radius": 14.0,
+						"peak": 6.5
+					}
+				]
+			}
 		},
 		{
 			"id": "buero",
 			"name": "Büroviertel",
-			"center": [420, -420],
-			"size": [420, 340],
+			"center": [
+				389,
+				-414
+			],
+			"size": [
+				420,
+				340
+			],
 			"height_m": 14,
 			"edge_m": 80,
 			"blockout": {
-				"kit": {"facade": "tower", "roofs": [["RoofParapet", 1]], "roof_palette": ["#8f9db0", "#7f8ea3"], "props": [["AcUnit", 3], ["Antenna", 1], ["VentStack", 1], ["Dish", 0.5]], "prop_density": 0.6, "helipad_min_h": 60, "helipad_chance": 0.45},
-				"palette": ["#b8c6d6", "#9fb3c8", "#d5dde6", "#8aa2bd", "#c7d4e2"],
-				"keep_free": [[420, -420, 100, 100]],
+				"kit": {
+					"facade": "tower",
+					"roofs": [
+						[
+							"RoofParapet",
+							1
+						]
+					],
+					"roof_palette": [
+						"#8f9db0",
+						"#7f8ea3"
+					],
+					"props": [
+						[
+							"AcUnit",
+							3
+						],
+						[
+							"Antenna",
+							1
+						],
+						[
+							"VentStack",
+							1
+						],
+						[
+							"Dish",
+							0.5
+						]
+					],
+					"prop_density": 0.6,
+					"helipad_min_h": 60,
+					"helipad_chance": 0.45
+				},
+				"palette": [
+					"#b8c6d6",
+					"#9fb3c8",
+					"#d5dde6",
+					"#8aa2bd",
+					"#c7d4e2"
+				],
+				"keep_free": [
+					[
+						389,
+						-414,
+						100,
+						100
+					]
+				],
 				"style": "towers",
 				"block_m": 85,
 				"street_m": 16,
@@ -167,20 +604,126 @@
 			},
 			"ground": "platten",
 			"important_cables": 250,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["gamer", "stadion"]},
-			"cables": {"seed": 2102, "unit": 7, "crossing_heaps": 15, "heap_count": [600, 700], "heap_radius": [6.5, 7.5], "heap_peak": [3.0, 3.8], "segment_heaps": {"count": 24, "heap_count": [350, 450], "heap_radius": [5.5, 6.5], "heap_peak": [2.5, 3.2]}, "street_cables": 1500, "street_length_m": [14, 28], "extra_heaps": [{"name": "Vorplatz der Börse", "at": [420, -420], "count": 4000, "radius": 16.0, "peak": 7.0}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"gamer",
+					"stadion"
+				]
+			},
+			"cables": {
+				"seed": 2102,
+				"unit": 7,
+				"crossing_heaps": 15,
+				"heap_count": [
+					600,
+					700
+				],
+				"heap_radius": [
+					6.5,
+					7.5
+				],
+				"heap_peak": [
+					3.0,
+					3.8
+				],
+				"segment_heaps": {
+					"count": 24,
+					"heap_count": [
+						350,
+						450
+					],
+					"heap_radius": [
+						5.5,
+						6.5
+					],
+					"heap_peak": [
+						2.5,
+						3.2
+					]
+				},
+				"street_cables": 1500,
+				"street_length_m": [
+					14,
+					28
+				],
+				"extra_heaps": [
+					{
+						"name": "Vorplatz der Börse",
+						"at": [
+							389,
+							-414
+						],
+						"count": 4000,
+						"radius": 16.0,
+						"peak": 7.0
+					}
+				]
+			}
 		},
 		{
 			"id": "lieferzentrum",
 			"name": "C.O.R.D.s Lieferzentrum",
-			"center": [-650, 300],
-			"size": [360, 260],
+			"center": [
+				-508,
+				276
+			],
+			"size": [
+				360,
+				260
+			],
 			"height_m": 6,
 			"edge_m": 70,
 			"blockout": {
-				"kit": {"facade": "warehouse", "roofs": [["RoofSawtooth", 2], ["RoofParapet", 1]], "roof_palette": ["#7d8790", "#8c949d", "#9a8a6c"], "props": [["VentStack", 2], ["Skylight", 2], ["AcUnit", 1]], "prop_density": 0.5},
-				"palette": ["#d8cdb4", "#b9c2a8", "#e3d9c4", "#c4b89c"],
-				"keep_free": [[-650, 300, 120, 120]],
+				"kit": {
+					"facade": "warehouse",
+					"roofs": [
+						[
+							"RoofSawtooth",
+							2
+						],
+						[
+							"RoofParapet",
+							1
+						]
+					],
+					"roof_palette": [
+						"#7d8790",
+						"#8c949d",
+						"#9a8a6c"
+					],
+					"props": [
+						[
+							"VentStack",
+							2
+						],
+						[
+							"Skylight",
+							2
+						],
+						[
+							"AcUnit",
+							1
+						]
+					],
+					"prop_density": 0.5
+				},
+				"palette": [
+					"#d8cdb4",
+					"#b9c2a8",
+					"#e3d9c4",
+					"#c4b89c"
+				],
+				"keep_free": [
+					[
+						-508,
+						276,
+						120,
+						120
+					]
+				],
 				"style": "warehouse",
 				"block_m": 110,
 				"street_m": 18,
@@ -190,14 +733,76 @@
 			},
 			"ground": "beton",
 			"important_cables": 200,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["wohnviertel", "hafen"]},
-			"cables": {"seed": 2103, "unit": 9, "crossing_heaps": 9, "heap_count": [1300, 1500], "heap_radius": [8.0, 9.0], "heap_peak": [4.5, 5.5], "segment_heaps": {"count": 12, "heap_count": [800, 900], "heap_radius": [7.0, 8.0], "heap_peak": [3.5, 4.5]}, "street_cables": 1500, "street_length_m": [14, 28], "extra_heaps": [{"name": "Paketberg", "at": [-650, 300], "count": 5000, "radius": 18.0, "peak": 8.0}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"wohnviertel",
+					"hafen"
+				]
+			},
+			"cables": {
+				"seed": 2103,
+				"unit": 9,
+				"crossing_heaps": 9,
+				"heap_count": [
+					1300,
+					1500
+				],
+				"heap_radius": [
+					8.0,
+					9.0
+				],
+				"heap_peak": [
+					4.5,
+					5.5
+				],
+				"segment_heaps": {
+					"count": 12,
+					"heap_count": [
+						800,
+						900
+					],
+					"heap_radius": [
+						7.0,
+						8.0
+					],
+					"heap_peak": [
+						3.5,
+						4.5
+					]
+				},
+				"street_cables": 1500,
+				"street_length_m": [
+					14,
+					28
+				],
+				"extra_heaps": [
+					{
+						"name": "Paketberg",
+						"at": [
+							-508,
+							276
+						],
+						"count": 5000,
+						"radius": 18.0,
+						"peak": 8.0
+					}
+				]
+			}
 		},
 		{
 			"id": "stadion",
 			"name": "Stadion",
-			"center": [640, 0],
-			"size": [300, 300],
+			"center": [
+				398,
+				-34
+			],
+			"size": [
+				300,
+				300
+			],
 			"height_m": 16,
 			"edge_m": 90,
 			"blockout": {
@@ -207,59 +812,756 @@
 			},
 			"ground": "beton",
 			"important_cables": 250,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["buero", "krater"]},
-			"cables": {"seed": 2104, "unit": 11, "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Stadion-Vorplatz", "at": [740, 0], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [540, 0], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [640, 92], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [640, -92], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [748, 98], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [532, 98], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [748, -98], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Vorplatz", "at": [532, -98], "count": 2600, "radius": 12.0, "peak": 5.5}, {"name": "Stadion-Rand", "at": [772, 40], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [508, 40], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [772, -40], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [508, -40], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [680, 132], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [600, 132], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [680, -132], "count": 500, "radius": 6.0, "peak": 2.6}, {"name": "Stadion-Rand", "at": [600, -132], "count": 500, "radius": 6.0, "peak": 2.6}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"buero",
+					"krater"
+				]
+			},
+			"cables": {
+				"seed": 2104,
+				"unit": 11,
+				"crossing_heaps": 0,
+				"street_cables": 0,
+				"extra_heaps": [
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							498,
+							-34
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							298,
+							-34
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							398,
+							58
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							398,
+							-126
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							506,
+							64
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							290,
+							64
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							506,
+							-132
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Vorplatz",
+						"at": [
+							290,
+							-132
+						],
+						"count": 2600,
+						"radius": 12.0,
+						"peak": 5.5
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							530,
+							6
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							266,
+							6
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							530,
+							-74
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							266,
+							-74
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							438,
+							98
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							358,
+							98
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							438,
+							-166
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Stadion-Rand",
+						"at": [
+							358,
+							-166
+						],
+						"count": 500,
+						"radius": 6.0,
+						"peak": 2.6
+					}
+				]
+			}
 		},
 		{
 			"id": "hafen",
 			"name": "Hafen",
-			"center": [120, 590],
-			"size": [560, 170],
+			"center": [
+				12,
+				616
+			],
+			"size": [
+				560,
+				170
+			],
 			"height_m": 3,
 			"edge_m": 60,
 			"blockout": {
-				"kit": {"facade": "warehouse", "roofs": [["RoofSawtooth", 2], ["RoofGable", 1]], "roof_palette": ["#c0503f", "#3f7fb5", "#9aa2aa", "#d9a441"], "props": [["VentStack", 1]]},
-				"palette": ["#c0503f", "#3f7fb5", "#d9a441", "#4f8f6a", "#b8bcc2"],
+				"kit": {
+					"facade": "warehouse",
+					"roofs": [
+						[
+							"RoofSawtooth",
+							2
+						],
+						[
+							"RoofGable",
+							1
+						]
+					],
+					"roof_palette": [
+						"#c0503f",
+						"#3f7fb5",
+						"#9aa2aa",
+						"#d9a441"
+					],
+					"props": [
+						[
+							"VentStack",
+							1
+						]
+					]
+				},
+				"palette": [
+					"#c0503f",
+					"#3f7fb5",
+					"#d9a441",
+					"#4f8f6a",
+					"#b8bcc2"
+				],
 				"style": "harbor",
 				"h_min": 10,
 				"h_max": 14
 			},
 			"ground": "beton",
 			"important_cables": 300,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["lieferzentrum", "krater"]},
-			"cables": {"seed": 2105, "unit": 13, "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Kai", "at": [-130.0, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [-83.6, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [-37.3, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [9.1, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [55.5, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [101.8, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [148.2, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [194.5, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [240.9, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [287.3, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [333.6, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Kai", "at": [380.0, 612], "count": 2250, "radius": 10.0, "peak": 4.5}, {"name": "Lagerhaus", "at": [-100, 578], "count": 500, "radius": 5.5, "peak": 2.4}, {"name": "Lagerhaus", "at": [-10, 578], "count": 500, "radius": 5.5, "peak": 2.4}, {"name": "Lagerhaus", "at": [80, 578], "count": 500, "radius": 5.5, "peak": 2.4}, {"name": "Lagerhaus", "at": [170, 578], "count": 500, "radius": 5.5, "peak": 2.4}, {"name": "Lagerhaus", "at": [260, 578], "count": 500, "radius": 5.5, "peak": 2.4}, {"name": "Lagerhaus", "at": [350, 578], "count": 500, "radius": 5.5, "peak": 2.4}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"lieferzentrum",
+					"krater"
+				]
+			},
+			"cables": {
+				"seed": 2105,
+				"unit": 13,
+				"crossing_heaps": 0,
+				"street_cables": 0,
+				"extra_heaps": [
+					{
+						"name": "Kai",
+						"at": [
+							-238,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							-191.6,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							-145.3,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							-98.9,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							-52.5,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							-6.2,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							40.2,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							86.5,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							132.9,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							179.3,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							225.6,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Kai",
+						"at": [
+							272,
+							638
+						],
+						"count": 2250,
+						"radius": 10.0,
+						"peak": 4.5
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							-208,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							-118,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							-28,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							62,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							152,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					},
+					{
+						"name": "Lagerhaus",
+						"at": [
+							242,
+							604
+						],
+						"count": 500,
+						"radius": 5.5,
+						"peak": 2.4
+					}
+				]
+			}
 		},
 		{
 			"id": "krater",
 			"name": "Rechenzentrums-Krater",
-			"center": [650, 430],
-			"size": [300, 300],
+			"center": [
+				572,
+				396
+			],
+			"size": [
+				300,
+				300
+			],
 			"height_m": -1,
 			"edge_m": 0,
 			"blockout": {
-				"kit": {"facade": "datacenter", "roofs": [["RoofParapet", 1]], "roof_palette": ["#76838d", "#8a96a0"], "props": [["AcUnit", 4], ["VentStack", 2], ["Dish", 1]], "prop_density": 1.4},
-				"palette": ["#9aa7b0", "#b5bec6", "#7f8c96"],
+				"kit": {
+					"facade": "datacenter",
+					"roofs": [
+						[
+							"RoofParapet",
+							1
+						]
+					],
+					"roof_palette": [
+						"#76838d",
+						"#8a96a0"
+					],
+					"props": [
+						[
+							"AcUnit",
+							4
+						],
+						[
+							"VentStack",
+							2
+						],
+						[
+							"Dish",
+							1
+						]
+					],
+					"prop_density": 1.4
+				},
+				"palette": [
+					"#9aa7b0",
+					"#b5bec6",
+					"#7f8c96"
+				],
 				"style": "crater",
 				"h_min": 8,
 				"h_max": 12
 			},
 			"ground": "kies",
 			"important_cables": 350,
-			"wall": {"height_m": 2.6, "thickness_m": 1.2, "gap_m": 22, "exits": ["stadion", "hafen"]},
-			"cables": {"seed": 2106, "unit": 15, "crossing_heaps": 0, "street_cables": 0, "extra_heaps": [{"name": "Kraterring", "at": [750.0, 430.0], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [740.1, 473.4], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [712.3, 508.2], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [672.3, 527.5], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [627.7, 527.5], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [587.7, 508.2], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [559.9, 473.4], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [550.0, 430.0], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [559.9, 386.6], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [587.7, 351.8], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [627.7, 332.5], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [672.3, 332.5], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [712.3, 351.8], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterring", "at": [740.1, 386.6], "count": 2200, "radius": 11.0, "peak": 5.0}, {"name": "Kraterrand", "at": [774.7, 481.7], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [701.7, 554.7], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [598.3, 554.7], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [525.3, 481.7], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [525.3, 378.3], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [598.3, 305.3], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [701.7, 305.3], "count": 530, "radius": 6.0, "peak": 2.6}, {"name": "Kraterrand", "at": [774.7, 378.3], "count": 530, "radius": 6.0, "peak": 2.6}]}
+			"wall": {
+				"height_m": 2.6,
+				"thickness_m": 1.2,
+				"gap_m": 22,
+				"exits": [
+					"stadion",
+					"hafen"
+				]
+			},
+			"cables": {
+				"seed": 2106,
+				"unit": 15,
+				"crossing_heaps": 0,
+				"street_cables": 0,
+				"extra_heaps": [
+					{
+						"name": "Kraterring",
+						"at": [
+							672,
+							396
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							662.1,
+							439.4
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							634.3,
+							474.2
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							594.3,
+							493.5
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							549.7,
+							493.5
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							509.7,
+							474.2
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							481.9,
+							439.4
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							472,
+							396
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							481.9,
+							352.6
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							509.7,
+							317.8
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							549.7,
+							298.5
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							594.3,
+							298.5
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							634.3,
+							317.8
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterring",
+						"at": [
+							662.1,
+							352.6
+						],
+						"count": 2200,
+						"radius": 11.0,
+						"peak": 5.0
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							696.7,
+							447.7
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							623.7,
+							520.7
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							520.3,
+							520.7
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							447.3,
+							447.7
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							447.3,
+							344.3
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							520.3,
+							271.3
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							623.7,
+							271.3
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					},
+					{
+						"name": "Kraterrand",
+						"at": [
+							696.7,
+							344.3
+						],
+						"count": 530,
+						"radius": 6.0,
+						"peak": 2.6
+					}
+				]
+			}
 		}
 	],
 	"crater": {
-		"center": [650, 430],
+		"center": [
+			572,
+			396
+		],
 		"rim_radius_m": 200,
 		"rim_height_m": 15,
 		"floor_m": 2,
 		"floor_radius_m": 70
 	},
 	"harbor_basin": {
-		"center": [120, 735],
-		"size": [320, 130],
+		"center": [
+			12,
+			761
+		],
+		"size": [
+			320,
+			130
+		],
 		"depth_m": -8
+	},
+	"pneumatic_post": {
+		"_kommentar": "Rohrpost-Stationen (PneumaticPost): je Viertel eine, inside_m hinter der Zaunlücke zum ersten Nachbarn in wall.exits (ohne Zaun: Richtung default_toward), side_m neben der Straße (über die halbe Straßenbreite hinaus); eigene Lage je Viertel mit \"post\": [x, z]. Geht in Betrieb, sobald jemand näher als activate_m kommt. skip: Viertel ohne Station (Campus hat den Serverraum)",
+		"inside_m": 22,
+		"side_m": 1.2,
+		"default_toward": "campus",
+		"activate_m": 14,
+		"skip": [
+			"campus"
+		]
 	},
 	"countryside": {
 		"_kommentar": "Bebauung zwischen den Vierteln (CityBlockout._build_countryside), ohne Kabel: Häuser (Blender-Modelle) und Scheunen (Kiste + Bausatz-Dach) an den Hauptstraßen (roadside), verstreute Höfe auf der Wiese (farms, Raster cell_m bis ±extent_m) und kleine Vororte (suburbs). Abstände: district_gap_m zu Vierteln, barrier_gap_m zu Straßenenden (dort liegen die Sperren), zipline_gap_m zu Seilbahnen; max_slope_m = größter Höhenunterschied unter einem Gebäude; Größen *_size = [[längs], [tief], [hoch]] in Metern",
@@ -269,22 +1571,148 @@
 		"max_slope_m": 2.5,
 		"min_height_m": 1.5,
 		"blockout": {
-			"kit": { "facade": "warehouse", "roofs": [["RoofGable", 3], ["RoofSawtooth", 1]], "roof_palette": ["#9b4a3a", "#7d5a44", "#5c6470", "#a5452f"] },
-			"palette": ["#c9a27a", "#b5894f", "#d8c7a8", "#a8b49a", "#c98b6b"]
+			"kit": {
+				"facade": "warehouse",
+				"roofs": [
+					[
+						"RoofGable",
+						3
+					],
+					[
+						"RoofSawtooth",
+						1
+					]
+				],
+				"roof_palette": [
+					"#9b4a3a",
+					"#7d5a44",
+					"#5c6470",
+					"#a5452f"
+				]
+			},
+			"palette": [
+				"#c9a27a",
+				"#b5894f",
+				"#d8c7a8",
+				"#a8b49a",
+				"#c98b6b"
+			]
 		},
-		"roadside": { "chance": 0.55, "barn_chance": 0.25, "setback_m": 7, "spacing_min_m": 22, "spacing_max_m": 38, "end_gap_m": 45 },
-		"farms": { "cell_m": 85, "extent_m": 940, "chance": 0.45, "barn_chance": 0.85, "second_barn_chance": 0.3 },
-		"props": { "_kommentar": "Ausstattung im Umland mit den Modellen des Hinterhofs (YardProps): in Kacheln zu chunk_m, ab range_m ausgeblendet", "chunk_m": 160, "range_m": 380, "house_trees": ["TreeRound", "TreeRound", "TreeAutumn", "TreePine"] },
-		"avenues": { "road_chance": 0.7, "spacing_m": 14, "offset_m": 3.5, "end_gap_m": 50, "models": ["TreeRound", "TreeAutumn", "TreePine"] },
-		"groves": { "cell_m": 110, "extent_m": 980, "chance": 0.5, "radius_max_m": 26, "trees_min": 5, "trees_max": 14, "pine_above_m": 25 },
+		"roadside": {
+			"chance": 0.55,
+			"barn_chance": 0.25,
+			"setback_m": 7,
+			"spacing_min_m": 22,
+			"spacing_max_m": 38,
+			"end_gap_m": 45
+		},
+		"farms": {
+			"cell_m": 85,
+			"extent_m": 940,
+			"chance": 0.45,
+			"barn_chance": 0.85,
+			"second_barn_chance": 0.3
+		},
+		"props": {
+			"_kommentar": "Ausstattung im Umland mit den Modellen des Hinterhofs (YardProps): in Kacheln zu chunk_m, ab range_m ausgeblendet",
+			"chunk_m": 160,
+			"range_m": 380,
+			"house_trees": [
+				"TreeRound",
+				"TreeRound",
+				"TreeAutumn",
+				"TreePine"
+			]
+		},
+		"avenues": {
+			"road_chance": 0.7,
+			"spacing_m": 14,
+			"offset_m": 3.5,
+			"end_gap_m": 50,
+			"models": [
+				"TreeRound",
+				"TreeAutumn",
+				"TreePine"
+			]
+		},
+		"groves": {
+			"cell_m": 110,
+			"extent_m": 980,
+			"chance": 0.5,
+			"radius_max_m": 26,
+			"trees_min": 5,
+			"trees_max": 14,
+			"pine_above_m": 25
+		},
 		"suburbs": [
-			{ "name": "Sonnenhang", "center": [290, 60], "size": [190, 150] },
-			{ "name": "Kirchberg", "center": [330, -135], "size": [150, 100], "lamp": "LampOld" },
-			{ "name": "Lindenau", "center": [-280, 290], "size": [150, 120] },
-			{ "name": "Nordheide", "center": [70, -720], "size": [230, 110] },
-			{ "name": "Westend", "center": [-760, 75], "size": [140, 100], "lamp": "LampOld" },
-			{ "name": "Seeblick", "center": [-560, 515], "size": [300, 80] },
-			{ "name": "Am Ostrand", "center": [770, -330], "size": [130, 170] }
+			{
+				"name": "Sonnenhang",
+				"center": [
+					225,
+					332
+				],
+				"size": [
+					190,
+					150
+				]
+			},
+			{
+				"name": "Kirchberg",
+				"center": [
+					654,
+					-121
+				],
+				"size": [
+					150,
+					100
+				],
+				"lamp": "LampOld"
+			},
+			{
+				"name": "Lindenau",
+				"center": [
+					-200,
+					330
+				],
+				"size": [
+					150,
+					120
+				]
+			},
+			{
+				"name": "Nordheide",
+				"center": [
+					27,
+					-580
+				],
+				"size": [
+					230,
+					110
+				]
+			},
+			{
+				"name": "Westend",
+				"center": [
+					-575,
+					490
+				],
+				"size": [
+					140,
+					100
+				],
+				"lamp": "LampOld"
+			},
+			{
+				"name": "Am Ostrand",
+				"center": [
+					703,
+					-331
+				],
+				"size": [
+					130,
+					170
+				]
+			}
 		]
 	},
 	"landmarks": [
@@ -292,44 +1720,126 @@
 			"id": "turm",
 			"name": "Wolkig-Turm",
 			"district": "campus",
-			"pos": [-700, -700],
-			"size": [36, 200, 36]
+			"pos": [
+				-484,
+				-534
+			],
+			"size": [
+				36,
+				200,
+				36
+			]
 		}
 	],
-	"spawn": [-637, -572],
+	"spawn": [
+		-421,
+		-406
+	],
 	"roads": {
 		"width_m": 12,
 		"_kommentar": "Hauptstraßen zwischen Vierteln (von Rand zu Rand, folgen dem Gelände)",
 		"links": [
-			["campus", "wohnviertel"],
-			["campus", "gamer"],
-			["wohnviertel", "altstadt"],
-			["wohnviertel", "lieferzentrum"],
-			["altstadt", "gamer"],
-			["altstadt", "buero"],
-			["altstadt", "hafen"],
-			["altstadt", "lieferzentrum"],
-			["gamer", "buero"],
-			["buero", "stadion"],
-			["stadion", "krater"],
-			["hafen", "krater"],
-			["lieferzentrum", "hafen"]
+			[
+				"campus",
+				"wohnviertel"
+			],
+			[
+				"campus",
+				"gamer"
+			],
+			[
+				"wohnviertel",
+				"altstadt"
+			],
+			[
+				"wohnviertel",
+				"lieferzentrum"
+			],
+			[
+				"altstadt",
+				"gamer"
+			],
+			[
+				"altstadt",
+				"buero"
+			],
+			[
+				"altstadt",
+				"hafen"
+			],
+			[
+				"altstadt",
+				"lieferzentrum"
+			],
+			[
+				"gamer",
+				"buero"
+			],
+			[
+				"buero",
+				"stadion"
+			],
+			[
+				"stadion",
+				"krater"
+			],
+			[
+				"hafen",
+				"krater"
+			],
+			[
+				"lieferzentrum",
+				"hafen"
+			]
 		]
 	},
 	"backyard": {
 		"_kommentar": "Wolkig-Hinterhof: hier liegt die bisherige Zone (Kabelberg, Haufen, Server-Schrank). Die Hauptszene verschiebt die Stadt so, dass dieser Punkt bei (0, 0, 0) liegt.",
-		"center": [-640, -585]
+		"center": [
+			-424,
+			-419
+		]
 	},
 	"ground": {
 		"_kommentar": "Bodentexturen (erzeugt von scripts/debug/make_terrain_textures.gd). Reihenfolge = Textur-ID. uv_scale: Wiederholungen pro Meter (0.1 = alle 10 m). Viertel ohne 'ground' bekommen den Automatik-Boden (Gras, an Hängen Fels).",
 		"textures": [
-			{ "name": "gras", "uv_scale": 0.3, "detiling": true },
-			{ "name": "pflaster", "uv_scale": 0.6, "detiling": false },
-			{ "name": "platten", "uv_scale": 0.5, "detiling": false, "tint": "#d6d3ce" },
-			{ "name": "beton", "uv_scale": 0.25, "detiling": true, "tint": "#b4b2ae" },
-			{ "name": "sand", "uv_scale": 0.2, "detiling": true },
-			{ "name": "kies", "uv_scale": 1.0, "detiling": true },
-			{ "name": "fels", "uv_scale": 0.15, "detiling": true }
+			{
+				"name": "gras",
+				"uv_scale": 0.3,
+				"detiling": true
+			},
+			{
+				"name": "pflaster",
+				"uv_scale": 0.6,
+				"detiling": false
+			},
+			{
+				"name": "platten",
+				"uv_scale": 0.5,
+				"detiling": false,
+				"tint": "#d6d3ce"
+			},
+			{
+				"name": "beton",
+				"uv_scale": 0.25,
+				"detiling": true,
+				"tint": "#b4b2ae"
+			},
+			{
+				"name": "sand",
+				"uv_scale": 0.2,
+				"detiling": true
+			},
+			{
+				"name": "kies",
+				"uv_scale": 1.0,
+				"detiling": true
+			},
+			{
+				"name": "fels",
+				"uv_scale": 0.15,
+				"detiling": true
+			}
 		],
 		"auto_base": "gras",
 		"auto_slope_overlay": "fels",
@@ -360,7 +1870,10 @@
 		{
 			"id": "sperre_wohnviertel",
 			"name": "Kabelberg vor dem Wohnviertel",
-			"road": ["campus", "wohnviertel"],
+			"road": [
+				"campus",
+				"wohnviertel"
+			],
 			"offset_m": -6,
 			"blocker_margin_m": 1.5,
 			"_kommentar_lage": "offset_m: Mitte des Bergs relativ zur Zaunlücke (negativ = auf der Campus-Seite). Die unsichtbare Blockade steht blocker_margin_m hinter dem Berg und schließt seitlich an den Zaun an.",
@@ -376,7 +1889,10 @@
 		{
 			"id": "sperre_altstadt",
 			"name": "Kabelberg vor der Altstadt",
-			"road": ["altstadt", "wohnviertel"],
+			"road": [
+				"altstadt",
+				"wohnviertel"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 160,
@@ -390,7 +1906,10 @@
 		{
 			"id": "sperre_gamer",
 			"name": "Kabelberg vor dem Gamer-Viertel",
-			"road": ["gamer", "altstadt"],
+			"road": [
+				"gamer",
+				"altstadt"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 500,
@@ -403,7 +1922,10 @@
 		{
 			"id": "sperre_buero",
 			"name": "Kabelberg vor dem Büroviertel",
-			"road": ["buero", "gamer"],
+			"road": [
+				"buero",
+				"gamer"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 550,
@@ -416,7 +1938,10 @@
 		{
 			"id": "sperre_lieferzentrum",
 			"name": "Kabelberg vor dem Lieferzentrum",
-			"road": ["lieferzentrum", "wohnviertel"],
+			"road": [
+				"lieferzentrum",
+				"wohnviertel"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 550,
@@ -429,7 +1954,10 @@
 		{
 			"id": "sperre_stadion",
 			"name": "Kabelberg vor dem Stadion",
-			"road": ["stadion", "buero"],
+			"road": [
+				"stadion",
+				"buero"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 600,
@@ -442,7 +1970,10 @@
 		{
 			"id": "sperre_hafen",
 			"name": "Kabelberg vor dem Hafen",
-			"road": ["hafen", "lieferzentrum"],
+			"road": [
+				"hafen",
+				"lieferzentrum"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 650,
@@ -455,7 +1986,10 @@
 		{
 			"id": "sperre_krater_stadion",
 			"name": "Kabelberg vor dem Krater (Stadion)",
-			"road": ["krater", "stadion"],
+			"road": [
+				"krater",
+				"stadion"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 700,
@@ -468,7 +2002,10 @@
 		{
 			"id": "sperre_krater_hafen",
 			"name": "Kabelberg vor dem Krater (Hafen)",
-			"road": ["krater", "hafen"],
+			"road": [
+				"krater",
+				"hafen"
+			],
 			"offset_m": 6,
 			"blocker_margin_m": 1.5,
 			"count": 700,
@@ -485,14 +2022,86 @@
 			"name": "Seilbahn Wohnviertel",
 			"unlock": "zipline_wohnviertel",
 			"_kommentar": "Punkte [x, z, Höhe über Boden] in world.json-Koordinaten, vom äußeren Ende zur Basis. Erster und letzter Punkt sind Stationen, dazwischen Masten. continues: am Ende geht die Fahrt mit dieser Strecke weiter (Richtung Basis)",
-			"points": [[-608, -388, 6], [-660, -440, 10], [-700, -492, 11], [-690, -525, 10], [-670, -545, 6]]
+			"points": [
+				[
+					-478.7,
+					-281.7,
+					6
+				],
+				[
+					-499.3,
+					-306.8,
+					10
+				],
+				[
+					-473.0,
+					-325.0,
+					11
+				],
+				[
+					-474,
+					-359,
+					10
+				],
+				[
+					-454,
+					-379,
+					6
+				]
+			]
 		},
 		{
 			"id": "seilbahn_altstadt",
 			"name": "Seilbahn Altstadt",
 			"unlock": "zipline_altstadt",
 			"continues": "seilbahn_wohnviertel",
-			"points": [[-290, 0, 6], [-325, -14, 11], [-370, -100, 10], [-430, -200, 10], [-530, -200, 10], [-620, -200, 10], [-620, -300, 10], [-620, -372, 12], [-640, -385, 6]]
+			"points": [
+				[
+					-176,
+					60,
+					6
+				],
+				[
+					-216.9,
+					50.7,
+					11
+				],
+				[
+					-260.0,
+					-12.6,
+					10
+				],
+				[
+					-310.9,
+					-87.2,
+					10
+				],
+				[
+					-401,
+					-94,
+					10
+				],
+				[
+					-491,
+					-94,
+					10
+				],
+				[
+					-491,
+					-194,
+					10
+				],
+				[
+					-491.0,
+					-262.0,
+					12
+				],
+				[
+					-511,
+					-279,
+					6
+				]
+			]
 		}
 	],
 	"streaming": {
@@ -500,6 +2109,152 @@
 		"unload_m": 220,
 		"_kommentar": "Einheiten (Viertel, Sperren) laden, wenn der Spieler näher als load_m an ihrem Rand ist, und entladen ab unload_m"
 	},
-	"sites": [{"id": "turm_oben", "name": "Wolkig-Turm", "unit": 18, "seed": 2108, "section": "turm", "at": [-700, -700], "half": [35, 35], "heaps": [{"name": "Etage 40", "at": [-677, -700], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-723, -700], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-700, -723], "lift_m": 120, "count": 300, "radius": 3.5, "peak": 1.8}, {"name": "Etage 40", "at": [-688, -677], "lift_m": 120, "count": 150, "radius": 3.0, "peak": 1.5}, {"name": "Etage 40", "at": [-712, -677], "lift_m": 120, "count": 150, "radius": 3.0, "peak": 1.5}, {"name": "Dach", "at": [-692, -692], "lift_m": 200, "count": 400, "radius": 3.5, "peak": 2.0}, {"name": "Dach", "at": [-710, -689], "lift_m": 200, "count": 400, "radius": 3.5, "peak": 2.0}, {"name": "Dach", "at": [-686, -702], "lift_m": 200, "count": 400, "radius": 3.0, "peak": 1.8}], "_kommentar": "Kabel oben im Turm (Etage 40 und Dach) mit den 150 Turm-Kabeln; lift_m = Höhe über dem Boden"}],
-	"tower_finale": {"_kommentar": "Finale im Wolkig-Turm: Aufzug mit drei Halten (Erdgeschoss, Etage 40 mit umlaufender Plattform, Dach). Er fährt erst, wenn alle anderen Schränke voll sind. Auf dem Dach steht C.O.R.D.s Kern; sind alle 2000 Ports belegt, schaltet E ihn ab.", "landmark": "turm", "deck_height_m": 120, "deck_width_m": 10, "railing_m": 1.2, "stops": [{"name": "Erdgeschoss", "at": [-700, -680.5], "lift_m": 0}, {"name": "Etage 40", "at": [-700, -676], "lift_m": 120}, {"name": "Dach", "at": [-700, -685], "lift_m": 200}], "core": {"at": [-709, -709], "lift_m": 200}}
+	"sites": [
+		{
+			"id": "turm_oben",
+			"name": "Wolkig-Turm",
+			"unit": 18,
+			"seed": 2108,
+			"section": "turm",
+			"at": [
+				-484,
+				-534
+			],
+			"half": [
+				35,
+				35
+			],
+			"heaps": [
+				{
+					"name": "Etage 40",
+					"at": [
+						-461,
+						-534
+					],
+					"lift_m": 120,
+					"count": 300,
+					"radius": 3.5,
+					"peak": 1.8
+				},
+				{
+					"name": "Etage 40",
+					"at": [
+						-507,
+						-534
+					],
+					"lift_m": 120,
+					"count": 300,
+					"radius": 3.5,
+					"peak": 1.8
+				},
+				{
+					"name": "Etage 40",
+					"at": [
+						-484,
+						-557
+					],
+					"lift_m": 120,
+					"count": 300,
+					"radius": 3.5,
+					"peak": 1.8
+				},
+				{
+					"name": "Etage 40",
+					"at": [
+						-472,
+						-511
+					],
+					"lift_m": 120,
+					"count": 150,
+					"radius": 3.0,
+					"peak": 1.5
+				},
+				{
+					"name": "Etage 40",
+					"at": [
+						-496,
+						-511
+					],
+					"lift_m": 120,
+					"count": 150,
+					"radius": 3.0,
+					"peak": 1.5
+				},
+				{
+					"name": "Dach",
+					"at": [
+						-476,
+						-526
+					],
+					"lift_m": 200,
+					"count": 400,
+					"radius": 3.5,
+					"peak": 2.0
+				},
+				{
+					"name": "Dach",
+					"at": [
+						-494,
+						-523
+					],
+					"lift_m": 200,
+					"count": 400,
+					"radius": 3.5,
+					"peak": 2.0
+				},
+				{
+					"name": "Dach",
+					"at": [
+						-470,
+						-536
+					],
+					"lift_m": 200,
+					"count": 400,
+					"radius": 3.0,
+					"peak": 1.8
+				}
+			],
+			"_kommentar": "Kabel oben im Turm (Etage 40 und Dach) mit den 150 Turm-Kabeln; lift_m = Höhe über dem Boden"
+		}
+	],
+	"tower_finale": {
+		"_kommentar": "Finale im Wolkig-Turm: Aufzug mit drei Halten (Erdgeschoss, Etage 40 mit umlaufender Plattform, Dach). Er fährt erst, wenn alle anderen Schränke voll sind. Auf dem Dach steht C.O.R.D.s Kern; sind alle 2000 Ports belegt, schaltet E ihn ab.",
+		"landmark": "turm",
+		"deck_height_m": 120,
+		"deck_width_m": 10,
+		"railing_m": 1.2,
+		"stops": [
+			{
+				"name": "Erdgeschoss",
+				"at": [
+					-484,
+					-514.5
+				],
+				"lift_m": 0
+			},
+			{
+				"name": "Etage 40",
+				"at": [
+					-484,
+					-510
+				],
+				"lift_m": 120
+			},
+			{
+				"name": "Dach",
+				"at": [
+					-484,
+					-519
+				],
+				"lift_m": 200
+			}
+		],
+		"core": {
+			"at": [
+				-493,
+				-543
+			],
+			"lift_m": 200
+		}
+	}
 }

@@ -404,7 +404,10 @@ func _nearest_end_for_drone(from: Vector3, radius: float) -> Dictionary:
 
 func _drone_deliver(d: Dictionary) -> void:
 	d["state"] = "deliver"
-	d["goal"] = ServerRoomView.door_point() + Vector3(0, 2.5, 0)
+	# Nächste Abgabe: Rohrpost-Station in Betrieb oder der Serverraum
+	var drop: Dictionary = world.delivery_point(d["pos"])
+	d["post"] = drop["post"]
+	d["goal"] = (drop["pos"] as Vector3) + Vector3(0, 2.5 if drop["post"] == null else 6.5, 0)
 
 
 func _drone_arrive(d: Dictionary, _index: int) -> void:
@@ -438,6 +441,10 @@ func _drone_arrive(d: Dictionary, _index: int) -> void:
 			if not cargo.is_empty():
 				world._plug_items(cargo.duplicate(), (d["pos"] as Vector3) + Vector3(0, 0.6, 0))
 				cargo.clear()
+				var post: PneumaticPost = d.get("post")
+				if post and is_instance_valid(post):
+					post.launch()
+					Net.send_event("post", { "i": (world._posts as Array).find(post) })
 			d["state"] = "seek"
 		_:
 			d["state"] = "seek"

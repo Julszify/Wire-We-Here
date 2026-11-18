@@ -17,7 +17,8 @@ os.makedirs(out_dir, exist_ok=True)
 MAX = 1024
 # Ziel-Dreiecke je Modell (nach Namensanfang); sonst DEFAULT
 TARGETS = {"baum": 5000, "herbstbaum": 5000, "nadelbaum": 3500, "busch": 3000, "blumenkuebel": 3000,
-           "laterne": 3000, "felsen": 2000, "chef_": 20000, "jukebox": 7500}
+           "laterne": 3000, "felsen": 2000, "chef_": 20000, "jukebox": 7500,
+           "kabelpritsche": 3000, "leitstand": 7000, "rohrpoststation": 6000}
 DEFAULT = 5000
 
 

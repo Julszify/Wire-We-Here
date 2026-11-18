@@ -16,8 +16,8 @@ const ASSUME := {
 	"nein_quote": 0.85,           # Anteil der Bestellfragen, die der Spieler rechtzeitig ablehnt
 	"weg_serverraum_hof_m": 30.0, # mittlerer Weg vom Kabel zum Serverraum im Hinterhof (einfach)
 	"weg_sperre_m": 95.0,         # Sperre -> Serverraum
-	"weg_wohnviertel_m": 400.0,   # Mitte Wohnviertel -> Serverraum
-	"weg_altstadt_m": 780.0,      # Mitte Altstadt -> Serverraum
+	"weg_wohnviertel_m": 110.0,   # Mitte Wohnviertel -> Rohrpost-Station (vorher 400 m zum Serverraum)
+	"weg_altstadt_m": 110.0,      # Mitte Altstadt -> Rohrpost-Station (vorher 780 m zum Serverraum)
 	"weg_zur_station_m": 180.0,   # mittlerer Fußweg zur nächsten Seilbahn-Station im Viertel
 	"seil_wohnviertel_m": 250.0,  # Seilbahn Wohnviertel -> Basis (Fahrstrecke)
 	"seil_altstadt_m": 650.0,     # Seilbahn Altstadt -> Basis (über das Wohnviertel)
@@ -28,6 +28,7 @@ const ASSUME := {
 	"sauger_anteil": 0.6,         # so viel Zeit hält der Spieler den Sauger (der Rest: suchen, laufen)
 	"drohne_wichtig_s": 45.0,     # eine Drohne bringt im Einsatzgebiet alle so viele Sekunden ein wichtiges Kabel
 	"weg_faktor": 1.25,           # Luftlinie -> Fußweg
+	"rohrpost_weg_m": 110.0,      # mittlerer Weg zur Rohrpost-Station im Viertel (statt zum Serverraum)
 	"schritt_s": 5.0,             # Zeitschritt der Rechnung
 }
 
@@ -304,7 +305,11 @@ func _way_m(id: String) -> float:
 	var base := Vector2(Balancing.world["backyard"]["center"][0], Balancing.world["backyard"]["center"][1])
 	for d: Dictionary in Balancing.world["districts"]:
 		if d["id"] == id:
-			return Vector2(d["center"][0], d["center"][1]).distance_to(base) * float(ASSUME["weg_faktor"])
+			var way := Vector2(d["center"][0], d["center"][1]).distance_to(base) * float(ASSUME["weg_faktor"])
+			# Mit Rohrpost-Station im Viertel: nur noch der Weg zur Station (Annahme: rohrpost_weg_m)
+			if not (Balancing.world.get("pneumatic_post", {}).get("skip", []) as Array).has(id):
+				way = minf(way, float(ASSUME["rohrpost_weg_m"]))
+			return way
 	for l: Dictionary in Balancing.world["landmarks"]:
 		if l["id"] == id:
 			return Vector2(l["pos"][0], l["pos"][1]).distance_to(base) * float(ASSUME["weg_faktor"]) + 60.0

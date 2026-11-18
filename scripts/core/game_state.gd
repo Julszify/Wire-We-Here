@@ -14,6 +14,8 @@ var _port_set: Dictionary = {}
 var snooze_cooldown: float = 0.0
 ## Finale geschafft: C.O.R.D.s Kern auf dem Turm abgeschaltet (C.O.R.D. bestellt nichts mehr)
 var finale_done := false
+## Rohrpost-Stationen in Betrieb (Viertel-IDs)
+var posts: Array[String] = []
 ## Neuer Auftrag (Prestige): wie oft schon neu begonnen und gesammelte Ruf-Punkte. Bleiben beim neuen Auftrag.
 var prestige_count := 0
 var reputation := 0
@@ -38,7 +40,7 @@ func add_port(port: int) -> void:
 
 func to_dict() -> Dictionary:
 	return { "money": money, "total_earned": total_earned, "upgrades": upgrades.duplicate(), "active_ports": Array(active_ports),
-		"snooze_cooldown": snooze_cooldown, "finale_done": finale_done, "meta": meta_dict() }
+		"snooze_cooldown": snooze_cooldown, "finale_done": finale_done, "posts": Array(posts), "meta": meta_dict() }
 
 
 ## Was einen neuen Auftrag überdauert: Ruf, Zahl der Aufträge, Kosmetik
@@ -72,4 +74,7 @@ func load_dict(d: Dictionary) -> void:
 		add_port(int(p))
 	snooze_cooldown = float(d.get("snooze_cooldown", 0.0))
 	finale_done = bool(d.get("finale_done", false))
+	posts.clear()
+	for p in d.get("posts", []):
+		posts.append(String(p))
 	load_meta(d.get("meta", {}))

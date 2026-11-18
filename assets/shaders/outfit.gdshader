@@ -58,8 +58,11 @@ void fragment() {
 		* smoothstep(0.45, 0.55, val) * (1.0 - smoothstep(0.12, 0.17, h));
 	// Hose: dunkles Grau zwischen Schuhen und Hoodie
 	float m_pants = (1.0 - smoothstep(0.18, 0.3, sat)) * band(val, 0.1, 0.55, 0.05) * band(h, 0.06, 0.4, 0.04);
-	// Kopfhörer: helles Grau bis Silber am Kopf
-	float m_phones = (1.0 - smoothstep(0.18, 0.28, sat)) * band(val, 0.42, 0.95, 0.05) * smoothstep(0.66, 0.74, h);
+	// Kopfhörer: helles, kühles Grau bis Silber am Kopf. Warme Töne (Haut, Haare) und Glanzpunkte bleiben,
+	// sonst gibt es Sprenkel in Gesicht, Haaren und Augen
+	float warm = (band(hue, 0.0, 0.17, 0.02) + band(hue, 0.92, 1.0, 0.02)) * smoothstep(0.04, 0.09, sat);
+	float m_phones = (1.0 - smoothstep(0.16, 0.24, sat)) * band(val, 0.42, 0.86, 0.04) * smoothstep(0.66, 0.74, h)
+		* (1.0 - warm);
 	vec3 outc = c;
 	outc = recolor(outc, hoodie_color, val, 0.82, m_hoodie);
 	outc = recolor(outc, shoes_color, val, 0.95, m_shoes);

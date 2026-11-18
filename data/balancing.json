@@ -1,6 +1,7 @@
 {
 	"_kommentar": "Balancing-Werte für den Vertical Slice. Startwerte aus dem Browser-Prototyp.",
 	"cable": {
+		"important_glow": { "_kommentar": "Wichtige Kabel pulsieren hell in ihrer Farbe (Leuchtstärke min bis max, hz Pulse pro Sekunde) und sind thickness-mal so dick", "min": 0.4, "max": 5.0, "hz": 0.9, "thickness": 1.4, "halo_radius": 2.4, "halo_min": 0.2, "halo_max": 0.7 },
 		"length_min_m": 15.0,
 		"length_max_m": 30.0,
 		"radius_m": 0.055,
@@ -15,7 +16,7 @@
 		"knot_max_fraction": 0.85,
 		"palette": [
 			"#d6453d",
-			"#f2c230",
+			"#26b5b0",
 			"#2f6fd6",
 			"#2f9e5b",
 			"#8a55d6",
