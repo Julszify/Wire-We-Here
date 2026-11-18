@@ -54,7 +54,7 @@ Das Intro spielt beim ersten Start und nach „Neues Spiel“ und lässt sich mi
 **Kabelende finden → aufwickeln → Knoten lösen → Geld.**
 
 - Jedes Kabel ist an beiden Enden greifbar. Du packst ein Ende mit E und ziehst das Kabel Meter für Meter aus dem Haufen. Das hintere Ende wandert dabei durch den Haufen nach vorne und schlägt zum Schluss aus dem Haufen heraus.
-- Jedes Kabel ist 15–30 m lang und hat bis zu zwei Knoten. An einem Knoten bleibt es hängen, dreimal E löst ihn.
+- Jedes Kabel ist zwischen 0,5 und 100 m lang, und so sieht es auch aus: kurze Stummel am Haufenrand, lange Kabel, die sich durch den ganzen Haufen oder quer über den Boden schlängeln. Es hat bis zu zwei Knoten. An einem Knoten bleibt es hängen, dreimal E löst ihn.
 - Gewöhnliche Kabel bringen Geld pro Meter (am Anfang 0,50 €).
 - Solange ein Kabel am Arm hängt, hält dich eine 6-m-Leine beim Haufen.
 
@@ -63,7 +63,7 @@ Das Intro spielt beim ersten Start und nach „Neues Spiel“ und lässt sich mi
 ### Wichtige Kabel, Serverraum und Dienste
 
 **Wichtige Kabel finden:**
-- Etwa jedes hundertste Kabel ist wichtig. Es pulsiert golden, ist dicker und trägt ein Etikett mit seinem Port bzw. Schrank, Reihe und Dienst.
+- Etwa jedes fünfzigste Kabel ist wichtig. Es pulsiert golden, ist dicker und trägt ein Etikett mit seinem Port bzw. Schrank, Reihe und Dienst.
 - Gewöhnliche Kabel sind nie gelb, damit Gold eindeutig „wichtig“ heißt.
 
 **Knäuel und Serverraum:**
@@ -132,19 +132,19 @@ Welche Stufe wann freigeht, steht je Upgrade als Liste `progress` in `data/balan
 
 ### C.O.R.D.
 
-C.O.R.D. schwebt dir hinterher und fragt regelmäßig, ob er nachbestellen soll: das erste Mal nach 30 Sekunden, danach alle 45–90 Sekunden.
+C.O.R.D. schwebt dir hinterher und fragt regelmäßig, ob er nachbestellen soll: das erste Mal nach 30 Sekunden, danach unregelmäßig: mal schon nach einer Minute wieder, mal sechs Minuten lang gar nicht.
 
-- Du hast 6 Sekunden für **N** („Nein“). Schaffst du es nicht, fallen 100 neue Kabel als frischer Haufen neben dir vom Himmel.
+- Du hast 6 Sekunden für **N** („Nein“). Schaffst du es nicht, fallen 50 neue Kabel als frischer Haufen neben dir vom Himmel.
 - Nach einem „Nein“ ist er beleidigt: Er sinkt, dreht sich weg, und sein Leuchtband wird dunkel.
 - Nach einer Bestellung dreht er sich vor Freude.
 
 ### Die Stadt
 
-Die Stadt ist etwa 2 × 2 km groß und hat zehn Bereiche, die nacheinander freigeräumt werden. Jedes Viertel hat einen Zaun mit Lücken; vor jeder Lücke liegt ein Kabelberg als Sperre. Ist genug davon abgetragen, ist der Weg frei. Zusammen liegen rund **195.000 Kabel** in der Stadt, etwa 100 gewöhnliche je wichtigem.
+Die Stadt ist etwa 2 × 2 km groß und hat zehn Bereiche, die nacheinander freigeräumt werden. Jedes Viertel hat einen Zaun mit Lücken; vor jeder Lücke liegt ein Kabelberg als Sperre. Ist genug davon abgetragen, ist der Weg frei. Zusammen liegen rund **100.000 Kabel** in der Stadt, etwa 50 gewöhnliche je wichtigem.
 
 | Bereich | Besonderheit |
 | --- | --- |
-| Wolkig-Hinterhof | Basis mit Serverraum, Tutorial mit ca. 525 Kabeln |
+| Wolkig-Hinterhof | Basis mit Serverraum, Tutorial mit ca. 260 Kabeln |
 | Wolkig-Campus | Bürowürfel und der Wolkig-Turm |
 | Wohnviertel | Wohnhäuser; Seilbahn zurück zur Basis |
 | Altstadt | Kopfsteinpflaster, Fensterläden, Marktplatz mit großem Haufen; zweite Seilbahn |
@@ -251,7 +251,7 @@ Das Spiel ist in Entwicklung. Der komplette Spielverlauf vom Intro bis zum Abspa
 
 | Bereich | Stand |
 | --- | --- |
-| Kabel | ca. 195.000 Kabel in der Stadt; beide Enden greifbar, Knoten, weiches Verbindungsstück, das nachschwingt und am Knoten ruckt |
+| Kabel | ca. 100.000 Kabel in der Stadt, 0,5–100 m lang; beide Enden greifbar, Knoten, weiches Verbindungsstück, das nachschwingt und am Knoten ruckt |
 | Werkzeuge | Hand, Handkurbel, Motorrollen, Kabeltrommel-Wagen, Kabelsauger, Haufen-Winden, Abräum-Drohnen |
 | Fortschritt | 29 Upgrades, Stufen nach „Viertel am Netz“, Detektor und Peilantenne, Fortschritt je Viertel |
 | Serverraum | begehbare Halle mit zehn Schränken und 2000 Ports; Ausbau in fünf Linien mit Möbeln aus Tripo3D |

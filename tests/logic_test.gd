@@ -290,7 +290,16 @@ func _test_important_ports() -> void:
 	for p in 20:
 		free.append(p)
 	var cables := zone.create_cables(0, free)
-	_check(cables.size() == zone.cable_total() and cables.size() >= 500, "Über 500 Kabel in der Zone (%d)" % cables.size())
+	_check(cables.size() == zone.cable_total() and cables.size() >= 250, "Über 250 Kabel in der Zone (%d)" % cables.size())
+	# Länge 0,5–100 m, und die sichtbare Bahn ist so lang wie das Kabel
+	var len_ok := true
+	var shortest := 1000.0
+	var longest := 0.0
+	for c in cables:
+		shortest = minf(shortest, c.length_m)
+		longest = maxf(longest, c.length_m)
+		len_ok = len_ok and c.length_m >= 0.5 and c.length_m <= 100.0 and absf(c.path.length - c.length_m) < 0.05 * c.length_m + 0.05
+	_check(len_ok and shortest < 10.0 and longest > 90.0, "Kabel 0,5–100 m, Bahn so lang wie das Kabel (%.1f–%.1f m)" % [shortest, longest])
 	var ports := []
 	var heaps_with_important := {}
 	for c in cables:
@@ -304,7 +313,7 @@ func _test_important_ports() -> void:
 	_check(ids.size() == cables.size(), "Kabel-IDs eindeutig")
 	var again := ZoneData.from_config(1234).create_cables(0, free)
 	var same := true
-	for i in [0, 100, 300, cables.size() - 1]:
+	for i in [0, 100, 200, cables.size() - 1]:
 		same = same and again[i].path.points == cables[i].path.points and again[i].port_id == cables[i].port_id
 	_check(same, "Zone reproduzierbar aus dem Seed")
 	var few: Array[int] = [3, 7]

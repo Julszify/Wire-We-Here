@@ -12,9 +12,12 @@ var length: float = 0.0
 
 ## Erzeugt eine zufällige Haufen-Bahn um `center`. Verbraucht Zufallszahlen aus `rng`.
 ## `radius` und `peak` (zusätzliche Höhe in der Mitte) bestimmen die Größe des Haufens.
+## `length_m` = Länge der Bahn in Metern (= Spiel-Länge des Kabels): kurze Kabel sind Stummel am Rand,
+## lange schlängeln sich mit vielen Stützpunkten durch den Haufen. <= 0: alte feste Form.
 ## Der Rand ist pro Haufen unregelmäßig (Wellen aus der Lage abgeleitet), manche Enden laufen als
 ## Ausläufer über den Boden, und die Kabel liegen eher nahe der Hügeloberfläche als quer im Inneren.
-static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radius: float = -1.0, peak: float = -1.0) -> CablePath:
+static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radius: float = -1.0, peak: float = -1.0,
+		length_m: float = -1.0) -> CablePath:
 	var h: Dictionary = Balancing.heap
 	var c: Dictionary = Balancing.cable
 	if radius <= 0.0:
@@ -61,7 +64,10 @@ static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radi
 			var mrim := radius * _rim_factor(atan2(m.y, m.x), phases)
 			var ms := float(h["base_height_m"]) + peak * pow(maxf(0.0, 1.0 - pow(minf(mr / mrim, 1.0), 2.0)), 0.8)
 			ctrl.append(center + Vector3(m.x, h["min_height_m"] + ms * rng.randf_range(maxf(surface_min, 0.7), 1.0), m.y))
-		for i in count:
+		var i_big := 0
+		var acc_big := _ctrl_length(ctrl)
+		while i_big < count or (length_m > 0.0 and acc_big < length_m * 1.25 and i_big < 400):
+			i_big += 1
 			var off := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * local_r
 			var q := target + off
 			var qr := q.length()
@@ -72,29 +78,65 @@ static func generate_heap_path(rng: RandomNumberGenerator, center: Vector3, radi
 			var surface := float(h["base_height_m"]) + peak * pow(maxf(0.0, 1.0 - pow(qr / local_rim, 2.0)), 0.8)
 			var y: float = h["min_height_m"] + surface * rng.randf_range(surface_min, 1.0)
 			ctrl.append(center + Vector3(q.x, y, q.y))
-		var dense_big := catmull_rom_centripetal(ctrl, 24)
-		var big := CablePath.new()
-		big.points = resample_even(dense_big, int(c["path_samples"]))
-		big.length = polyline_length(big.points)
-		return big
+			acc_big += ctrl[ctrl.size() - 1].distance_to(ctrl[ctrl.size() - 2]) * 1.1
+		return _finish(catmull_rom_centripetal(ctrl, 24), length_m)
 
 	var r1 := rim * inner_frac
 	ctrl.append(center + Vector3(r1 * cos(a0 + 0.15), 0.35, r1 * sin(a0 + 0.15)))
 
 	# Weitere Stützpunkte im Haufen, meist knapp unter der Hügeloberfläche
-	for i in count:
+	var i_pt := 0
+	var acc := _ctrl_length(ctrl)
+	while i_pt < count or (length_m > 0.0 and acc < length_m * 1.25 and i_pt < 400):
+		i_pt += 1
 		var t := rng.randf() * TAU
 		var local_rim := radius * _rim_factor(t, phases)
 		var r := sqrt(rng.randf()) * local_rim * inner_frac
 		var surface := float(h["base_height_m"]) + peak * pow(maxf(0.0, 1.0 - pow(r / local_rim, 2.0)), 0.8)
 		var y: float = h["min_height_m"] + surface * rng.randf_range(surface_min, 1.0)
 		ctrl.append(center + Vector3(r * cos(t), y, r * sin(t)))
+		acc += ctrl[ctrl.size() - 1].distance_to(ctrl[ctrl.size() - 2]) * 1.1
 
-	var dense := catmull_rom_centripetal(ctrl, 24)
+	return _finish(catmull_rom_centripetal(ctrl, 24), length_m)
+
+
+## Bahn fertig machen: auf `target` Meter kürzen (falls > 0) und gleichmäßig abtasten. Punktabstand aus
+## balancing.json → cable.path_spacing_m (kurze Kabel wenige Punkte, lange viele).
+static func _finish(dense: PackedVector3Array, target: float) -> CablePath:
+	var c: Dictionary = Balancing.cable
+	if target > 0.0:
+		dense = cut_to_length(dense, target)
+	var len := polyline_length(dense)
+	var segs := int(c["path_samples"])
+	if target > 0.0:
+		segs = clampi(ceili(len / float(c.get("path_spacing_m", 0.25))), int(c.get("path_samples_min", 6)),
+			int(c.get("path_samples_max", 500)))
 	var path := CablePath.new()
-	path.points = resample_even(dense, int(c["path_samples"]))
+	path.points = resample_even(dense, segs)
 	path.length = polyline_length(path.points)
 	return path
+
+
+## Polylinie nach `length` Metern abschneiden (ist sie kürzer, bleibt sie, wie sie ist).
+static func cut_to_length(pts: PackedVector3Array, length: float) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	if pts.size() < 2:
+		return pts
+	out.append(pts[0])
+	var acc := 0.0
+	for i in range(1, pts.size()):
+		var d := pts[i].distance_to(pts[i - 1])
+		if acc + d >= length:
+			out.append(pts[i - 1].lerp(pts[i], (length - acc) / maxf(d, 1e-6)))
+			return out
+		acc += d
+		out.append(pts[i])
+	return out  # kürzer als gewünscht (selten): lieber etwas kürzer als ein gerader Stab
+
+
+## Grobe Länge der Stützpunkte (Kurve wird etwas länger)
+static func _ctrl_length(ctrl: PackedVector3Array) -> float:
+	return polyline_length(ctrl) * 1.1
 
 
 ## Radius-Faktor des welligen Haufenrands in Richtung `angle` (1 = Nennradius)
@@ -113,7 +155,8 @@ static func _rim_phases(center: Vector3) -> Vector3:
 
 ## Einzelnes Kabel, das quer über den Boden läuft (Zufallsweg mit leichten Kurven).
 ## Index 0 ist ein Ende auf dem Boden, an dem man es greifen kann.
-static func generate_scatter_path(rng: RandomNumberGenerator, center: Vector3, area_radius: float) -> CablePath:
+static func generate_scatter_path(rng: RandomNumberGenerator, center: Vector3, area_radius: float,
+		length_m: float = -1.0) -> CablePath:
 	var sc: Dictionary = Balancing.zone.get("scatter", {})
 	var ctrl := PackedVector3Array()
 	var r := sqrt(rng.randf()) * area_radius
@@ -122,17 +165,17 @@ static func generate_scatter_path(rng: RandomNumberGenerator, center: Vector3, a
 	var heading := rng.randf() * TAU
 	var count := rng.randi_range(int(sc.get("points_min", 5)), int(sc.get("points_max", 8)))
 	var turn := deg_to_rad(float(sc.get("turn_max_deg", 70.0)))
-	for i in count:
+	var i_sc := 0
+	var acc_sc := 0.0
+	while i_sc < count or (length_m > 0.0 and acc_sc < length_m * 1.1 and i_sc < 400):
+		i_sc += 1
 		pos.y = rng.randf_range(float(sc.get("height_min_m", 0.06)), float(sc.get("height_max_m", 0.16)))
 		ctrl.append(pos)
 		heading += rng.randf_range(-turn, turn)
 		var step := rng.randf_range(float(sc.get("step_min_m", 1.8)), float(sc.get("step_max_m", 3.2)))
 		pos += Vector3(cos(heading), 0.0, sin(heading)) * step
-	var dense := catmull_rom_centripetal(ctrl, 16)
-	var path := CablePath.new()
-	path.points = resample_even(dense, int(Balancing.cable["path_samples"]))
-	path.length = polyline_length(path.points)
-	return path
+		acc_sc += step
+	return _finish(catmull_rom_centripetal(ctrl, 16), length_m)
 
 
 ## Kabel, das eine Straße entlang liegt: vom greifbaren Ende `start` aus in Richtung `dir`, `length` Meter,
@@ -149,11 +192,7 @@ static func generate_street_path(rng: RandomNumberGenerator, start: Vector3, dir
 		var p := start + forward * (t * length) + side * lateral
 		p.y = start.y + rng.randf_range(0.06, 0.14)
 		ctrl.append(p)
-	var dense := catmull_rom_centripetal(ctrl, 12)
-	var path := CablePath.new()
-	path.points = resample_even(dense, int(Balancing.cable["path_samples"]))
-	path.length = polyline_length(path.points)
-	return path
+	return _finish(catmull_rom_centripetal(ctrl, 12), length)
 
 
 ## Zentripetale Catmull-Rom-Kurve durch alle Punkte; `steps` Abtastungen pro Segment.

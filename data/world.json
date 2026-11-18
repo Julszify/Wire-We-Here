@@ -233,8 +233,8 @@
 				],
 				"street_cables": 900,
 				"street_length_m": [
-					14,
-					30
+					0.5,
+					100
 				],
 				"segment_heaps": {
 					"count": 20,
@@ -355,8 +355,8 @@
 				],
 				"street_cables": 1000,
 				"street_length_m": [
-					12,
-					26
+					0.5,
+					100
 				],
 				"extra_heaps": [
 					{
@@ -513,8 +513,8 @@
 				},
 				"street_cables": 1500,
 				"street_length_m": [
-					12,
-					26
+					0.5,
+					100
 				],
 				"extra_heaps": [
 					{
@@ -646,8 +646,8 @@
 				},
 				"street_cables": 1500,
 				"street_length_m": [
-					14,
-					28
+					0.5,
+					100
 				],
 				"extra_heaps": [
 					{
@@ -775,8 +775,8 @@
 				},
 				"street_cables": 1500,
 				"street_length_m": [
-					14,
-					28
+					0.5,
+					100
 				],
 				"extra_heaps": [
 					{

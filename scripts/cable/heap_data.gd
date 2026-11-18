@@ -30,6 +30,13 @@ func _init(heap_id: int = 0, heap_seed: int = 0, heap_center: Vector3 = Vector3.
 	peak_height = peak if peak > 0.0 else float(Balancing.heap["peak_extra_height_m"])
 
 
+## Kabelzahl aus world.json / zone.json mal balancing.json → cable.count_factor (mindestens 1)
+static func scaled(count: int) -> int:
+	if count <= 0:
+		return 0
+	return maxi(1, roundi(count * float(Balancing.cable.get("count_factor", 1.0))))
+
+
 func cable_seed(index: int) -> int:
 	return hash([rng_seed, index])
 

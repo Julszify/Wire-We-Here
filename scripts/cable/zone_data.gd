@@ -14,13 +14,13 @@ static func from_config(zone_seed: int) -> ZoneData:
 	zone.rng_seed = zone_seed
 	var hid := 0
 	for h: Dictionary in z.get("heaps", []):
-		zone.heaps.append(HeapData.new(hid, hash([zone_seed, hid]), _vec(h["center"]), int(h["count"]),
+		zone.heaps.append(HeapData.new(hid, hash([zone_seed, hid]), _vec(h["center"]), HeapData.scaled(int(h["count"])),
 			float(h["radius"]), float(h["peak_height"]), HeapData.Kind.HEAP))
 		zone.heaps[-1].name = String(h.get("name", ""))
 		hid += 1
 	var sc: Dictionary = z.get("scatter", {})
 	if int(sc.get("count", 0)) > 0:
-		zone.heaps.append(HeapData.new(hid, hash([zone_seed, hid]), _vec(sc["center"]), int(sc["count"]),
+		zone.heaps.append(HeapData.new(hid, hash([zone_seed, hid]), _vec(sc["center"]), HeapData.scaled(int(sc["count"])),
 			float(sc["radius"]), -1.0, HeapData.Kind.SCATTER))
 	return zone
 

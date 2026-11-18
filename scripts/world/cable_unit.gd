@@ -124,7 +124,7 @@ static func _barrier(city: CityWorld, b: Dictionary, index: int) -> CableUnit:
 	var r := float(b["radius_m"])
 	u.center = city.to_scene(hc)
 	u.half = Vector2(r, r)
-	var heap := HeapData.new(9000 + index, hash([int(b.get("seed", 1)), u.id]), u.center, int(b["count"]), r,
+	var heap := HeapData.new(9000 + index, hash([int(b.get("seed", 1)), u.id]), u.center, HeapData.scaled(int(b["count"])), r,
 		float(b["peak_m"]), HeapData.Kind.HEAP)
 	heap.name = u.name
 	u.heaps.append(heap)
@@ -161,7 +161,7 @@ static func _site(city: CityWorld, cfg: Dictionary, index: int) -> CableUnit:
 	for e: Dictionary in cfg.get("heaps", []):
 		var at := city.to_scene(WorldLayout._v2(e["at"]))
 		var h := HeapData.new(hid, hash([int(cfg.get("seed", 1)), u.id, hid]), at + Vector3(0, float(e.get("lift_m", 0.0)), 0),
-			int(e["count"]), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
+			HeapData.scaled(int(e["count"])), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
 		h.name = "%s, %s" % [u.name, String(e.get("name", "Haufen"))]
 		u.heaps.append(h)
 		hid += 1
@@ -199,7 +199,7 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 	for e: Dictionary in extra:
 		var at := WorldLayout._v2(e["at"])
 		var big := HeapData.new(hid, hash([int(cfg.get("seed", 1)), String(e.get("name", "")), hid]), city.to_scene(at),
-			int(e["count"]), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
+			HeapData.scaled(int(e["count"])), float(e["radius"]), float(e["peak"]), HeapData.Kind.HEAP)
 		big.name = "%s, %s" % [u.name, String(e.get("name", "Haufen"))]
 		u.heaps.append(big)
 		hid += 1
@@ -218,7 +218,7 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 	for k in wanted:
 		var p: Vector2 = crossings.pop_at(rng.randi_range(0, crossings.size() - 1))
 		var heap := HeapData.new(hid, rng.randi(), city.to_scene(p),
-			rng.randi_range(int(cfg["heap_count"][0]), int(cfg["heap_count"][1])),
+			HeapData.scaled(rng.randi_range(int(cfg["heap_count"][0]), int(cfg["heap_count"][1]))),
 			rng.randf_range(float(cfg["heap_radius"][0]), float(cfg["heap_radius"][1])),
 			rng.randf_range(float(cfg["heap_peak"][0]), float(cfg["heap_peak"][1])), HeapData.Kind.HEAP)
 		heap.name = "%s, Kreuzung" % u.name
@@ -247,7 +247,7 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 		for k in mini(int(seg.get("count", 0)), spots.size()):
 			var p: Vector2 = spots.pop_at(rng.randi_range(0, spots.size() - 1))
 			var heap := HeapData.new(hid, rng.randi(), city.to_scene(p),
-				rng.randi_range(int(seg["heap_count"][0]), int(seg["heap_count"][1])),
+				HeapData.scaled(rng.randi_range(int(seg["heap_count"][0]), int(seg["heap_count"][1]))),
 				rng.randf_range(float(seg["heap_radius"][0]), float(seg["heap_radius"][1])),
 				rng.randf_range(float(seg["heap_peak"][0]), float(seg["heap_peak"][1])), HeapData.Kind.HEAP)
 			heap.name = "%s, Straße" % u.name
@@ -255,7 +255,7 @@ static func _district(city: CityWorld, d: Dictionary, index: int) -> CableUnit:
 			hid += 1
 
 	# Einzelne Kabel entlang der Straßen (je ein "Haufen" mit einem Kabel)
-	for k in int(cfg.get("street_cables", 0)):
+	for k in HeapData.scaled(int(cfg.get("street_cables", 0))):
 		var along_x := rng.randf() < 0.5
 		var line: float = (zs if along_x else xs)[rng.randi_range(0, (zs if along_x else xs).size() - 1)]
 		var length := rng.randf_range(float(cfg["street_length_m"][0]), float(cfg["street_length_m"][1]))

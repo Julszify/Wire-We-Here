@@ -45,16 +45,19 @@ static func from_seed(cable_id: int, cable_seed: int, center: Vector3, heap: Hea
 	d.id = cable_id
 	d.rng_seed = cable_seed
 	d.heap_center = center
-	# Reihenfolge der Zufallsaufrufe nicht ändern, sonst ändern sich alle Haufen
+	# Reihenfolge der Zufallsaufrufe nicht ändern, sonst ändern sich alle Haufen.
+	# Erst die Länge, dann die Bahn genau so lang: ein 0,5-m-Stummel sieht kurz aus, ein 100-m-Kabel lang.
+	d.length_m = rng.randf_range(c["length_min_m"], c["length_max_m"])
+	if heap and heap.kind == HeapData.Kind.STREET:
+		d.length_m = heap.radius  # Straßenkabel: so lang, wie es auf der Straße liegt
 	if heap and heap.kind == HeapData.Kind.SCATTER:
-		d.path = CablePath.generate_scatter_path(rng, center, heap.radius)
+		d.path = CablePath.generate_scatter_path(rng, center, heap.radius, d.length_m)
 	elif heap and heap.kind == HeapData.Kind.STREET:
 		d.path = CablePath.generate_street_path(rng, center, heap.dir, heap.radius)
 	elif heap:
-		d.path = CablePath.generate_heap_path(rng, center, heap.radius, heap.peak_height)
+		d.path = CablePath.generate_heap_path(rng, center, heap.radius, heap.peak_height, d.length_m)
 	else:
-		d.path = CablePath.generate_heap_path(rng, center)
-	d.length_m = rng.randf_range(c["length_min_m"], c["length_max_m"])
+		d.path = CablePath.generate_heap_path(rng, center, -1.0, -1.0, d.length_m)
 
 	var knot_count := 0
 	if rng.randf() < float(c["knot_chance"]):
