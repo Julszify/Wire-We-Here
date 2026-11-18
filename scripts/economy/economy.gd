@@ -166,7 +166,20 @@ func bag_capacity() -> int:
 
 
 func can_buy(upgrade_id: String) -> bool:
-	return not is_locked(upgrade_id) and not is_maxed(upgrade_id) and state.money >= cost(upgrade_id) - 1e-6
+	return not is_locked(upgrade_id) and not is_maxed(upgrade_id) and not progress_locked(upgrade_id) \
+		and state.money >= cost(upgrade_id) - 1e-6
+
+
+## Viertel am Netz, die die nächste Stufe braucht (balancing.json → upgrades.<id>.progress je Stufe; 0 = sofort)
+func progress_needed(upgrade_id: String) -> int:
+	var req: Array = Balancing.upgrades.get(upgrade_id, {}).get("progress", [])
+	var lvl := state.level(upgrade_id)
+	return int(req[lvl]) if lvl < req.size() else 0
+
+
+## Nächste Stufe noch gesperrt, weil zu wenige Viertel am Netz sind?
+func progress_locked(upgrade_id: String) -> bool:
+	return progress_needed(upgrade_id) > RackPlan.districts_online(state)
 
 
 ## Wirkungsfaktor eines Upgrades: effect_factor ^ Stufe (1.0 ohne Upgrade)

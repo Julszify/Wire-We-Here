@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_finale_gate()
 	_test_money_sinks()
 	_test_rope()
+	_test_progress_gates()
 	print("ALLE TESTS OK" if _failed == 0 else "%d TEST(S) FEHLGESCHLAGEN" % _failed)
 	get_tree().quit(1 if _failed > 0 else 0)
 
@@ -158,6 +159,25 @@ func _test_economy() -> void:
 	var c1 := eco.cost("extra_reel")
 	eco.buy("extra_reel")
 	_check(eco.cost("extra_reel") > c1, "Motorrolle wird teurer")
+	eco.queue_free()
+
+
+## Upgrade-Stufen hängen an „Viertel am Netz“ (Schrank voll)
+func _test_progress_gates() -> void:
+	var eco := Economy.new()
+	add_child(eco)
+	eco.state.money = 1e9
+	_check(RackPlan.districts_online(eco.state) == 0 and eco.progress_locked("vacuum"), "Kabelsauger erst mit Campus am Netz")
+	_check(not eco.buy("vacuum"), "Gesperrte Stufe lässt sich nicht kaufen")
+	var campus: Dictionary = RackPlan.sections()[0]
+	for p in range(int(campus["first_port"]), int(campus["first_port"]) + int(campus["count"])):
+		eco.state.add_port(p)
+	_check(RackPlan.districts_online(eco.state) == 1 and eco.buy("vacuum"), "Campus am Netz: Kabelsauger kaufbar")
+	eco.buy("vacuum_power")
+	eco.buy("vacuum_power")
+	eco.buy("vacuum_power")
+	_check(eco.state.level("vacuum_power") == 3 and eco.progress_locked("vacuum_power")
+		and eco.progress_needed("vacuum_power") == 2, "Saugkraft Stufe 4 erst mit zwei Vierteln am Netz")
 	eco.queue_free()
 
 

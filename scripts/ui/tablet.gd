@@ -261,6 +261,16 @@ func _refresh_rows() -> void:
 			button.disabled = true
 			desc.text = "Benötigt Dienst „%s“ (%s)." % [RackPlan.service_name(blocker), RackPlan.service_place(blocker)]
 			desc.add_theme_color_override("font_color", UiTheme.RED)
+		elif not economy.is_maxed(id) and economy.progress_locked(id):
+			# Nächste Stufe erst, wenn genug Viertel am Netz sind
+			var need := economy.progress_needed(id)
+			var secs := RackPlan.sections()
+			var where := String(secs[mini(need, secs.size()) - 1]["name"]) if need > 0 else ""
+			button.text = "Gesperrt"
+			button.disabled = true
+			desc.text = "%s\nNächste Stufe, sobald %s am Netz ist (%d von %d Vierteln)." % [
+				economy.upgrade_description(id), where, RackPlan.districts_online(economy.state), need]
+			desc.add_theme_color_override("font_color", UiTheme.PURPLE.darkened(0.15))
 		else:
 			desc.text = economy.upgrade_description(id)
 			desc.add_theme_color_override("font_color", UiTheme.INK_SOFT)

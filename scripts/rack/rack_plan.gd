@@ -65,6 +65,22 @@ static func section_of_service(service: int) -> Dictionary:
 
 ## Ports eines Schranks, die zu Reihen gehören (ohne die Einzel-Dienste)
 ## Eingesteckte Ports eines Schranks (Fortschritt eines Viertels)
+## Viertel am Netz: Schränke, in denen alle Ports belegt sind (Fortschritt für Upgrade-Stufen)
+static func districts_online(state: GameState) -> int:
+	var counts := {}
+	for sec in sections():
+		counts[String(sec["id"])] = 0
+	for p in state.active_ports:
+		var sec := section_of_port(p)
+		if not sec.is_empty():
+			counts[String(sec["id"])] = int(counts[String(sec["id"])]) + 1
+	var n := 0
+	for sec in sections():
+		if int(counts[String(sec["id"])]) >= int(sec["count"]):
+			n += 1
+	return n
+
+
 static func section_plugged(state: GameState, section_id: String) -> int:
 	var sec := section(section_id)
 	if sec.is_empty():

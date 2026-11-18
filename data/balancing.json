@@ -54,15 +54,16 @@
 		"_kommentar": "important_pay_factor: Anteil des normalen Meterpreises, den ein wichtiges Kabel beim Aufrollen bringt"
 	},
 	"upgrades": {
+		"_kommentar_progress": "progress: je Stufe die Zahl der Viertel am Netz (Schrank voll), ab der sie gekauft werden kann; Reihenfolge Campus, Wohnviertel, Altstadt, Gamer-Viertel, Büroviertel, Lieferzentrum, Stadion, Hafen, Krater, Turm",
 		"crank": {
-			"name": "Handkurbel",
+			"name": "Handkurbel", "progress": [0],
 			"base_cost": 8.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
 			"description": "Aufstellbare Rolle mit Kurbel: 0,75 m pro Druck statt 0,25 m."
 		},
 		"grip": {
-			"name": "Festerer Griff",
+			"name": "Festerer Griff", "progress": [0, 0, 1, 1, 2, 3],
 			"base_cost": 10.0,
 			"cost_growth": 1.9,
 			"effect_factor": 1.414,
@@ -71,7 +72,7 @@
 			"_kommentar": "1,414^6 = 8: Hand (5 Klicks/s × 0,25 m) voll aufgerüstet 10 m/s, ohne Dienst-Boni"
 		},
 		"motor": {
-			"name": "Stärkere Motoren",
+			"name": "Stärkere Motoren", "progress": [0, 0, 1, 1, 2, 3, 4, 5],
 			"base_cost": 40.0,
 			"cost_growth": 2.2,
 			"effect_factor": 1.73,
@@ -80,14 +81,14 @@
 			"_kommentar": "1,73^8 = 80: Motorrolle (0,25 m/s) voll aufgerüstet 20 m/s, ohne Dienst-Boni"
 		},
 		"extra_reel": {
-			"name": "Motorrolle",
+			"name": "Motorrolle", "progress": [0, 0, 0, 1, 1, 2, 2, 3],
 			"base_cost": 15.0,
 			"cost_growth": 1.8,
 			"max_count": 8,
 			"description": "Stellt eine Motorrolle auf, die eingehängte Kabel von selbst zieht."
 		},
 		"copper": {
-			"name": "Kupferhändler",
+			"name": "Kupferhändler", "progress": [0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8],
 			"base_cost": 60.0,
 			"cost_growth": 2.3,
 			"effect_factor": 1.35,
@@ -95,7 +96,7 @@
 			"description": "Jeder Meter bringt 35 % mehr Geld."
 		},
 		"bag": {
-			"name": "Größere Tasche",
+			"name": "Größere Tasche", "progress": [0, 1, 2, 3, 4, 5],
 			"base_cost": 40.0,
 			"cost_growth": 2.0,
 			"effect_add": 2,
@@ -103,14 +104,14 @@
 			"description": "2 Knäuel mehr gleichzeitig tragen."
 		},
 		"wagon": {
-			"name": "Kabeltrommel-Wagen",
+			"name": "Kabeltrommel-Wagen", "progress": [0],
 			"base_cost": 250.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
 			"description": "Rollt dir hinterher und zieht bis zu drei Kabel gleichzeitig – auch draußen in der Stadt."
 		},
 		"auto_pull": {
-			"name": "Dauerzug",
+			"name": "Dauerzug", "progress": [0],
 			"base_cost": 30.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
@@ -118,14 +119,14 @@
 			"description": "Zieh-Taste gedrückt halten statt hämmern."
 		},
 		"vacuum": {
-			"name": "Kabelsauger",
+			"name": "Kabelsauger", "progress": [1],
 			"base_cost": 1500.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
 			"description": "Handgerät: Linksklick halten (Arm frei) saugt alle Kabelenden vor dir ein, mehrere gleichzeitig. Knoten schüttelt er selbst los."
 		},
 		"vacuum_power": {
-			"name": "Saugkraft",
+			"name": "Saugkraft", "progress": [1, 1, 1, 2, 3, 4, 5, 6],
 			"base_cost": 2500.0,
 			"cost_growth": 2.3,
 			"effect_factor": 1.5,
@@ -133,24 +134,24 @@
 			"description": "Der Kabelsauger zieht 50 % schneller."
 		},
 		"vacuum_nozzle": {
-			"name": "Breitere Düse",
+			"name": "Breitere Düse", "progress": [1, 1, 2, 3, 5, 6],
 			"base_cost": 4000.0,
 			"cost_growth": 2.5,
 			"max_count": 6,
 			"description": "Der Kabelsauger fasst 2 Kabel mehr gleichzeitig und reicht weiter."
 		},
-		"vacuum_auto": { "name": "Sauger-Dauerbetrieb", "base_cost": 6000.0, "cost_growth": 1.0, "max_count": 1, "description": "Der Kabelsauger läuft weiter, ohne dass du die Maustaste hältst: Linksklick schaltet ihn an und aus." },
-		"vacuum_cyclone": { "name": "Zyklon-Kammer", "base_cost": 20000.0, "cost_growth": 2.8, "effect_add": 3, "max_count": 4, "description": "Der Kabelsauger fasst 3 Kabel mehr gleichzeitig." },
-		"shoes": { "name": "Laufschuhe", "base_cost": 120.0, "cost_growth": 2.6, "effect_factor": 1.1, "max_count": 5, "description": "Du läufst und rennst 10 % schneller." },
+		"vacuum_auto": { "name": "Sauger-Dauerbetrieb", "progress": [1], "base_cost": 6000.0, "cost_growth": 1.0, "max_count": 1, "description": "Der Kabelsauger läuft weiter, ohne dass du die Maustaste hältst: Linksklick schaltet ihn an und aus." },
+		"vacuum_cyclone": { "name": "Zyklon-Kammer", "progress": [3, 5, 6, 8], "base_cost": 20000.0, "cost_growth": 2.8, "effect_add": 3, "max_count": 4, "description": "Der Kabelsauger fasst 3 Kabel mehr gleichzeitig." },
+		"shoes": { "name": "Laufschuhe", "progress": [0, 1, 2, 4, 6], "base_cost": 120.0, "cost_growth": 2.6, "effect_factor": 1.1, "max_count": 5, "description": "Du läufst und rennst 10 % schneller." },
 		"winch": {
-			"name": "Haufen-Winde",
+			"name": "Haufen-Winde", "progress": [1, 2, 3, 4, 5, 6],
 			"base_cost": 4000.0,
 			"cost_growth": 2.2,
 			"max_count": 6,
 			"description": "Stellt eine Winde auf, die einen Haufen in der Nähe Kabel für Kabel von selbst abrollt – auch wenn du weg bist."
 		},
 		"winch_speed": {
-			"name": "Windenmotor",
+			"name": "Windenmotor", "progress": [2, 3, 4, 5, 6, 7],
 			"base_cost": 6000.0,
 			"cost_growth": 3.0,
 			"effect_factor": 1.5,
@@ -158,14 +159,14 @@
 			"description": "Alle Haufen-Winden ziehen 50 % schneller."
 		},
 		"drone": {
-			"name": "Abräum-Drohne",
+			"name": "Abräum-Drohne", "progress": [2, 3, 3, 4, 5, 6, 7, 8],
 			"base_cost": 15000.0,
 			"cost_growth": 2.4,
 			"max_count": 8,
 			"description": "Fliegt in ihrem Einsatzgebiet von Haufen zu Haufen, rollt Kabel ab und bringt wichtige Knäuel selbst in den Serverraum."
 		},
 		"drone_speed": {
-			"name": "Drohnen-Turbo",
+			"name": "Drohnen-Turbo", "progress": [4, 5, 6, 7, 8],
 			"base_cost": 25000.0,
 			"cost_growth": 3.5,
 			"effect_factor": 1.5,
@@ -173,25 +174,25 @@
 			"description": "Drohnen ziehen und fliegen 50 % schneller."
 		},
 		"detector": {
-			"name": "Kabel-Detektor",
+			"name": "Kabel-Detektor", "progress": [1],
 			"base_cost": 300.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
 			"description": "Zeigt unten rechts, wie nah das nächste wichtige Kabel ist: kalt, lau, warm, heiß."
 		},
 		"detector_arrow": {
-			"name": "Peilantenne",
+			"name": "Peilantenne", "progress": [1],
 			"base_cost": 2500.0,
 			"cost_growth": 1.0,
 			"max_count": 1,
 			"description": "Der Detektor zeigt zusätzlich Richtung und Entfernung zum nächsten wichtigen Kabel."
 		},
 		"_kommentar_room": "Serverraum-Ausbau (room_order): teure Stufen fürs späte Spiel, jede Stufe ist im Raum zu sehen und wirkt wie ein Dienst-Bonus (bonus je Stufe; Faktor bzw. bei bag/answer_time Summe)",
-		"room_light": { "name": "Neonbeleuchtung", "base_cost": 250000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "money": 1.05 }, "description": "Leuchtleisten unter der Decke, an den Schränken und am Boden. Jede Stufe: 5 % mehr Geld pro Meter." },
-		"room_cooling": { "name": "Kühlung", "base_cost": 400000.0, "cost_growth": 3.5, "max_count": 4, "bonus": { "motor": 1.06 }, "description": "Klimageräte auf dem Dach und an den Wänden. Jede Stufe: Motorrollen und Werkzeuge ziehen 6 % schneller." },
-		"room_cables": { "name": "Kabelmanagement", "base_cost": 600000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "bag": 2, "important_pay": 1.2 }, "description": "Kabelpritschen über den Schränken, alles sauber gebündelt. Jede Stufe: 2 Knäuel mehr in der Tasche, wichtige Kabel bringen 20 % mehr." },
-		"room_monitors": { "name": "Leitstand", "base_cost": 1000000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "answer_time": 1 }, "description": "Monitorwand mit dem Stand aller Dienste. Jede Stufe: C.O.R.D. lässt dir 1 s mehr für „Nein“." },
-		"room_coffee": { "name": "Kaffeeecke", "base_cost": 150000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "press": 1.15, "walk": 1.03 }, "description": "Bank, Pflanzen, Kaffeemaschine und Sofa. Jede Stufe: 15 % mehr Handzug und 3 % schneller laufen." }
+		"room_light": { "name": "Neonbeleuchtung", "progress": [3, 5, 7], "base_cost": 250000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "money": 1.05 }, "description": "Leuchtleisten unter der Decke, an den Schränken und am Boden. Jede Stufe: 5 % mehr Geld pro Meter." },
+		"room_cooling": { "name": "Kühlung", "progress": [3, 4, 6, 8], "base_cost": 400000.0, "cost_growth": 3.5, "max_count": 4, "bonus": { "motor": 1.06 }, "description": "Klimageräte auf dem Dach und an den Wänden. Jede Stufe: Motorrollen und Werkzeuge ziehen 6 % schneller." },
+		"room_cables": { "name": "Kabelmanagement", "progress": [4, 6, 8], "base_cost": 600000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "bag": 2, "important_pay": 1.2 }, "description": "Kabelpritschen über den Schränken, alles sauber gebündelt. Jede Stufe: 2 Knäuel mehr in der Tasche, wichtige Kabel bringen 20 % mehr." },
+		"room_monitors": { "name": "Leitstand", "progress": [4, 6, 8], "base_cost": 1000000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "answer_time": 1 }, "description": "Monitorwand mit dem Stand aller Dienste. Jede Stufe: C.O.R.D. lässt dir 1 s mehr für „Nein“." },
+		"room_coffee": { "name": "Kaffeeecke", "progress": [2, 4, 6], "base_cost": 150000.0, "cost_growth": 4.0, "max_count": 3, "bonus": { "press": 1.15, "walk": 1.03 }, "description": "Bank, Pflanzen, Kaffeemaschine und Sofa. Jede Stufe: 15 % mehr Handzug und 3 % schneller laufen." }
 	},
 	"hand_crank": {
 		"_kommentar": "Erstes Werkzeug-Upgrade, aufstellbar",

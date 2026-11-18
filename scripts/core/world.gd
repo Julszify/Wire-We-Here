@@ -1025,6 +1025,7 @@ func _deliver_bag() -> void:
 
 ## Knäuel in ihre Ports stecken (Spieler am Schrank oder Drohne an der Tür)
 func _plug_items(items: Array, label_at: Vector3) -> void:
+	var online_before := RackPlan.districts_online(_economy.state)
 	var plugged := 0
 	for item: CoilItem in items:
 		if _rack.plug(item.port_id):
@@ -1043,6 +1044,11 @@ func _plug_items(items: Array, label_at: Vector3) -> void:
 		_float(label_at, "%d Knäuel eingesteckt" % plugged, Color(0.6, 1.0, 0.8))
 	if plugged > 0:
 		_fx(label_at, _look_fx(), clampf(plugged / 3.0, 1.0, 3.0))
+	var online := RackPlan.districts_online(_economy.state)
+	if online > online_before:
+		var secs := RackPlan.sections()
+		_announce("%s ist komplett am Netz! Neue Upgrade-Stufen im Tablet (%d von %d Vierteln)." % [
+			String(secs[mini(online, secs.size()) - 1]["name"]), online, secs.size()])
 
 
 func _pick_up(item: CoilItem) -> void:

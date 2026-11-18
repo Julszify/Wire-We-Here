@@ -37,7 +37,7 @@ Noch nicht enthalten: Steam-Anbindung (Lobbys, Einladungen), weitere Story-Szene
 
 ## Nächste Schritte (Ideen, noch nicht entschieden)
 
-1. **Spieltest der neuen Werkzeuge und des Finales:** Laut Verlaufs-Rechnung dauert das ganze Spiel nach Verkleinern der Karte und mit Rohrpost ca. 4:10 Stunden, ab etwa 2:30 Stunden ist alles gekauft. Die Sperren sind dann in unter einer Minute weg; die Zeit bestimmt das Finden wichtiger Kabel.
+1. **Spieltest der neuen Werkzeuge und des Finales:** Laut Verlaufs-Rechnung dauert das ganze Spiel mit Stufen nach Fortschritt ca. 4:50 Stunden; die letzten Werkzeug-Stufen kommen mit dem Hafen, der letzte Kauf nach ca. 4:10 Stunden (vorher war nach 2:40 alles gekauft). Die Sperren sind dann in unter einer Minute weg; die Zeit bestimmt das Finden wichtiger Kabel.
 2. **Geld-Senken prüfen:** Ausbau und Kosmetik binden zusammen ca. 100 Mio. €; im ersten Auftrag bleiben am Ende trotzdem ca. 260 Mio. € übrig. Der eigentliche Kreislauf ist der neue Auftrag (zweiter Durchgang mit 18 Ruf laut Verlaufs-Rechnung ca. 4 Stunden).
 3. **Story ausbauen:** C.O.R.D.-Durchsagen als Running Gag, Chefs in der Stadt, Finale mit Party und Pointe, Aufzugfahrt sichtbar machen.
 4. **Klettern, Leitern:** Höhe in der Stadt nutzen.
@@ -150,6 +150,8 @@ Sauger, Winde und Drohne ziehen mit eigenem Tempo (`ReelData.speed_factor` aus i
 **Umstellen:** Leere Handkurbeln und Motorrollen hebt man mit E auf und stellt sie mit E oder Q woanders ab (auch in der Stadt). Getragen blockiert die Rolle den Arm.
 
 Upgrade **„Dauerzug“**: Taste gedrückt halten statt wiederholt drücken.
+
+**Stufen nach Fortschritt („Viertel am Netz“):** Jedes Upgrade hat in `balancing.json` eine Liste `progress` mit der nötigen Zahl kompletter Viertel je Stufe (Viertel am Netz = alle Ports seines Schranks belegt, `RackPlan.districts_online`; Reihenfolge Campus, Wohnviertel, Altstadt, Gamer, Büro, Lieferzentrum, Stadion, Hafen, Krater, Turm). `Economy.progress_locked`/`progress_needed` prüfen das, `can_buy` beachtet es; das Tablet zeigt „Gesperrt“ mit dem nötigen Viertel, beim Einstecken meldet `world.gd`, wenn ein Viertel komplett ist. Beispiele: Sauger und Detektor ab Campus, Winde ab Campus, Drohnen ab Wohnviertel, Zyklon-Kammer ab Altstadt; die letzten Stufen erst gegen Ende.
 
 **Steuerung (Eingabe-Aktionen in project.godot):** WASD laufen, Shift rennen, Leertaste springen, Maus umsehen, Esc Maus freigeben.
 E: Kabelende greifen (beide Enden eines Kabels sind greifbar; am hinteren Ende gegriffen, dreht `CableData.reverse()` die Bahn um), Kabel vom Arm an anvisierte Rolle hängen, Knoten lösen (3 Drücke), Knäuel aufheben bzw. im Serverraum alle Knäuel aus der Tasche einstecken.
@@ -283,3 +285,4 @@ Maßgeblich ist `data/balancing.json` (alle Werte dort, nicht im Code).
 - ✅ Startmenü mit Einstellungen; Koop für 2–4 Spieler über IP (Host rechnet, Clients schicken Absichten)
 - ✅ Kabel flüssiger (schnelleres Formen, Verbindungsstück als weiches Seil)
 - ✅ Nach Spieltest: Straßen auf dem Gelände mit Kollision, Kosmetik ohne Sprenkel, wichtige Kabel golden pulsierend, Rohrpost-Stationen, Karte verkleinert
+- ✅ Upgrade-Stufen nach Fortschritt (Viertel am Netz)
